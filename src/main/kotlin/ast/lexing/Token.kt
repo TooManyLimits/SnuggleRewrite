@@ -1,4 +1,4 @@
-package lexing
+package ast.lexing
 
 import errors.LexingException
 import java.math.BigInteger
@@ -47,8 +47,12 @@ fun tokenOf(loc: Loc, string: String): Token? {
         return null
 
     val type: TokenType = when(string) {
+
+        "let" -> TokenType.LET
+
         "+" -> TokenType.PLUS
         "-" -> TokenType.MINUS
+        "=" -> TokenType.EQUALS
 
         else -> return when {
             //Identifiers
@@ -76,8 +80,11 @@ enum class TokenType {
     LITERAL,
     IDENTIFIER,
 
+    LET,
+
     PLUS,
-    MINUS
+    MINUS,
+    EQUALS
 }
 
 data class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: Int)

@@ -1,5 +1,6 @@
-package lexing
+package ast.lexing
 
+import errors.ParsingException
 import java.io.StringReader
 import java.util.Scanner
 
@@ -26,6 +27,11 @@ class Lexer(val fileName: String, private val scanner: Scanner): Iterable<Token>
     fun check(vararg types: TokenType): Boolean = peek()?.type in types // Check if the next token is one of the given types
     fun consume(type: TokenType): Boolean = check(type).also { if (it) advance() } // Consume the next token if it's the given type
     fun consume(vararg types: TokenType): Boolean = check(*types).also { if (it) advance() } // Consume the next token if it's one of the given types
+    fun expect(type: TokenType): Token = take().let {// Expect the next token to be of the given type, if it isn't, then throw an error
+        if (it?.type != type)
+            throw ParsingException("$type", "${it?.type ?: "End of file"}", it?.loc ?: curLoc)
+        else it
+    }
     override fun iterator(): Iterator<Token> = object : Iterator<Token> {
         override fun hasNext(): Boolean = !isDone()
         override fun next(): Token = take()!!

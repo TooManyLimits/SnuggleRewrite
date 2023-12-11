@@ -1,7 +1,13 @@
-fun main(args: Array<String>) {
-    println("Hello World!")
+import ast.parsing.parseFile
+import ast.lexing.Lexer
+import ast.parsing.parseFileLazy
 
-    // Try adding program arguments via Run/Debug configuration.
-    // Learn more about running applications: https://www.jetbrains.com/help/idea/running-applications.html.
-    println("Program arguments: ${args.joinToString()}")
+fun main(args: Array<String>) {
+
+    val code = "let x = 5 x + 3"
+    val lexer = Lexer("main", code)
+
+    val file = parseFileLazy(lexer)
+    file.value.elements.forEach(::println)
+
 }

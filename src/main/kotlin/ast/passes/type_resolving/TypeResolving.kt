@@ -1,2 +1,2 @@
-package ast.passes
+package ast.passes.type_resolving
 

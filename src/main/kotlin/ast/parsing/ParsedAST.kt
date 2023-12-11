@@ -1,4 +1,4 @@
-package ast.passes.parsing
+package ast.parsing
 
 import ast.lexing.Loc
 import util.ConsList
@@ -34,7 +34,8 @@ sealed interface ParsedElement {
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
-        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: ConsList<ParsedExpr>): ParsedExpr
+        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: ConsList<ParsedExpr>):
+            ParsedExpr
 
         //... etc
     }
@@ -54,7 +55,8 @@ sealed interface ParsedPattern {
 //    object Empty : ParsedPattern // _
 //    data class Literal(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
 //    data class And(override val loc: Loc, val pats: ConsList<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
-    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
+    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?):
+    ParsedPattern
 //    data class Tuple(override val loc: Loc, val elements: ConsList<ParsedPattern>): ParsedPattern // (mut a, b: i32)
 
 }

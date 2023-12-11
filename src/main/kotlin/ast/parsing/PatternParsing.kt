@@ -1,6 +1,5 @@
-package ast.passes.parsing
+package ast.parsing
 
-import ast.ParsedPattern
 import ast.lexing.Lexer
 import ast.lexing.TokenType
 

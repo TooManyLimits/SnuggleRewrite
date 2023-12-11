@@ -1,6 +1,5 @@
-package ast.passes.parsing
+package ast.parsing
 
-import ast.ParsedElement
 import ast.lexing.Lexer
 
 /**

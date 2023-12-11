@@ -1,9 +1,9 @@
-package ast.passes.parsing
+package ast.parsing
 
-import ast.ParsedElement.*
-import errors.ParsingException
+import ast.parsing.ParsedElement.*
 import ast.lexing.Lexer
 import ast.lexing.TokenType
+import errors.ParsingException
 import util.ConsList
 
 /**
