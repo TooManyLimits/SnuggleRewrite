@@ -3,7 +3,7 @@ package util
 import util.ConsList.Companion.nil
 
 
-sealed interface ConsList<T> : Iterable<T> {
+sealed interface ConsList<out T> : Iterable<T> {
 
     fun <R> map(func: (elem: T) -> R): ConsList<R> {
         return when (this) {
@@ -24,6 +24,10 @@ sealed interface ConsList<T> : Iterable<T> {
             is Nil<T> -> nil()
             is Cons<T> -> if (func(elem)) Cons(elem, rest.filter(func)) else rest.filter(func)
         }
+    }
+
+    fun <K> associate(func: (T) -> K): ConsMap<K, T> {
+        return map { e -> Pair(func(e), e) }
     }
 
     fun reverse(): ConsList<T> {
