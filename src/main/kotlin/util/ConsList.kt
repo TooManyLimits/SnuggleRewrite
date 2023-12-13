@@ -1,7 +1,5 @@
 package util
 
-import util.ConsList.Companion.nil
-
 
 sealed interface ConsList<out T> : Iterable<T> {
 
@@ -19,6 +17,13 @@ sealed interface ConsList<out T> : Iterable<T> {
         }
     }
 
+    fun <R> flatMap(func: (elem: T) -> ConsList<R>): ConsList<R> {
+        return when (this) {
+            is Nil<T> -> nil()
+            is Cons<T> -> func(elem).append(rest.flatMap(func))
+        }
+    }
+
     fun filter(func: (T) -> Boolean): ConsList<T> {
         return when (this) {
             is Nil<T> -> nil()
@@ -26,8 +31,8 @@ sealed interface ConsList<out T> : Iterable<T> {
         }
     }
 
-    fun <K> associate(func: (T) -> K): ConsMap<K, T> {
-        return map { e -> Pair(func(e), e) }
+    fun <K> associate(getKey: (T) -> K): ConsMap<K, T> {
+        return ConsMap(map { e -> Pair(getKey(e), e) })
     }
 
     fun reverse(): ConsList<T> {
@@ -49,6 +54,14 @@ sealed interface ConsList<out T> : Iterable<T> {
         }
     }
 }
+
+fun <T> ConsList<T>.append(other: ConsList<T>): ConsList<T> {
+    return when (this) {
+        is Nil<T> -> other
+        is Cons<T> -> Cons(elem, rest.append(other))
+    }
+}
+
 
 class Nil<T> private constructor() : ConsList<T> {
     init {

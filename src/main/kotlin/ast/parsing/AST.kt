@@ -14,7 +14,7 @@ import util.ConsMap
 data class ParsedAST(val files: ConsMap<String, Lazy<ParsedFile>>)
 
 //But entire files are parsed together, as one unit.
-data class ParsedFile(val name: String, val elements: ConsList<ParsedElement>)
+data class ParsedFile(val name: String, val block: ParsedElement.ParsedExpr.Block)
 
 // Parsed elements
 sealed interface ParsedElement {
@@ -37,9 +37,9 @@ sealed interface ParsedElement {
 
     sealed interface ParsedExpr: ParsedElement {
 
-//        data class Import(override val loc: Loc, val path: String): ParsedExpr
+        data class Import(override val loc: Loc, val path: String): ParsedExpr
 
-        data class Block(override val loc: Loc, val exprs: ConsList<ParsedExpr>): ParsedExpr
+        data class Block(override val loc: Loc, val elements: ConsList<ParsedElement>): ParsedExpr
         data class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr

@@ -51,7 +51,7 @@ data class ImportResolvedAST(
     val allTypes: ConsList<ImportResolvedTypeDef> // All type definitions in the program.
 )
 
-data class ImportResolvedFile(val name: String, val code: ConsList<ImportResolvedExpr>)
+data class ImportResolvedFile(val name: String, val block: ImportResolvedExpr.Block)
 
 sealed interface ImportResolvedTypeDef {
 
