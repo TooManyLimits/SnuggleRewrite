@@ -11,6 +11,6 @@ internal fun parseType(lexer: Lexer): ParsedType {
 //    }
 
     val ident = lexer.expect(TokenType.IDENTIFIER)
-    return ParsedType.Basic(ident.loc, ident.string(), nil())
+    return ParsedType.Basic(ident.loc, ident.string(), listOf())
 
 }

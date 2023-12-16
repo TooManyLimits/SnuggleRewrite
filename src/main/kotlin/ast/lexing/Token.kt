@@ -48,7 +48,12 @@ fun tokenOf(loc: Loc, string: String): Token? {
 
     val type: TokenType = when(string) {
 
+        "import" -> TokenType.IMPORT
+
         "let" -> TokenType.LET
+
+        ":" -> TokenType.COLON
+        ";" -> TokenType.SEMICOLON
 
         "+" -> TokenType.PLUS
         "-" -> TokenType.MINUS
@@ -69,6 +74,26 @@ fun tokenOf(loc: Loc, string: String): Token? {
                 string.contains('u') -> Token(loc, TokenType.LITERAL, IntLiteralData(BigInteger(string.substring(0, string.indexOf('u'))), false, string.substring(string.indexOf('u') + 1).toInt()))
                 else -> Token(loc, TokenType.LITERAL, BigInteger(string))
             }
+            //Strings
+            (string[0] == '"') -> when {
+                string.length == 1 || !string.endsWith('"') -> throw LexingException("Encountered unmatched quote", loc)
+                else -> {
+                    val builder: StringBuilder = StringBuilder()
+                    var i = 1
+                    while (i < string.length - 1) {
+                        val c = string[i]
+                        if (c == '\\') {
+                            val escaped = handleEscape(string, i, loc)
+                            i = escaped.second
+                            builder.append(escaped.first)
+                        } else {
+                            builder.append(c)
+                        }
+                        i++
+                    }
+                    Token(loc, TokenType.STRING_LITERAL, builder.toString())
+                }
+            }
             else -> throw LexingException(string, loc)
         }
     }
@@ -78,13 +103,69 @@ fun tokenOf(loc: Loc, string: String): Token? {
 
 enum class TokenType {
     LITERAL,
+    STRING_LITERAL,
     IDENTIFIER,
+
+    IMPORT,
 
     LET,
 
+    COLON,
+    SEMICOLON,
+
     PLUS,
     MINUS,
-    EQUALS
+    EQUALS,
 }
 
 data class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: Int)
+
+
+// Parse an escape character
+private fun handleEscape(string: String, startIndex: Int, loc: Loc): Pair<Char, Int> {
+    var index = startIndex + 1
+    val next = string[index]
+    return when (next) {
+        'b' -> '\b'
+        't' -> '\t'
+        'n' -> '\n'
+        'f' -> '\u000C'
+        'r' -> '\r'
+        '\'' -> '\''
+        '"' -> '"'
+        '\\' -> '\\'
+        'u' -> {
+            var num = 0
+            for (j: Int in 0 until 4) {
+                index++
+                num = num * 16 + string[index].digitToInt(16)
+            }
+            num.toChar()
+        }
+        '0', '1', '2', '3' -> {
+            val digit2 = string[index + 1]
+            if (digit2 in '0'..'7') {
+                val digit3 = string[index + 2]
+                if (digit3 in '0'..'7') {
+                    index += 2
+                    (next.digitToInt(8) * 64 + digit2.digitToInt(8) * 8 + digit3.digitToInt(8)).toChar()
+                } else {
+                    index += 1
+                    (next.digitToInt(8) * 8 + digit2.digitToInt(8)).toChar()
+                }
+            } else {
+                next.digitToInt(8).toChar()
+            }
+        }
+        '4', '5', '6', '7' -> {
+            val digit2 = string[index + 1]
+            if (digit2 in '0'..'7') {
+                index += 1
+                (next.digitToInt(8) * 8 + digit2.digitToInt(8)).toChar();
+            } else {
+                next.digitToInt(8).toChar()
+            }
+        }
+        else -> throw LexingException("Illegal escape character \"\\" + next + "\"", loc)
+    } to index
+}

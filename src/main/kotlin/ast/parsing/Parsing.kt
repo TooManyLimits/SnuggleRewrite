@@ -1,9 +1,7 @@
 package ast.parsing
 
 import ast.lexing.Lexer
-import util.Cons
-import util.ConsList
-import util.ConsList.Companion.nil
+import ast.lexing.Loc
 
 /**
  * Program parsing !
@@ -12,8 +10,9 @@ import util.ConsList.Companion.nil
 fun parseFileLazy(lexer: Lexer): Lazy<ParsedFile> = lazy { parseFile(lexer) }
 
 fun parseFile(lexer: Lexer): ParsedFile {
-    var elems: ConsList<ParsedElement> = nil()
+    val elems: ArrayList<ParsedElement> = ArrayList()
     while (!lexer.isDone())
-        elems = Cons(parseElement(lexer), elems)
-    return ParsedFile(lexer.fileName, elems.reverse())
+        elems += parseElement(lexer)
+    val loc = lexer.curLoc.merge(Loc(1, 0, 1, 0, lexer.fileName))
+    return ParsedFile(lexer.fileName, ParsedElement.ParsedExpr.Block(loc, elems))
 }

@@ -1,5 +1,9 @@
 package builtins
 
+import ast.typing.FieldDef
+import ast.typing.MethodDef
+import ast.typing.TypeDef
+
 /**
  * A type that is defined through Java code, not through
  * Snuggle code. These are injected to the AST while
@@ -28,5 +32,11 @@ interface BuiltinType {
     // there is no class associated with them. This is why it's
     // optional.
     val runtimeName: String?
+
+    // Get the fields of this type, given the generics.
+    fun getFields(generics: List<TypeDef>): List<FieldDef> = listOf() //listOf() for now
+
+    // Get the methods of this type, given the generics.
+    fun getMethods(generics: List<TypeDef>): List<MethodDef> = listOf() //listOf() for now
 
 }

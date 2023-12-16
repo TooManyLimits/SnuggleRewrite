@@ -31,7 +31,7 @@ sealed interface ConsList<out T> : Iterable<T> {
         }
     }
 
-    fun <K> associate(getKey: (T) -> K): ConsMap<K, T> {
+    fun <K> associateBy(getKey: (T) -> K): ConsMap<K, T> {
         return ConsMap(map { e -> Pair(getKey(e), e) })
     }
 

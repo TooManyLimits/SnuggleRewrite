@@ -47,29 +47,30 @@ import util.ConsMap
 
 data class ImportResolvedAST(
     // All files used in the program. (No longer lazy. Things that are never imported do not appear, and were never parsed.)
-    val allFiles: ConsMap<String, ImportResolvedFile>,
-    val allTypes: ConsList<ImportResolvedTypeDef> // All type definitions in the program.
+    val allFiles: Map<String, ImportResolvedFile>,
+    //val allTypes: Set<ImportResolvedTypeDef> // All type definitions in the program.
 )
 
-data class ImportResolvedFile(val name: String, val block: ImportResolvedExpr.Block)
+data class ImportResolvedFile(val name: String, val code: ImportResolvedExpr)
 
 sealed interface ImportResolvedTypeDef {
-
-    data class Builtin(val builtin: BuiltinType): ImportResolvedTypeDef
-
+    data class Builtin(val builtin: BuiltinType): ImportResolvedTypeDef {
+        override fun equals(other: Any?): Boolean = this === other
+        override fun hashCode(): Int = System.identityHashCode(this)
+    }
 }
 
 sealed interface ImportResolvedExpr {
     val loc: Loc
 
-    data class Import(override val loc: Loc, val file: ImportResolvedFile): ImportResolvedExpr
+    data class Import(override val loc: Loc, val file: String): ImportResolvedExpr
 
-    data class Block(override val loc: Loc, val exprs: ConsList<ImportResolvedExpr>): ImportResolvedExpr
+    data class Block(override val loc: Loc, val exprs: List<ImportResolvedExpr>): ImportResolvedExpr
     data class Declaration(override val loc: Loc, val pattern: ImportResolvedPattern, val initializer: ImportResolvedExpr): ImportResolvedExpr
 
     data class Literal(override val loc: Loc, val value: Any): ImportResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ImportResolvedExpr
-    data class MethodCall(override val loc: Loc, val receiver: ImportResolvedExpr, val methodName: String, val args: ConsList<ImportResolvedExpr>): ImportResolvedExpr
+    data class MethodCall(override val loc: Loc, val receiver: ImportResolvedExpr, val methodName: String, val args: List<ImportResolvedExpr>): ImportResolvedExpr
 }
 
 sealed interface ImportResolvedPattern {
@@ -82,5 +83,5 @@ sealed interface ImportResolvedType {
     val loc: Loc
 
     //Note: Now a DIRECT REFERENCE to an ImportResolvedTypeDef, rather than a mere String. This is the *primary reason for this AST pass*.
-    data class Basic(override val loc: Loc, val base: ImportResolvedTypeDef, val generics: ConsList<ImportResolvedType>): ImportResolvedType
+    data class Basic(override val loc: Loc, val base: ImportResolvedTypeDef, val generics: List<ImportResolvedType>): ImportResolvedType
 }

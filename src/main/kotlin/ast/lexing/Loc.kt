@@ -14,6 +14,10 @@ data class Loc(val startRow: Int, val startCol: Int, val endRow: Int, val endCol
     override fun toString(): String = "$startRow:$startCol in file \"$fileName\""
 
     companion object {
+
+        // A loc which should never end up as part of an error report
+        val NEVER: Loc = Loc(-1,-3,-3,-7,"Should never happen. If you see this location in an error, there's a bug in the compiler - please report!")
+
         private fun getFirst(row1: Int, col1: Int, row2: Int, col2: Int): Pair<Int, Int> {
             return if (row1 < row2)
                 Pair(row1, col1)
@@ -37,5 +41,3 @@ data class Loc(val startRow: Int, val startCol: Int, val endRow: Int, val endCol
         }
     }
 }
-
-

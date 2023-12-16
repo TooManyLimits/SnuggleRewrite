@@ -28,7 +28,7 @@ private fun parseBinary(lexer: Lexer, precedence: Int): ParsedExpr {
         }
         val rhs = parseBinary(lexer, rhsPrecedence)
         val loc = lhs.loc.merge(rhs.loc)
-        lhs = ParsedExpr.MethodCall(loc, lhs, methodName, ConsList.of(rhs))
+        lhs = ParsedExpr.MethodCall(loc, lhs, methodName, listOf(rhs))
     }
     return lhs
 }
@@ -42,7 +42,7 @@ private fun parseUnary(lexer: Lexer): ParsedExpr {
         }
         val operand = parseUnary(lexer)
         val loc = tok.loc.merge(operand.loc)
-        return ParsedExpr.MethodCall(loc, operand, methodName, ConsList.of())
+        return ParsedExpr.MethodCall(loc, operand, methodName, listOf())
     }
     return parseUnit(lexer)
 }
@@ -51,7 +51,9 @@ private fun parseUnit(lexer: Lexer): ParsedExpr {
     return when(lexer.take()?.type) {
         null -> throw ParsingException(expected = "Expression", found = "End of file", loc = lexer.curLoc)
 
-        TokenType.LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value ?: println(lexer.last().type))
+        TokenType.IMPORT -> parseImport(lexer)
+
+        TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value ?: println(lexer.last().type))
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
         TokenType.LET -> parseDeclaration(lexer)
@@ -59,6 +61,12 @@ private fun parseUnit(lexer: Lexer): ParsedExpr {
 
         else -> throw ParsingException(expected = "Expression", found = lexer.last().type.toString(), loc = lexer.last().loc)
     }
+}
+
+private fun parseImport(lexer: Lexer): ParsedExpr {
+    val loc = lexer.last().loc
+    val lit = lexer.expect(TokenType.STRING_LITERAL)
+    return ParsedExpr.Import(loc, lit.string())
 }
 
 private fun parseDeclaration(lexer: Lexer): ParsedExpr {
