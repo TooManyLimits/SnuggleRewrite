@@ -2,9 +2,10 @@ package ast.import_resolution
 
 import ast.parsing.ParsedAST
 import ast.parsing.ParsedFile
-import ast.parsing.parseExpr
 import builtins.BuiltinType
 import util.*
+import java.util.LinkedList
+import java.util.Queue
 
 /**
  * Resolve a ParsedAST into an ImportResolvedAST.
@@ -22,32 +23,54 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ImportResol
         .associateBy { t -> t.builtin.name } // Associate by name
 
     val mainFile: ParsedFile = ast.files["main"]?.value ?: throw IllegalArgumentException("Expected \"main\" file, but did not find one")
-    val resolvedMainFile = resolveFile(mainFile, startingMappings, ast, IdentityCache())
 
-    val allFiles = resolvedMainFile.otherFiles + resolvedMainFile.file
-//    val allTypes = resolvedMainFile.allTypes
+    // Create the cache
+    val publicMemberCache: IdentityCache<ParsedFile, PublicMembers> = IdentityCache()
+    // Repeatedly resolve all new files that were reached during the
+    // last resolution phase, until convergence
+    val alreadyResolved: IdentityCache<ParsedFile, FileResolutionResult> = IdentityCache()
+    val resolveQueue: Queue<ParsedFile> = LinkedList()
+    resolveQueue.add(mainFile) // Start out with main file
+    while (resolveQueue.isNotEmpty()) {
+        val parsedFile = resolveQueue.poll()
+        // If we  haven't already resolved it, do so
+        alreadyResolved.get(parsedFile) {
+            val res = resolveFile(it, startingMappings, ast, publicMemberCache)
+            // Also, add its "otherFiles" to the queue.
+            resolveQueue.addAll(res.otherFiles)
+            res
+        }
+    }
 
-    return ImportResolvedAST(allFiles.associateBy { it.name }) //, allTypes)
+    // Once that's done, the alreadyResolved cache contains what we need.
+    val allFiles = alreadyResolved.freeze()
+        .mapKeys { it.key.name }
+        .mapValues { it.value.file }
+
+    return ImportResolvedAST(allFiles)
 }
 
-data class FileResolutionResult(
+// Result of resolving a file:
+// - The resolved file
+// - A set of other files which were reached while resolving
+//   it, yet to be resolved themselves
+private data class FileResolutionResult(
     val file: ImportResolvedFile, // The resolved file.
-    val otherFiles: Set<ImportResolvedFile>, // A set of other files reached while resolving this one.
-//    val allTypes: Set<ImportResolvedTypeDef>, // All type definitions reached while resolving this file.
-    val myPubTypes: ConsMap<String, ImportResolvedTypeDef> // The pub types defined in this file.
+    val otherFiles: Set<ParsedFile>, // A set of other files reached while resolving this one.
 )
 
-fun resolveFile(
-    file: ParsedFile,
-    startingMappings: ConsMap<String, ImportResolvedTypeDef>,
-    ast: ParsedAST,
-    cache: IdentityCache<ParsedFile, FileResolutionResult> // Just a pinch of mutability used for memoizing calls to this function, resolveFile.
-): FileResolutionResult = cache.get(file) {
-    val resolvedBlock = resolveExpr(file.block, startingMappings, startingMappings, ast, cache)
-    FileResolutionResult(
+private fun resolveFile(
+    file: ParsedFile, // The file to resolve
+    startingMappings: ConsMap<String, ImportResolvedTypeDef>, // The starting mappings, containing the built-in types
+    ast: ParsedAST, // The AST containing the file we're resolving
+    publicMemberCache: IdentityCache<ParsedFile, PublicMembers> // Memoize the set of public members of some file
+): FileResolutionResult {
+    // Update public member cache if necessary
+    publicMemberCache.get(file) { getPubMembers(it.block) }
+
+    val resolvedBlock = resolveExpr(file.block, startingMappings, startingMappings, ast, publicMemberCache)
+    return FileResolutionResult(
         ImportResolvedFile(file.name, resolvedBlock.expr),
         resolvedBlock.files,
-//        resolvedBlock.types,
-        resolvedBlock.exposedTypes
     )
 }

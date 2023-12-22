@@ -7,7 +7,6 @@ import util.ConsList
 import util.ConsMap
 import util.extend
 import util.lookup
-import kotlin.math.exp
 
 /**
  * The output of type-checking an expression. Always results in a TypedExpr,
@@ -15,17 +14,17 @@ import kotlin.math.exp
  */
 sealed interface TypingResult {
     val expr: TypedExpr
-    val newVarsIfTrue: ConsMap<String, TypeDef>
-    val newVarsIfFalse: ConsMap<String, TypeDef>
+    val newVarsIfTrue: ConsMap<String, VariableBinding>
+    val newVarsIfFalse: ConsMap<String, VariableBinding>
 
-    data class WithVars(override val expr: TypedExpr, override val newVarsIfTrue: ConsMap<String, TypeDef>, override val newVarsIfFalse: ConsMap<String, TypeDef>): TypingResult
+    data class WithVars(override val expr: TypedExpr, override val newVarsIfTrue: ConsMap<String, VariableBinding>, override val newVarsIfFalse: ConsMap<String, VariableBinding>): TypingResult
     @JvmInline value class JustExpr(override val expr: TypedExpr): TypingResult {
-        override val newVarsIfTrue: ConsMap<String, TypeDef> get() = ConsMap(ConsList.nil())
-        override val newVarsIfFalse: ConsMap<String, TypeDef> get() = ConsMap(ConsList.nil())
+        override val newVarsIfTrue: ConsMap<String, VariableBinding> get() = ConsMap(ConsList.nil())
+        override val newVarsIfFalse: ConsMap<String, VariableBinding> get() = ConsMap(ConsList.nil())
     }
 }
 
-private fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
+fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
 
 /**
  * Infer an expression's type, and output a TypingResult.
@@ -33,14 +32,14 @@ private fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr
  * @param scope The current set of variables in scope. Immutable, notably.
  * @param typeCache The cache used for keeping track of the types that have been instantiated. (A small amount of mutable state.)
  */
-fun infer(expr: ImportResolvedExpr, scope: ConsMap<String, TypeDef>, typeCache: TypeDefCache): TypingResult = when (expr) {
+fun inferExpr(expr: ImportResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypingResult = when (expr) {
 
     // Import has type bool
     is ImportResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
 
     // Variable looks up its name in scope, errors if none is there
     is ImportResolvedExpr.Variable -> just(TypedExpr.Variable(expr.loc, expr.name,
-        scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc),
+        (scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)).type,
     ))
 
     // Blocks maintain their own scope, infer each element. Type of block is type of last expr inside
@@ -48,14 +47,14 @@ fun infer(expr: ImportResolvedExpr, scope: ConsMap<String, TypeDef>, typeCache: 
         var scope = scope // Shadow scope
         val inferredExprs = expr.exprs.map {
             // Infer the inner expression
-            val inferred = infer(it, scope, typeCache)
+            val inferred = inferExpr(it, scope, typeCache)
             // Check its new vars. If neither side is empty, add the vars in.
-            if (inferred.newVarsIfTrue.isEmpty() || inferred.newVarsIfFalse.isEmpty()) {
-                // TODO: Warn; this is a useless binding
-            } else {
+            if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                 // Extend the scope with the new vars
                 assert(inferred.newVarsIfTrue == inferred.newVarsIfFalse) { "Failed assertion - different vars ifTrue vs ifFalse, but neither is empty? Bug in compiler, please report!" }
                 scope = scope.extend(inferred.newVarsIfTrue)
+            } else {
+                // TODO: Warn; this is a useless binding
             }
             // Output the inferred expr from the map
             inferred.expr
@@ -68,7 +67,31 @@ fun infer(expr: ImportResolvedExpr, scope: ConsMap<String, TypeDef>, typeCache: 
     // If the pattern is refutable, only the ifTrue branch contains the bindings.
     // If irrefutable, both branches contain the bindings.
     is ImportResolvedExpr.Declaration -> {
-        throw RuntimeException()
+        val typedPattern: TypedPattern
+        val typedInitializer: TypedExpr
+        // Choose how to initialize these, based on whether
+        // the pattern is explicitly typed or not.
+        if (isExplicitlyTyped(expr.pattern)) {
+            // If the pattern is explicitly typed, then infer its type:
+            typedPattern = inferPattern(expr.pattern, typeCache)
+            // Check the right side against that:
+            typedInitializer = checkExpr(expr.initializer, typedPattern.type, scope, typeCache).expr
+        } else {
+            // The pattern is not explicitly typed, so instead infer the RHS:
+            typedInitializer = inferExpr(expr.initializer, scope, typeCache).expr
+            // Check the pattern against the inferred type:
+            typedPattern = checkPattern(expr.pattern, typedInitializer.type, typeCache)
+        }
+        // Create the new typed expr, type is always bool
+        val typed = TypedExpr.Declaration(expr.loc, typedPattern, typedInitializer, getBasicBuiltin(BoolType, typeCache))
+        // Fetch the bindings if this "let" succeeds
+        val patternBindings = bindings(typedPattern)
+        // If it's fallible, only output the results if true.
+        // Otherwise, always output the results.
+        if (isFallible(typedPattern))
+            TypingResult.WithVars(typed, patternBindings, ConsMap.of())
+        else
+            TypingResult.WithVars(typed, patternBindings, patternBindings)
     }
 
     is ImportResolvedExpr.MethodCall -> {
@@ -81,7 +104,5 @@ fun infer(expr: ImportResolvedExpr, scope: ConsMap<String, TypeDef>, typeCache: 
 
         else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
     }))
-
-
 
 }

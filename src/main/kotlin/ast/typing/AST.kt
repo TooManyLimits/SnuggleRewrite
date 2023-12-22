@@ -1,10 +1,6 @@
 package ast.typing
 
-import ast.import_resolution.ImportResolvedExpr
 import ast.lexing.Loc
-import builtins.BuiltinType
-import util.Promise
-import util.toGeneric
 
 /**
  * Previous AST stage was the ImportResolvedAST.
@@ -53,6 +49,8 @@ sealed interface TypedExpr {
 
 sealed interface TypedPattern {
     val loc: Loc
-
-    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: TypeDef?): TypedPattern
+    val type: TypeDef
+    // After typing is over, the binding pattern _always knows its type_,
+    // rather than having an _optional_ type annotation.
+    data class BindingPattern(override val loc: Loc, override val type: TypeDef, val name: String, val isMut: Boolean): TypedPattern
 }

@@ -1,12 +1,7 @@
 package ast.import_resolution
 
 import ast.lexing.Loc
-import ast.parsing.ParsedElement
-import ast.parsing.ParsedPattern
-import ast.parsing.ParsedType
 import builtins.BuiltinType
-import util.ConsList
-import util.ConsMap
 
 /**
  * Here, the raw string data of the previous AST (ParsedAST)
@@ -76,7 +71,7 @@ sealed interface ImportResolvedExpr {
 sealed interface ImportResolvedPattern {
     val loc: Loc
 
-    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ImportResolvedType?): ImportResolvedPattern
+    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ImportResolvedType?): ImportResolvedPattern
 }
 
 sealed interface ImportResolvedType {

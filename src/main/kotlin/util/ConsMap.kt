@@ -7,6 +7,10 @@ value class ConsMap<out K, out V>(val list: ConsList<Pair<K, V>>) {
 
     fun isEmpty() = list is Nil
     fun isNotEmpty() = list !is Nil
+
+    companion object {
+        fun <K, V> of(vararg pairs: Pair<K, V>): ConsMap<K, V> = ConsMap(ConsList.of(*pairs))
+    }
 }
 
 // Extend this map with a new pair.

@@ -11,28 +11,34 @@ import util.ConsList.Companion.nil
  * After resolving the main block for a file, this should come back with everything done by that.
  */
 data class ExprResolutionResult(
-    val expr: ImportResolvedExpr, // The resolved expression.
-    val files: Set<ImportResolvedFile>, // A set of files reached while resolving this expression.
-//    val types: Set<ImportResolvedTypeDef>, // The type definitions reached while resolving this expression.
-    val exposedTypes: ConsMap<String, ImportResolvedTypeDef> // The type definitions which are exposed by this expression to the surrounding environment.
-                                                             // Example: The import expression "exposes" all pub types in the file it refers to, to the context where the import occurs.
+    // The resolved expression.
+    val expr: ImportResolvedExpr,
+    // A set of files reached while resolving this expression.
+    val files: Set<ParsedFile>,
+    // The type definitions which are exposed by this expression
+    // to the surrounding environment.
+    // Example: The import expression "exposes" all pub types in the file
+    // it refers to, to the context where the import occurs.
+    val exposedTypes: ConsMap<String, ImportResolvedTypeDef>
 ) {
-    constructor(expr: ImportResolvedExpr): this(expr, setOf(), /*setOf(),*/ ConsMap(nil()))
-//    fun mapExpr(mapper: (ImportResolvedExpr) -> ImportResolvedExpr): ExprResolutionResult = ExprResolutionResult(mapper(expr), files, types, exposedTypes)
+    constructor(expr: ImportResolvedExpr): this(expr, setOf(), ConsMap(nil()))
 }
 
-//private fun collect(results: List<ExprResolutionResult>, mapper: (List<ImportResolvedExpr>) -> ImportResolvedExpr): ExprResolutionResult {
-//    var files = results[0].files
-//    var types = results[0].types
-//    var newUsableTypes = results[0].exposedTypes
-//    for (i in 1 until results.size) {
-//        files = union(files, results[i].files)
-//        types = union(types, results[i].types)
-//        newUsableTypes = newUsableTypes.extend(results[i].exposedTypes)
-//    }
-//    return ExprResolutionResult(mapper(results.map(ExprResolutionResult::expr)), files, types, newUsableTypes)
-//}
+// A class representing the public members of a block.
+// Cached for each file, so imports can bring them in.
+data class PublicMembers(
+    val pubTypes: ConsMap<String, ImportResolvedTypeDef>
+)
 
+// Scan a block to get its public members. Used for both regular blocks
+// and on entire files.
+fun getPubMembers(block: ParsedElement.ParsedExpr.Block): PublicMembers {
+    var pubTypes: ConsMap<String, ImportResolvedTypeDef> = ConsMap(nil());
+    for (elem: ParsedElement in block.elements) {
+
+    }
+    return PublicMembers(pubTypes)
+}
 
 /**
  * Resolve an expression.
@@ -42,13 +48,13 @@ fun resolveExpr(
     startingMappings: ConsMap<String, ImportResolvedTypeDef>,
     currentMappings: ConsMap<String, ImportResolvedTypeDef>,
     ast: ParsedAST,
-    cache: IdentityCache<ParsedFile, FileResolutionResult>
+    cache: IdentityCache<ParsedFile, PublicMembers>
 ): ExprResolutionResult = when (expr) {
     // Block, one of the 2 important expressions
     is ParsedElement.ParsedExpr.Block -> {
         // Shadow currentMappings
         var currentMappings = currentMappings
-        var files: Set<ImportResolvedFile> = setOf()
+        var files: Set<ParsedFile> = setOf()
 //            var types: Set<ImportResolvedTypeDef> = setOf()
         var exposedTypes: ConsMap<String, ImportResolvedTypeDef> = ConsMap(nil())
         val innerExprs: ArrayList<ImportResolvedExpr> = ArrayList()
@@ -66,16 +72,11 @@ fun resolveExpr(
                     // Add the new data into our variables
                     currentMappings = currentMappings.extend(resolved.exposedTypes)
                     files = union(files, resolved.files)
-//                        types = union(types, resolved.types)
                     innerExprs += resolved.expr
                 }
             }
         }
-        //
-        ExprResolutionResult(
-            ImportResolvedExpr.Block(expr.loc, innerExprs),
-            files, /*types,*/ exposedTypes
-        )
+        ExprResolutionResult(ImportResolvedExpr.Block(expr.loc, innerExprs), files, exposedTypes)
     }
     // Import, the other of the 2 important expressions
     is ParsedElement.ParsedExpr.Import -> {
@@ -83,13 +84,12 @@ fun resolveExpr(
         val otherFile = ast.files[expr.path]?.value
             ?: throw ResolutionException(expr.path, expr.loc)
         // Resolve the other file
-        val otherResolved = resolveFile(otherFile, startingMappings, ast, cache)
+        val otherPubMembers = cache.get(otherFile) { getPubMembers(it.block) }
         // Return an import, as well as all the things imported from the other file
         ExprResolutionResult(
-            ImportResolvedExpr.Import(expr.loc, otherResolved.file.name),
-            otherResolved.otherFiles + otherResolved.file,
-            // otherResolved.allTypes,
-            otherResolved.myPubTypes
+            ImportResolvedExpr.Import(expr.loc, expr.path),
+            setOf(otherFile),
+            otherPubMembers.pubTypes
         )
     }
 
@@ -101,11 +101,10 @@ fun resolveExpr(
         val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
         val resolvedArgs = expr.args.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
         val unitedFiles = union(resolvedReceiver.files, union(resolvedArgs.map { it.files }))
-//            val unitedTypes = union(resolvedReceiver.types, union(resolvedArgs.map { it.types }))
         val unitedExposedTypes = resolvedReceiver.exposedTypes.extendMany(resolvedArgs.map { it.exposedTypes })
         ExprResolutionResult(
             ImportResolvedExpr.MethodCall(expr.loc, resolvedReceiver.expr, expr.methodName, resolvedArgs.map { it.expr }),
-            unitedFiles, /*unitedTypes,*/ unitedExposedTypes
+            unitedFiles, unitedExposedTypes
         )
     }
 
@@ -131,7 +130,7 @@ fun resolveExpr(
 fun resolvePattern(pattern: ParsedPattern, currentMappings: ConsMap<String, ImportResolvedTypeDef>): Pair<ImportResolvedPattern, Set<ImportResolvedTypeDef>> = when (pattern) {
     is ParsedPattern.Binding -> {
         val resolved = pattern.typeAnnotation?.let { resolveType(it, currentMappings) }
-        ImportResolvedPattern.Binding(pattern.loc, pattern.name, pattern.isMut, resolved?.first) to (resolved?.second ?: setOf())
+        ImportResolvedPattern.BindingPattern(pattern.loc, pattern.name, pattern.isMut, resolved?.first) to (resolved?.second ?: setOf())
     }
 }
 

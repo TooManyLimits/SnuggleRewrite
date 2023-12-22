@@ -3,9 +3,7 @@ package ast.typing
 import ast.import_resolution.ImportResolvedAST
 import ast.import_resolution.ImportResolvedType
 import ast.import_resolution.ImportResolvedTypeDef
-import ast.lexing.Loc
 import builtins.BuiltinType
-import util.ConsList
 import util.ConsList.Companion.nil
 import util.ConsMap
 import util.EqualityCache
@@ -22,11 +20,9 @@ fun typeAST(ast: ImportResolvedAST): TypedAST {
 
     val cache: TypeDefCache = TypeDefCache()
 
-    TypedAST(ast.allFiles.mapValues {
-        TypedFile(it.value.name, infer(it.value.code, ConsMap(nil()), cache).expr)
+    return TypedAST(ast.allFiles.mapValues {
+        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), cache).expr)
     })
-
-    throw RuntimeException()
 }
 
 /**

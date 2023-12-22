@@ -59,6 +59,9 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "-" -> TokenType.MINUS
         "=" -> TokenType.EQUALS
 
+        "true" -> return Token(loc, TokenType.LITERAL, true)
+        "false" -> return Token(loc, TokenType.LITERAL, false)
+
         else -> return when {
             //Identifiers
             (string[0].isLetter() || string[0] == '_') && WORD_REGEX.matcher(string).matches() -> Token(loc, TokenType.IDENTIFIER, string)

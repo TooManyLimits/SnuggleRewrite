@@ -5,7 +5,7 @@ import util.ConsList
 import util.ConsMap
 
 /**
- * The very beginnning of the AST. Contains only the raw data,
+ * The very beginning of the AST. Contains only the raw data,
  * parsed out of the tokens. The next step after this point is
  * the import resolution phase.
  */
