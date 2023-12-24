@@ -1,11 +1,12 @@
 package util
 
-fun <T> union(sets: Iterable<Set<T>>): Set<T> {
+fun <T> union(vararg setIterables: Iterable<Set<T>>): Set<T> {
     var curSet = setOf<T>()
-    for (set in sets) {
-        if (set.isNotEmpty())
-            curSet = if (curSet.isEmpty()) set else curSet + set
-    }
+    for (setIterable in setIterables)
+        for (set in setIterable) {
+            if (set.isNotEmpty())
+                curSet = if (curSet.isEmpty()) set else curSet + set
+        }
     return curSet
 }
 

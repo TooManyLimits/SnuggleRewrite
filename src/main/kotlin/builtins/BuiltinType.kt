@@ -3,6 +3,7 @@ package builtins
 import ast.typing.FieldDef
 import ast.typing.MethodDef
 import ast.typing.TypeDef
+import ast.typing.TypeDefCache
 
 /**
  * A type that is defined through Java code, not through
@@ -34,9 +35,9 @@ interface BuiltinType {
     val runtimeName: String?
 
     // Get the fields of this type, given the generics.
-    fun getFields(generics: List<TypeDef>): List<FieldDef> = listOf() //listOf() for now
+    fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now
 
     // Get the methods of this type, given the generics.
-    fun getMethods(generics: List<TypeDef>): List<MethodDef> = listOf() //listOf() for now
+    fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> = listOf() //listOf() for now
 
 }

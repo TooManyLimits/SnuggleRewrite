@@ -9,5 +9,5 @@ fun parsePattern(lexer: Lexer): ParsedPattern {
     val ident = lexer.expect(TokenType.IDENTIFIER)
     val annotation = if (lexer.consume(TokenType.COLON)) parseType(lexer) else null
 
-    return ParsedPattern.Binding(ident.loc, ident.string(), false, annotation)
+    return ParsedPattern.BindingPattern(ident.loc, ident.string(), false, annotation)
 }

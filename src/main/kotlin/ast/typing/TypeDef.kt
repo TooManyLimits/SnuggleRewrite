@@ -13,11 +13,16 @@ sealed interface TypeDef {
     val fields: List<FieldDef>
     val methods: List<MethodDef>
 
-    class InstantiatedBuiltin(builtin: BuiltinType, private val generics: List<TypeDef>): TypeDef {
+    fun isSubtype(other: TypeDef, cache: TypeDefCache): Boolean {
+        //TODO
+        return true
+    }
+
+    class InstantiatedBuiltin(builtin: BuiltinType, private val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
         override val name: String = toGeneric(builtin.name, generics)
         override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
-        override val fields: List<FieldDef> = builtin.getFields(generics)
-        override val methods: List<MethodDef> = builtin.getMethods(generics)
+        override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
+        override val methods: List<MethodDef> = builtin.getMethods(generics, typeCache)
     }
 
     // An indirection which points to another TypeDef. Needed because of
@@ -30,12 +35,6 @@ sealed interface TypeDef {
         override val fields: List<FieldDef> get() = promise.expect().fields
         override val methods: List<MethodDef> get() = promise.expect().methods
     }
-
-}
-
-// A generic method def, which still has generics left to fill in !
-sealed interface GenericMethodDef: MethodDef {
-    val numGenerics: Int // How many generics are there to fill ?
 }
 
 // A method definition,
@@ -50,7 +49,6 @@ sealed interface MethodDef {
 
     data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                  val bytecode: (Array<Byte>) -> Unit): MethodDef
-
     data class ConstMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                               val func: (TypedExpr.MethodCall) -> TypedExpr): MethodDef
 }

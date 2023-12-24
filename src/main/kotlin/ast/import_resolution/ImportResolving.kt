@@ -20,7 +20,7 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ImportResol
     val startingMappings: ConsMap<String, ImportResolvedTypeDef> = builtinTypes
         .filter(BuiltinType::nameable) // Only nameable types should be in here
         .map(ImportResolvedTypeDef::Builtin) // Wrap in Builtin()
-        .associateBy { t -> t.builtin.name } // Associate by name
+        .associateBy { t -> t.name } // Associate by name
 
     val mainFile: ParsedFile = ast.files["main"]?.value ?: throw IllegalArgumentException("Expected \"main\" file, but did not find one")
 

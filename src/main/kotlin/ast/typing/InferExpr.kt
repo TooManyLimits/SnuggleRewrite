@@ -95,8 +95,14 @@ fun inferExpr(expr: ImportResolvedExpr, scope: ConsMap<String, VariableBinding>,
     }
 
     is ImportResolvedExpr.MethodCall -> {
-        // Cant wait to get to this :DDDDDDD
-        throw RuntimeException()
+        // Infer the type of the receiver
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache).expr
+        // Gather the set of non-static methods on the receiver
+        val methods = typedReceiver.type.methods.filter { !it.static }
+        // Choose the best method from among them
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache)
+        // Return the typed method call
+        just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
     is ImportResolvedExpr.Literal -> just(TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {

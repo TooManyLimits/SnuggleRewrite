@@ -55,15 +55,25 @@ fun resolveExpr(
         // Shadow currentMappings
         var currentMappings = currentMappings
         var files: Set<ParsedFile> = setOf()
-//            var types: Set<ImportResolvedTypeDef> = setOf()
         var exposedTypes: ConsMap<String, ImportResolvedTypeDef> = ConsMap(nil())
         val innerExprs: ArrayList<ImportResolvedExpr> = ArrayList()
 
-        // TODO Scan the block once to find type declarations, etc. Update currentMappings/types/exposedTypes to reflect this.
-        // TODO currentMappings/types: All types at the top level of this block
-        // TODO exposedTypes: All *pub* types at the top level of this block
+        // Scan the block once to find type declarations, etc.
+        // Update files/currentMappings/exposedTypes to reflect this.
+        for (element in expr.elements) {
+            when (element) {
+                is ParsedElement.ParsedTypeDef -> {
+                    val resolved = resolveTypeDef(element, startingMappings, currentMappings, ast, cache)
+                    files = union(files, resolved.files)
+                    currentMappings = currentMappings.extend(resolved.resolvedTypeDef.name, resolved.resolvedTypeDef)
+                    if (resolved.resolvedTypeDef.pub)
+                        exposedTypes = exposedTypes.extend(resolved.resolvedTypeDef.name, resolved.resolvedTypeDef)
+                }
+                else -> {}
+            }
+        }
 
-        // For each element, call recursively, and update our vars
+        // For each expr, call recursively, and update our vars
         for (element in expr.elements) {
             when (element) {
                 is ParsedElement.ParsedExpr -> {
@@ -74,6 +84,7 @@ fun resolveExpr(
                     files = union(files, resolved.files)
                     innerExprs += resolved.expr
                 }
+                else -> {}
             }
         }
         ExprResolutionResult(ImportResolvedExpr.Block(expr.loc, innerExprs), files, exposedTypes)
@@ -113,9 +124,8 @@ fun resolveExpr(
         val pattern = resolvePattern(expr.lhs, currentMappings)
         val initializer = resolveExpr(expr.initializer, startingMappings, currentMappings, ast, cache)
         ExprResolutionResult(
-            ImportResolvedExpr.Declaration(expr.loc, pattern.first, initializer.expr),
+            ImportResolvedExpr.Declaration(expr.loc, pattern, initializer.expr),
             initializer.files,
-            // union(pattern.second, initializer.types),
             initializer.exposedTypes
         )
     }
@@ -123,23 +133,13 @@ fun resolveExpr(
     // For ones where there's no nested expressions or other things, it's just a 1-liner.
     is ParsedElement.ParsedExpr.Literal -> ExprResolutionResult(ImportResolvedExpr.Literal(expr.loc, expr.value))
     is ParsedElement.ParsedExpr.Variable -> ExprResolutionResult(ImportResolvedExpr.Variable(expr.loc, expr.name))
-
-}
-
-// Returns the resolved pattern, as well as a set of types which have been reached by the pattern
-fun resolvePattern(pattern: ParsedPattern, currentMappings: ConsMap<String, ImportResolvedTypeDef>): Pair<ImportResolvedPattern, Set<ImportResolvedTypeDef>> = when (pattern) {
-    is ParsedPattern.Binding -> {
-        val resolved = pattern.typeAnnotation?.let { resolveType(it, currentMappings) }
-        ImportResolvedPattern.BindingPattern(pattern.loc, pattern.name, pattern.isMut, resolved?.first) to (resolved?.second ?: setOf())
-    }
 }
 
 // Returns the resolved type, as well as a set of types that were reached while resolving this type
-fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ImportResolvedTypeDef>): Pair<ImportResolvedType, Set<ImportResolvedTypeDef>> = when (type) {
+fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ImportResolvedTypeDef>): ImportResolvedType = when (type) {
     is ParsedType.Basic -> {
         val resolvedBase = currentMappings.lookup(type.base) ?: throw UnknownTypeException(type.toString(), type.loc)
         val resolvedGenerics = type.generics.map { resolveType(it, currentMappings) }
-        val usedTypes = union(setOf(resolvedBase), union(resolvedGenerics.map { it.second }))
-        ImportResolvedType.Basic(type.loc, resolvedBase, resolvedGenerics.map { it.first }) to usedTypes
+        ImportResolvedType.Basic(type.loc, resolvedBase, resolvedGenerics)
     }
 }

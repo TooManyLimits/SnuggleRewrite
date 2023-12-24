@@ -18,10 +18,10 @@ import util.IdentityCache
  */
 fun typeAST(ast: ImportResolvedAST): TypedAST {
 
-    val cache: TypeDefCache = TypeDefCache()
+    val typeCache = TypeDefCache(IdentityCache(), IdentityCache())
 
     return TypedAST(ast.allFiles.mapValues {
-        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), cache).expr)
+        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache).expr)
     })
 }
 
@@ -30,41 +30,45 @@ fun typeAST(ast: ImportResolvedAST): TypedAST {
  *
  * Small amount of mutability, from the cache.
  */
-fun getTypeDef(type: ImportResolvedType, cache: TypeDefCache): TypeDef = when (type) {
+fun getTypeDef(type: ImportResolvedType, typeCache: TypeDefCache): TypeDef = when (type) {
 
-    is ImportResolvedType.Basic -> instantiateBasicType(type.base, type.generics.map { getTypeDef(it, cache) }, cache)
+    is ImportResolvedType.Basic -> instantiateBasicType(type.base, type.generics.map { getTypeDef(it, typeCache) }, typeCache)
 
 }
 
 // Instantiate a basic type in the given cache.
-private fun instantiateBasicType(base: ImportResolvedTypeDef, generics: List<TypeDef>, cache: TypeDefCache): TypeDef = cache.get(base, generics) {
+private fun instantiateBasicType(base: ImportResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef = typeCache.get(base, generics) {
     _, _ ->
     // We have the base, and the generics which have been recursively instantiated.
     // Before instantiating the main type, create an indirection, and store it in the cache:
     val indirection = TypeDef.Indirection()
-    cache.put(base, generics, indirection)
+    typeCache.put(base, generics, indirection)
     // Now instantiate the type:
-    val instantiated = instantiateType(base, generics, cache)
+    val instantiated = instantiateType(base, generics, typeCache)
     // Fill in the indirection and return it.
     indirection.also { it.promise.fill(instantiated) }
 }
 
 // Helpers for quickly instantiating BuiltinType into TypeDef where it's needed.
-fun getGenericBuiltin(type: BuiltinType, generics: List<TypeDef>, cache: TypeDefCache): TypeDef = instantiateBasicType(ImportResolvedTypeDef.Builtin(type), generics, cache)
-fun getBasicBuiltin(type: BuiltinType, cache: TypeDefCache): TypeDef = getGenericBuiltin(type, listOf(), cache)
+fun getGenericBuiltin(type: BuiltinType, generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef =
+    instantiateBasicType(typeCache.builtins.get(type) { ImportResolvedTypeDef.Builtin(it) }, generics, typeCache)
+fun getBasicBuiltin(type: BuiltinType, cache: TypeDefCache): TypeDef =
+    getGenericBuiltin(type, listOf(), cache)
 
 
-fun instantiateType(resolvedTypeDef: ImportResolvedTypeDef, generics: List<TypeDef>, cache: TypeDefCache): TypeDef = when (resolvedTypeDef) {
+private fun instantiateType(resolvedTypeDef: ImportResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef = when (resolvedTypeDef) {
 
-    is ImportResolvedTypeDef.Builtin -> TypeDef.InstantiatedBuiltin(resolvedTypeDef.builtin, generics)
-
+    is ImportResolvedTypeDef.Builtin -> TypeDef.InstantiatedBuiltin(resolvedTypeDef.builtin, generics, typeCache)
 }
 
 
 // Alias for the type def cache, with related useful extension methods get() and put()
-typealias TypeDefCache = IdentityCache<ImportResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>
+data class TypeDefCache(
+    val typeDefs: IdentityCache<ImportResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>,
+    val builtins: IdentityCache<BuiltinType, ImportResolvedTypeDef>
+)
 private fun TypeDefCache.get(base: ImportResolvedTypeDef, generics: List<TypeDef>, func: (ImportResolvedTypeDef, List<TypeDef>) -> TypeDef) =
-    this.get(base) {EqualityCache()}.get(generics) {func(base, it)}
+    this.typeDefs.get(base) {EqualityCache()}.get(generics) {func(base, it)}
 private fun TypeDefCache.put(base: ImportResolvedTypeDef, generics: List<TypeDef>, value: TypeDef) =
     this.get(base, generics) {_, _ -> value}
 

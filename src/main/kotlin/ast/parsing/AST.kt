@@ -1,8 +1,6 @@
 package ast.parsing
 
 import ast.lexing.Loc
-import util.ConsList
-import util.ConsMap
 
 /**
  * The very beginning of the AST. Contains only the raw data,
@@ -12,7 +10,7 @@ import util.ConsMap
 
 //Files are lazily parsed
 data class ParsedAST(val files: Map<String, Lazy<ParsedFile>>) {
-    fun debug_readAllFiles() { // Debug function; read all the files, so they can be printed
+    fun debugReadAllFiles() { // Debug function; read all the files, so they can be printed
         for (file in files) file.value.value
     }
 }
@@ -25,15 +23,16 @@ sealed interface ParsedElement {
 
     val loc: Loc
 
-//    sealed interface ParsedTypeDef: ParsedElement {
-//        val pub: Boolean
-//        val name: String
-//
-//        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
+    sealed interface ParsedTypeDef: ParsedElement {
+        val pub: Boolean
+        val name: String
+
+        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType?, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
 //        data class Struct(override val loc: Loc, override val pub: Boolean, override val name: String, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
-//    }
+
+    }
 //
-//    data class FuncDef(override val loc: Loc, val pub: Boolean, val name: String, val params: List<ParsedParam>, val returnType: ParsedType, val body: ParsedExpr): ParsedElement
+//    data class FuncDef(override val loc: Loc, val pub: Boolean, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedExpr): ParsedElement
 //    data class PubVar(override val loc: Loc, val mutable: Boolean, val lhs: ParsedPattern, val annotatedType: ParsedType, val initializer: ParsedExpr): ParsedElement
 
 //    data class ImplBlock(override val loc: Loc): ParsedElement
@@ -55,12 +54,9 @@ sealed interface ParsedElement {
 
 }
 
-//Other data structures
-
-//data class ParsedFieldDef(val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ParsedType, val initializer: ParsedElement.ParsedExpr?)
-//data class ParsedMethodDef(val pub: Boolean, val static: Boolean, val name: String, val params: List<ParsedParam>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
-//data class ParsedParam(val name: String, val type: ParsedType)
-
+// Helper data structures
+data class ParsedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ParsedType, val initializer: ParsedElement.ParsedExpr?)
+data class ParsedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
 sealed interface ParsedPattern {
 
     val loc: Loc
@@ -68,7 +64,7 @@ sealed interface ParsedPattern {
 //    object Empty : ParsedPattern // _
 //    data class Literal(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
 //    data class And(override val loc: Loc, val pats: List<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
-    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
+    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
 //    data class Tuple(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
 
 }

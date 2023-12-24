@@ -37,7 +37,15 @@ fun checkExpr(expr: ImportResolvedExpr, expectedType: TypeDef, scope: ConsMap<St
     }
 
     is ImportResolvedExpr.MethodCall -> {
-        throw RuntimeException("Not yet implemented")
+        // Largely the same as the infer() version, just passes the "expectedType" parameter
+        // Infer the type of the receiver
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache).expr
+        // Gather the set of non-static methods on the receiver
+        val methods = typedReceiver.type.methods.filter { !it.static }
+        // Choose the best method from among them
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache)
+        // Return the typed method call
+        just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
     // Some expressions can just be inferred,

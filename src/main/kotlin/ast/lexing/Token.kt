@@ -10,7 +10,7 @@ data class Token(val loc: Loc, val type: TokenType, val value: Any?) {
     }
 }
 
-val TOKEN_REGEX = Pattern.compile(
+val TOKEN_REGEX: Pattern = Pattern.compile(
     //Single line comments
     "//.*" + "|" +
     //Multi line comments
@@ -48,12 +48,22 @@ fun tokenOf(loc: Loc, string: String): Token? {
 
     val type: TokenType = when(string) {
 
+        "pub" -> TokenType.PUB
+        "static" -> TokenType.STATIC
         "import" -> TokenType.IMPORT
+        "class" -> TokenType.CLASS
+        "struct" -> TokenType.STRUCT
+        "fn" -> TokenType.FN
 
         "let" -> TokenType.LET
 
         ":" -> TokenType.COLON
         ";" -> TokenType.SEMICOLON
+        "," -> TokenType.COMMA
+        "(" -> TokenType.LEFT_PAREN
+        ")" -> TokenType.RIGHT_PAREN
+        "{" -> TokenType.LEFT_CURLY
+        "}" -> TokenType.RIGHT_CURLY
 
         "+" -> TokenType.PLUS
         "-" -> TokenType.MINUS
@@ -109,12 +119,22 @@ enum class TokenType {
     STRING_LITERAL,
     IDENTIFIER,
 
+    PUB,
+    STATIC,
     IMPORT,
+    CLASS,
+    STRUCT,
+    FN,
 
     LET,
 
     COLON,
     SEMICOLON,
+    COMMA,
+    LEFT_PAREN,
+    RIGHT_PAREN,
+    LEFT_CURLY,
+    RIGHT_CURLY,
 
     PLUS,
     MINUS,

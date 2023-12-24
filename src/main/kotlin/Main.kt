@@ -7,20 +7,22 @@ import ast.typing.typeAST
 import builtins.BoolType
 import util.ConsList
 
-fun main(args: Array<String>) {
+fun main() {
 
     val code = """
         let x: bool = true
+        let y: bool = false
+        let z: bool = x - y
     """.trimIndent()
     val lexer = Lexer("main", code)
 
     val file = parseFileLazy(lexer)
     val parsedAST = ParsedAST(mapOf("main" to file))
-    parsedAST.debug_readAllFiles() // Remove lazy wrapping
+    parsedAST.debugReadAllFiles() // Remove lazy wrapping
     println(parsedAST)
-    val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType));
+    val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType))
     println(resolvedAST)
-    val typedAST = typeAST(resolvedAST);
+    val typedAST = typeAST(resolvedAST)
     println(typedAST)
 
 }

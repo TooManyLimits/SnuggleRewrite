@@ -1,6 +1,7 @@
 package ast.import_resolution
 
 import ast.lexing.Loc
+import ast.parsing.*
 import builtins.BuiltinType
 
 /**
@@ -49,11 +50,24 @@ data class ImportResolvedAST(
 data class ImportResolvedFile(val name: String, val code: ImportResolvedExpr)
 
 sealed interface ImportResolvedTypeDef {
+    val pub: Boolean
+    val name: String
     data class Builtin(val builtin: BuiltinType): ImportResolvedTypeDef {
-        override fun equals(other: Any?): Boolean = this === other
-        override fun hashCode(): Int = System.identityHashCode(this)
+        override val name: String get() = builtin.name
+        override val pub: Boolean get() = true
     }
+    sealed interface SnuggleImportResolvedTypeDef: ImportResolvedTypeDef {
+        val loc: Loc
+        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String,
+                         val superType: ImportResolvedType,
+                         val fields: List<ImportResolvedFieldDef>,
+                         val methods: List<ImportResolvedMethodDef>): SnuggleImportResolvedTypeDef
+    }
+
 }
+
+data class ImportResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ImportResolvedType, val initializer: ImportResolvedExpr?)
+data class ImportResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val params: List<ImportResolvedPattern>, val returnType: ImportResolvedType, val body: ImportResolvedExpr)
 
 sealed interface ImportResolvedExpr {
     val loc: Loc
