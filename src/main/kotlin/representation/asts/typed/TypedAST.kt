@@ -1,4 +1,4 @@
-package representation.passes.typing
+package representation.asts.typed
 
 import representation.passes.lexing.Loc
 

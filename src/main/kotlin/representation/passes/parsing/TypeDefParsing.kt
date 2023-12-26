@@ -3,14 +3,19 @@ package representation.passes.parsing
 import representation.asts.parsed.ParsedElement
 import representation.asts.parsed.ParsedFieldDef
 import representation.asts.parsed.ParsedMethodDef
+import representation.asts.parsed.ParsedType
 import representation.passes.lexing.Lexer
+import representation.passes.lexing.Loc
 import representation.passes.lexing.TokenType
 
 // The "class" token was just consumed
 fun parseClass(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedTypeDef.Class {
     val classLoc = lexer.last().loc
     val className = lexer.expect(TokenType.IDENTIFIER, extraInfo = "after \"class\"").string()
-    val supertype = if (lexer.consume(TokenType.COLON)) parseType(lexer, extraInfo = "for superclass") else null
+    val supertype = if (lexer.consume(TokenType.COLON))
+        parseType(lexer, extraInfo = "for superclass")
+    else
+        ParsedType.Basic(Loc.NEVER, "Object", listOf()) // Default superclass to Object if none is given
     lexer.expect(TokenType.LEFT_CURLY, "to begin class definition")
     val members = parseMembers(lexer)
     return ParsedElement.ParsedTypeDef.Class(classLoc, isPub, className, supertype, members.first, members.second)

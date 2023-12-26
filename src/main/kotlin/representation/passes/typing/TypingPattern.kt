@@ -1,6 +1,8 @@
 package representation.passes.typing
 
 import representation.asts.resolved.ResolvedPattern
+import representation.asts.typed.TypeDef
+import representation.asts.typed.TypedPattern
 import util.ConsMap
 
 data class VariableBinding(val type: TypeDef, val mutable: Boolean)

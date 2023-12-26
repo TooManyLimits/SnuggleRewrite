@@ -1,6 +1,6 @@
 package util
 
-import representation.passes.typing.TypeDef
+import representation.asts.typed.TypeDef
 
 fun toGeneric(base: String, generics: List<TypeDef>, leftBracket: String = "(", rightBracket: String = ")"): String {
     return if (generics.isNotEmpty()) {

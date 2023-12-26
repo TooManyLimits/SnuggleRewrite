@@ -1,6 +1,9 @@
 package representation.passes.typing
 
+import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
+import representation.asts.typed.TypeDef
+import representation.asts.typed.TypedExpr
 import util.ConsMap
 import util.extend
 import kotlin.math.max
@@ -54,6 +57,14 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     // Usually, inferring and checking work similarly.
     else -> {
         val res = inferExpr(expr, scope, typeCache)
+        if (!res.expr.type.isSubtype(expectedType, typeCache))
+            throw TypeCheckingException(expectedType, res.expr.type, when(expr) {
+                is ResolvedExpr.Import -> "Import expression"
+                is ResolvedExpr.Variable -> "Variable \"${expr.name}\""
+                is ResolvedExpr.Literal -> "Literal"
+                is ResolvedExpr.Declaration -> "Let expression"
+                else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
+            }, expr.loc)
         // TODO: Ensure that res.expr.type is a subtype of expectedType
         res
     }

@@ -4,6 +4,9 @@ import representation.asts.resolved.ResolvedAST
 import representation.asts.resolved.ResolvedType
 import representation.asts.resolved.ResolvedTypeDef
 import builtins.BuiltinType
+import representation.asts.typed.TypeDef
+import representation.asts.typed.TypedAST
+import representation.asts.typed.TypedFile
 import util.ConsList.Companion.nil
 import util.ConsMap
 import util.EqualityCache
@@ -45,14 +48,14 @@ fun getTypeDef(type: ResolvedType, typeCache: TypeDefCache): TypeDef = when (typ
  * Handle adding an indirection to the instantiation process.
  */
 private inline fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache,
-                            instantiator: () -> TypeDef
+                            instantiator: (TypeDef.Indirection) -> TypeDef
 ): TypeDef {
     // Create the indirection and add it to the cache
     val indirection = TypeDef.Indirection()
     typeCache.put(base, generics, indirection)
     // Instantiate, fill in the indirection with the result, and return.
-    val instantiated = instantiator()
-    indirection.promise.fill(instantiated)
+    val instantiated = instantiator(indirection)
+    indirection.promise.fulfill(instantiated)
     return indirection
 }
 
@@ -70,7 +73,16 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
             TypeDef.InstantiatedBuiltin(base.builtin, generics, typeCache)
         }
         // Other types need more work replacing generics.
-        is ResolvedTypeDef.Class -> throw RuntimeException("Class instantiation not yet implemented")
+        is ResolvedTypeDef.Class -> indirect(base, generics, typeCache) { indirection ->
+            val superType = getTypeDef(base.superType, typeCache)
+            TypeDef.ClassDef(
+                base.loc, base.name, superType, generics,
+                // Map the fields
+                base.fields.map { throw RuntimeException("Fields not implemented yet") },
+                // Map the methods, using the indirection as the "this"/owning type.
+                base.methods.map { typeMethod(indirection, it, typeCache) }
+            )
+        }
     }
 }
 

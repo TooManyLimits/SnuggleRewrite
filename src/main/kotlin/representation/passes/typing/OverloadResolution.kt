@@ -5,6 +5,9 @@ import representation.passes.lexing.Loc
 import errors.CompilationException
 import errors.NoApplicableMethodException
 import errors.TooManyMethodsException
+import representation.asts.typed.MethodDef
+import representation.asts.typed.TypeDef
+import representation.asts.typed.TypedExpr
 import util.*
 import java.util.*
 

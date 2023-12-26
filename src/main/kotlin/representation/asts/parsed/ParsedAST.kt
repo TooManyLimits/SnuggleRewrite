@@ -27,7 +27,7 @@ sealed interface ParsedElement {
         val pub: Boolean
         val name: String
 
-        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType?, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>):
+        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>):
             ParsedTypeDef
 //        data class Struct(override val loc: Loc, override val pub: Boolean, override val name: String, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
 

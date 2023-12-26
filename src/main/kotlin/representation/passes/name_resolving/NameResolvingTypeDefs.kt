@@ -21,13 +21,12 @@ fun resolveTypeDef(
     cache: IdentityCache<ParsedFile, PublicMembers>
 ): TypeDefResolutionResult = when (typeDef) {
     is ParsedElement.ParsedTypeDef.Class -> {
-        val resolvedSupertype = typeDef.superType?.let { resolveType(it, currentMappings) }
+        val resolvedSupertype = typeDef.superType.let { resolveType(it, currentMappings) }
         val resolvedFields = typeDef.fields.map { resolveFieldDef(it, startingMappings, currentMappings, ast, cache) }
         val resolvedMethods = typeDef.methods.map { resolveMethodDef(it, startingMappings, currentMappings, ast, cache) }
-        // TODO: Default supertype to Object
         TypeDefResolutionResult(
             ResolvedTypeDef.Class(typeDef.loc, typeDef.pub, typeDef.name,
-                resolvedSupertype!!,
+                resolvedSupertype,
                 resolvedFields.map { it.first },
                 resolvedMethods.map { it.first }
             ),

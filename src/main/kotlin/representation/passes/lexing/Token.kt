@@ -1,6 +1,7 @@
 package representation.passes.lexing
 
 import errors.LexingException
+import errors.UnknownTokenException
 import java.math.BigInteger
 import java.util.regex.Pattern
 
@@ -40,7 +41,7 @@ val TOKEN_REGEX: Pattern = Pattern.compile(
     "."
 )
 
-private val WORD_REGEX = Pattern.compile("[a-z_][a-z\\d_]*")
+private val WORD_REGEX = Pattern.compile("[a-zA-Z_][a-zA-Z\\d_]*")
 
 fun tokenOf(loc: Loc, string: String): Token? {
     if (string.isBlank() || string.startsWith("//") || string.startsWith("/*"))
@@ -56,6 +57,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "fn" -> TokenType.FN
 
         "let" -> TokenType.LET
+        "mut" -> TokenType.MUT
 
         ":" -> TokenType.COLON
         ";" -> TokenType.SEMICOLON
@@ -107,7 +109,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
                     Token(loc, TokenType.STRING_LITERAL, builder.toString())
                 }
             }
-            else -> throw LexingException(string, loc)
+            else -> throw UnknownTokenException(string, loc)
         }
     }
 
@@ -127,6 +129,7 @@ enum class TokenType {
     FN,
 
     LET,
+    MUT,
 
     COLON,
     SEMICOLON,
@@ -147,8 +150,7 @@ data class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: 
 // Parse an escape character
 private fun handleEscape(string: String, startIndex: Int, loc: Loc): Pair<Char, Int> {
     var index = startIndex + 1
-    val next = string[index]
-    return when (next) {
+    return when (val next = string[index]) {
         'b' -> '\b'
         't' -> '\t'
         'n' -> '\n'
@@ -189,6 +191,6 @@ private fun handleEscape(string: String, startIndex: Int, loc: Loc): Pair<Char, 
                 next.digitToInt(8).toChar()
             }
         }
-        else -> throw LexingException("Illegal escape character \"\\" + next + "\"", loc)
+        else -> throw LexingException("Illegal escape character \"\\$next\"", loc)
     } to index
 }

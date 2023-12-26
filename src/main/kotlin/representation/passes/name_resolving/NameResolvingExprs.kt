@@ -81,7 +81,7 @@ fun resolveExpr(
         indirections.forEach {
             val resolved = resolveTypeDef(it.first, startingMappings, currentMappings, ast, cache)
             // Once we resolve, fill the promise
-            it.second.promise.fill(resolved.resolvedTypeDef)
+            it.second.promise.fulfill(resolved.resolvedTypeDef)
             // Track the files
             files = union(files, resolved.files)
         }

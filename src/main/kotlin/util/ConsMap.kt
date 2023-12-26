@@ -8,12 +8,14 @@ value class ConsMap<out K, out V>(val list: ConsList<Pair<K, V>>): Iterable<Pair
     fun filterValues(func: (V) -> Boolean): ConsMap<K, V> = ConsMap(this.list.filter { func(it.second) })
     fun filterKeys(func: (K) -> Boolean): ConsMap<K, V> = ConsMap(this.list.filter { func(it.first) })
 
+    fun reverse(): ConsMap<K, V> = ConsMap(this.list.reverse())
 
     fun isEmpty() = list is Nil
     fun isNotEmpty() = list !is Nil
 
     companion object {
         fun <K, V> of(vararg pairs: Pair<K, V>): ConsMap<K, V> = ConsMap(ConsList.of(*pairs))
+        fun <K, V> fromIterable(iterable: Iterable<Pair<K, V>>): ConsMap<K, V> = ConsMap(ConsList.fromIterable(iterable))
     }
 
     override fun iterator(): Iterator<Pair<K, V>> = list.iterator()

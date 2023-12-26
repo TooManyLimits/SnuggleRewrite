@@ -1,7 +1,7 @@
 package builtins
 
-import representation.passes.typing.MethodDef
-import representation.passes.typing.TypeDef
+import representation.asts.typed.MethodDef
+import representation.asts.typed.TypeDef
 import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getBasicBuiltin
 

@@ -3,6 +3,8 @@ package representation.passes.typing
 import representation.asts.resolved.ResolvedExpr
 import builtins.BoolType
 import errors.NoSuchVariableException
+import representation.asts.typed.TypedExpr
+import representation.asts.typed.TypedPattern
 import util.ConsList
 import util.ConsMap
 import util.extend
@@ -38,7 +40,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
 
     // Variable looks up its name in scope, errors if none is there
-    is ResolvedExpr.Variable -> just(TypedExpr.Variable(expr.loc, expr.name,
+    is ResolvedExpr.Variable -> just(
+        TypedExpr.Variable(expr.loc, expr.name,
         (scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)).type,
     ))
 
@@ -105,7 +108,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
-    is ResolvedExpr.Literal -> just(TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {
+    is ResolvedExpr.Literal -> just(
+        TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {
         is Boolean -> getBasicBuiltin(BoolType, typeCache)
 
         else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
