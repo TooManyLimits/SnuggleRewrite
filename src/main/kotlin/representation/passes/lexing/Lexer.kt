@@ -1,4 +1,4 @@
-package ast.lexing
+package representation.passes.lexing
 
 import errors.ParsingException
 import java.io.StringReader

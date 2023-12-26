@@ -1,6 +1,6 @@
-package ast.typing
+package representation.passes.typing
 
-import ast.import_resolution.ImportResolvedExpr
+import representation.asts.resolved.ResolvedExpr
 import builtins.BoolType
 import errors.NoSuchVariableException
 import util.ConsList
@@ -32,18 +32,18 @@ fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
  * @param scope The current set of variables in scope. Immutable, notably.
  * @param typeCache The cache used for keeping track of the types that have been instantiated. (A small amount of mutable state.)
  */
-fun inferExpr(expr: ImportResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypingResult = when (expr) {
+fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypingResult = when (expr) {
 
     // Import has type bool
-    is ImportResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
+    is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
 
     // Variable looks up its name in scope, errors if none is there
-    is ImportResolvedExpr.Variable -> just(TypedExpr.Variable(expr.loc, expr.name,
+    is ResolvedExpr.Variable -> just(TypedExpr.Variable(expr.loc, expr.name,
         (scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)).type,
     ))
 
     // Blocks maintain their own scope, infer each element. Type of block is type of last expr inside
-    is ImportResolvedExpr.Block -> {
+    is ResolvedExpr.Block -> {
         var scope = scope // Shadow scope
         val inferredExprs = expr.exprs.map {
             // Infer the inner expression
@@ -66,7 +66,7 @@ fun inferExpr(expr: ImportResolvedExpr, scope: ConsMap<String, VariableBinding>,
     // Declarations need to work with patterns. The resulting type is bool.
     // If the pattern is refutable, only the ifTrue branch contains the bindings.
     // If irrefutable, both branches contain the bindings.
-    is ImportResolvedExpr.Declaration -> {
+    is ResolvedExpr.Declaration -> {
         val typedPattern: TypedPattern
         val typedInitializer: TypedExpr
         // Choose how to initialize these, based on whether
@@ -94,7 +94,7 @@ fun inferExpr(expr: ImportResolvedExpr, scope: ConsMap<String, VariableBinding>,
             TypingResult.WithVars(typed, patternBindings, patternBindings)
     }
 
-    is ImportResolvedExpr.MethodCall -> {
+    is ResolvedExpr.MethodCall -> {
         // Infer the type of the receiver
         val typedReceiver = inferExpr(expr.receiver, scope, typeCache).expr
         // Gather the set of non-static methods on the receiver
@@ -105,7 +105,7 @@ fun inferExpr(expr: ImportResolvedExpr, scope: ConsMap<String, VariableBinding>,
         just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
-    is ImportResolvedExpr.Literal -> just(TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {
+    is ResolvedExpr.Literal -> just(TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {
         is Boolean -> getBasicBuiltin(BoolType, typeCache)
 
         else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")

@@ -1,7 +1,10 @@
-package ast.parsing
+package representation.passes.parsing
 
-import ast.lexing.Lexer
-import ast.lexing.TokenType
+import representation.asts.parsed.ParsedElement
+import representation.asts.parsed.ParsedFieldDef
+import representation.asts.parsed.ParsedMethodDef
+import representation.passes.lexing.Lexer
+import representation.passes.lexing.TokenType
 
 // The "class" token was just consumed
 fun parseClass(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedTypeDef.Class {

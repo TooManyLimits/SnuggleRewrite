@@ -1,6 +1,6 @@
-package ast.parsing
+package representation.asts.parsed
 
-import ast.lexing.Loc
+import representation.passes.lexing.Loc
 
 /**
  * The very beginning of the AST. Contains only the raw data,
@@ -27,7 +27,8 @@ sealed interface ParsedElement {
         val pub: Boolean
         val name: String
 
-        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType?, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
+        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType?, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>):
+            ParsedTypeDef
 //        data class Struct(override val loc: Loc, override val pub: Boolean, override val name: String, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
 
     }
@@ -47,7 +48,8 @@ sealed interface ParsedElement {
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
-        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr
+        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>):
+            ParsedExpr
 
         //... etc
     }
@@ -64,7 +66,8 @@ sealed interface ParsedPattern {
 //    object Empty : ParsedPattern // _
 //    data class Literal(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
 //    data class And(override val loc: Loc, val pats: List<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
-    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
+    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?):
+    ParsedPattern
 //    data class Tuple(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
 
 }

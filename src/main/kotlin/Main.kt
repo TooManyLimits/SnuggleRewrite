@@ -1,9 +1,8 @@
-import ast.import_resolution.resolveAST
-import ast.parsing.parseFile
-import ast.lexing.Lexer
-import ast.parsing.ParsedAST
-import ast.parsing.parseFileLazy
-import ast.typing.typeAST
+import representation.passes.name_resolving.resolveAST
+import representation.passes.lexing.Lexer
+import representation.asts.parsed.ParsedAST
+import representation.passes.parsing.parseFileLazy
+import representation.passes.typing.typeAST
 import builtins.BoolType
 import util.ConsList
 

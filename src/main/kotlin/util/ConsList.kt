@@ -52,6 +52,9 @@ sealed interface ConsList<out T> : Iterable<T> {
         fun <T> of(vararg elems: T): ConsList<T> {
             return elems.foldRight(nil(), ::Cons)
         }
+        fun <T> fromIterable(elems: Iterable<T>): ConsList<T> {
+            return elems.reversed().fold(nil()) { acc: ConsList<T>, t -> Cons(t, acc) }
+        }
     }
 }
 

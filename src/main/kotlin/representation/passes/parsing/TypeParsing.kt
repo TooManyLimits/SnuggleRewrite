@@ -1,8 +1,8 @@
-package ast.parsing
+package representation.passes.parsing
 
-import ast.lexing.Lexer
-import ast.lexing.TokenType
-import util.ConsList.Companion.nil
+import representation.asts.parsed.ParsedType
+import representation.passes.lexing.Lexer
+import representation.passes.lexing.TokenType
 
 internal fun parseType(lexer: Lexer, extraInfo: String? = null): ParsedType {
 

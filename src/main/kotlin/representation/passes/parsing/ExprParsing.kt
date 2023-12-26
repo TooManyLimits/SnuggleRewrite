@@ -1,10 +1,9 @@
-package ast.parsing
+package representation.passes.parsing
 
-import ast.parsing.ParsedElement.*
-import ast.lexing.Lexer
-import ast.lexing.TokenType
+import representation.asts.parsed.ParsedElement.*
+import representation.passes.lexing.Lexer
+import representation.passes.lexing.TokenType
 import errors.ParsingException
-import util.ConsList
 
 /**
  * Expression parsing !

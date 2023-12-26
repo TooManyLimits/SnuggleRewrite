@@ -1,25 +1,28 @@
-package ast.import_resolution
+package representation.passes.name_resolving
 
-import ast.parsing.ParsedAST
-import ast.parsing.ParsedFile
+import representation.asts.parsed.ParsedAST
+import representation.asts.parsed.ParsedFile
 import builtins.BuiltinType
+import representation.asts.resolved.ResolvedAST
+import representation.asts.resolved.ResolvedFile
+import representation.asts.resolved.ResolvedTypeDef
 import util.*
 import java.util.LinkedList
 import java.util.Queue
 
 /**
- * Resolve a ParsedAST into an ImportResolvedAST.
+ *
+ * Convert a ParsedAST into a ResolvedAST.
  * Details about the difference between the two can be found in their
  * respective files.
- *
  * - Requires builtin type information. This information is injected into the AST.
  */
-fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ImportResolvedAST {
+fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ResolvedAST {
 
     // Get the starting map of type definitions.
-    val startingMappings: ConsMap<String, ImportResolvedTypeDef> = builtinTypes
-        .filter(BuiltinType::nameable) // Only nameable types should be in here
-        .map(ImportResolvedTypeDef::Builtin) // Wrap in Builtin()
+    val startingMappings: ConsMap<String, ResolvedTypeDef.Builtin> = builtinTypes
+        .filter { it.nameable } // Only nameable types should be in here
+        .map { ResolvedTypeDef.Builtin(it) } // Wrap in Builtin()
         .associateBy { t -> t.name } // Associate by name
 
     val mainFile: ParsedFile = ast.files["main"]?.value ?: throw IllegalArgumentException("Expected \"main\" file, but did not find one")
@@ -47,7 +50,12 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ImportResol
         .mapKeys { it.key.name }
         .mapValues { it.value.file }
 
-    return ImportResolvedAST(allFiles)
+    // Also create the map of builtins, out of the starting mappings.
+    val builtinMap = startingMappings
+        .map { it.second } // Select the values, the Builtin ResolvedTypeDefs
+        .associateBy { it.builtin } // Map them according to their builtin
+
+    return ResolvedAST(allFiles, builtinMap)
 }
 
 // Result of resolving a file:
@@ -55,13 +63,13 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ImportResol
 // - A set of other files which were reached while resolving
 //   it, yet to be resolved themselves
 private data class FileResolutionResult(
-    val file: ImportResolvedFile, // The resolved file.
+    val file: ResolvedFile, // The resolved file.
     val otherFiles: Set<ParsedFile>, // A set of other files reached while resolving this one.
 )
 
 private fun resolveFile(
     file: ParsedFile, // The file to resolve
-    startingMappings: ConsMap<String, ImportResolvedTypeDef>, // The starting mappings, containing the built-in types
+    startingMappings: ConsMap<String, ResolvedTypeDef>, // The starting mappings, containing the built-in types
     ast: ParsedAST, // The AST containing the file we're resolving
     publicMemberCache: IdentityCache<ParsedFile, PublicMembers> // Memoize the set of public members of some file
 ): FileResolutionResult {
@@ -70,7 +78,7 @@ private fun resolveFile(
 
     val resolvedBlock = resolveExpr(file.block, startingMappings, startingMappings, ast, publicMemberCache)
     return FileResolutionResult(
-        ImportResolvedFile(file.name, resolvedBlock.expr),
+        ResolvedFile(file.name, resolvedBlock.expr),
         resolvedBlock.files,
     )
 }

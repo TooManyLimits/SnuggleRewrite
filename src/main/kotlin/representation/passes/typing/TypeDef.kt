@@ -1,4 +1,4 @@
-package ast.typing
+package representation.passes.typing
 
 import builtins.BuiltinType
 import util.Promise

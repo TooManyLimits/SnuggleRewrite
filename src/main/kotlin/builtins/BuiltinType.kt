@@ -1,14 +1,14 @@
 package builtins
 
-import ast.typing.FieldDef
-import ast.typing.MethodDef
-import ast.typing.TypeDef
-import ast.typing.TypeDefCache
+import representation.passes.typing.FieldDef
+import representation.passes.typing.MethodDef
+import representation.passes.typing.TypeDef
+import representation.passes.typing.TypeDefCache
 
 /**
  * A type that is defined through Java code, not through
  * Snuggle code. These are injected to the AST while
- * moving from the ParsedAST to the ImportResolvedAST
+ * moving from the ParsedAST to the ResolvedAST
  * phase.
  */
 interface BuiltinType {

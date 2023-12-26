@@ -1,8 +1,8 @@
 package errors
 
-import ast.lexing.Loc
-import ast.typing.MethodDef
-import ast.typing.TypeDef
+import representation.passes.lexing.Loc
+import representation.passes.typing.MethodDef
+import representation.passes.typing.TypeDef
 
 open class CompilationException(message: String, loc: Loc): Exception("$message at $loc")
 

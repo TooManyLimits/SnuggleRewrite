@@ -1,9 +1,9 @@
 package builtins
 
-import ast.typing.MethodDef
-import ast.typing.TypeDef
-import ast.typing.TypeDefCache
-import ast.typing.getBasicBuiltin
+import representation.passes.typing.MethodDef
+import representation.passes.typing.TypeDef
+import representation.passes.typing.TypeDefCache
+import representation.passes.typing.getBasicBuiltin
 
 // Bool type.
 object BoolType: BuiltinType {

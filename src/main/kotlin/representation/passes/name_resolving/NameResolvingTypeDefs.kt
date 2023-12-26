@@ -1,19 +1,22 @@
-package ast.import_resolution
+package representation.passes.name_resolving
 
-import ast.parsing.*
+import representation.asts.resolved.ResolvedFieldDef
+import representation.asts.resolved.ResolvedMethodDef
+import representation.asts.resolved.ResolvedTypeDef
+import representation.asts.parsed.*
 import util.ConsMap
 import util.IdentityCache
 import util.union
 
 data class TypeDefResolutionResult(
-    val resolvedTypeDef: ImportResolvedTypeDef,
+    val resolvedTypeDef: ResolvedTypeDef,
     val files: Set<ParsedFile>
 )
 
 fun resolveTypeDef(
     typeDef: ParsedElement.ParsedTypeDef,
-    startingMappings: ConsMap<String, ImportResolvedTypeDef>,
-    currentMappings: ConsMap<String, ImportResolvedTypeDef>,
+    startingMappings: ConsMap<String, ResolvedTypeDef>,
+    currentMappings: ConsMap<String, ResolvedTypeDef>,
     ast: ParsedAST,
     cache: IdentityCache<ParsedFile, PublicMembers>
 ): TypeDefResolutionResult = when (typeDef) {
@@ -23,7 +26,7 @@ fun resolveTypeDef(
         val resolvedMethods = typeDef.methods.map { resolveMethodDef(it, startingMappings, currentMappings, ast, cache) }
         // TODO: Default supertype to Object
         TypeDefResolutionResult(
-            ImportResolvedTypeDef.SnuggleImportResolvedTypeDef.Class(typeDef.loc, typeDef.pub, typeDef.name,
+            ResolvedTypeDef.Class(typeDef.loc, typeDef.pub, typeDef.name,
                 resolvedSupertype!!,
                 resolvedFields.map { it.first },
                 resolvedMethods.map { it.first }
@@ -35,29 +38,29 @@ fun resolveTypeDef(
 }
 
 private fun resolveFieldDef(fieldDef: ParsedFieldDef,
-                            startingMappings: ConsMap<String, ImportResolvedTypeDef>,
-                            currentMappings: ConsMap<String, ImportResolvedTypeDef>,
+                            startingMappings: ConsMap<String, ResolvedTypeDef>,
+                            currentMappings: ConsMap<String, ResolvedTypeDef>,
                             ast: ParsedAST,
                             cache: IdentityCache<ParsedFile, PublicMembers>
-): Pair<ImportResolvedFieldDef, Set<ParsedFile>> {
+): Pair<ResolvedFieldDef, Set<ParsedFile>> {
     val resolvedType = resolveType(fieldDef.annotatedType, currentMappings)
     val resolvedInitializer = fieldDef.initializer?.let { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
-    return ImportResolvedFieldDef(
+    return ResolvedFieldDef(
         fieldDef.loc, fieldDef.pub, fieldDef.static, fieldDef.name, resolvedType, resolvedInitializer?.expr
     ) to (resolvedInitializer?.files ?: setOf())
 }
 
 private fun resolveMethodDef(
     methodDef: ParsedMethodDef,
-    startingMappings: ConsMap<String, ImportResolvedTypeDef>,
-    currentMappings: ConsMap<String, ImportResolvedTypeDef>,
+    startingMappings: ConsMap<String, ResolvedTypeDef>,
+    currentMappings: ConsMap<String, ResolvedTypeDef>,
     ast: ParsedAST,
     cache: IdentityCache<ParsedFile, PublicMembers>
-): Pair<ImportResolvedMethodDef, Set<ParsedFile>> {
+): Pair<ResolvedMethodDef, Set<ParsedFile>> {
     val resolvedParams = methodDef.params.map { resolvePattern(it, currentMappings) }
     val resolvedReturnType = resolveType(methodDef.returnType, currentMappings)
     val resolvedBody = resolveExpr(methodDef.body, startingMappings, currentMappings, ast, cache)
-    return ImportResolvedMethodDef(
+    return ResolvedMethodDef(
         methodDef.loc, methodDef.pub, methodDef.static, methodDef.name, resolvedParams, resolvedReturnType, resolvedBody.expr
     ) to resolvedBody.files
 }

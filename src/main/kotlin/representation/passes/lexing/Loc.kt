@@ -1,4 +1,4 @@
-package ast.lexing
+package representation.passes.lexing
 
 data class Loc(val startRow: Int, val startCol: Int, val endRow: Int, val endCol: Int, val fileName: String) {
 

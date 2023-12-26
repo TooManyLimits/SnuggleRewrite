@@ -1,16 +1,16 @@
-package ast.typing
+package representation.passes.typing
 
-import ast.import_resolution.ImportResolvedExpr
+import representation.asts.resolved.ResolvedExpr
 import util.ConsMap
 import util.extend
 import kotlin.math.max
 
 
-fun checkExpr(expr: ImportResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypingResult = when(expr) {
+fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypingResult = when(expr) {
 
     // Very similar to inferring a block; we just need to
     // checkExpr() on the last expression, not infer it.
-    is ImportResolvedExpr.Block -> {
+    is ResolvedExpr.Block -> {
         var scope = scope // Shadow scope
         // DIFFERENCE: Map _all but the last expression_ to their inferred forms.
         val typedExprs = expr.exprs.subList(0, max(0, expr.exprs.size - 1)).mapTo(ArrayList(expr.exprs.size+1)) {
@@ -36,7 +36,7 @@ fun checkExpr(expr: ImportResolvedExpr, expectedType: TypeDef, scope: ConsMap<St
         just(TypedExpr.Block(expr.loc, typedExprs, lastExpr.type))
     }
 
-    is ImportResolvedExpr.MethodCall -> {
+    is ResolvedExpr.MethodCall -> {
         // Largely the same as the infer() version, just passes the "expectedType" parameter
         // Infer the type of the receiver
         val typedReceiver = inferExpr(expr.receiver, scope, typeCache).expr

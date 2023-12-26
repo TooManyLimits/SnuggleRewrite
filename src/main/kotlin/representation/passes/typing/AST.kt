@@ -1,9 +1,9 @@
-package ast.typing
+package representation.passes.typing
 
-import ast.lexing.Loc
+import representation.passes.lexing.Loc
 
 /**
- * Previous AST stage was the ImportResolvedAST.
+ * Previous AST stage was the ResolvedAST.
  *
  * The AST is now typed and instantiated.
  *

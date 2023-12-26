@@ -1,7 +1,9 @@
-package ast.parsing
+package representation.passes.parsing
 
-import ast.lexing.Lexer
-import ast.lexing.Loc
+import representation.asts.parsed.ParsedElement
+import representation.asts.parsed.ParsedFile
+import representation.passes.lexing.Lexer
+import representation.passes.lexing.Loc
 
 /**
  * Program parsing !

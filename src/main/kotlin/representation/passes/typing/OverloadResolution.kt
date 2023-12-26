@@ -1,7 +1,7 @@
-package ast.typing
+package representation.passes.typing
 
-import ast.import_resolution.ImportResolvedExpr
-import ast.lexing.Loc
+import representation.asts.resolved.ResolvedExpr
+import representation.passes.lexing.Loc
 import errors.CompilationException
 import errors.NoApplicableMethodException
 import errors.TooManyMethodsException
@@ -20,7 +20,7 @@ fun getBestMethod(
     // Data for understanding the call site
     callLoc: Loc,
     methodName: String,
-    arguments: List<ImportResolvedExpr>,
+    arguments: List<ResolvedExpr>,
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
     typeCache: TypeDefCache,
@@ -75,7 +75,7 @@ private fun getApplicableMethods(
     // The name of the method.
     methodName: String,
     // The arguments to the method call.
-    arguments: List<ImportResolvedExpr>,
+    arguments: List<ResolvedExpr>,
     // The expected output of the method call.
     // If there is no expected output (we're infer()ring), it's null.
     expectedResult: TypeDef?,
@@ -154,7 +154,7 @@ private fun tryChooseBestMethod(
 
     // Auxiliary info used to generate better error messages.
     methodName: String,
-    arguments: List<ImportResolvedExpr>,
+    arguments: List<ResolvedExpr>,
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
     typeCache: TypeDefCache

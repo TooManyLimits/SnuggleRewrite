@@ -1,7 +1,7 @@
-package ast.parsing
+package representation.passes.parsing
 
-import ast.lexing.Lexer
-import ast.lexing.TokenType
+import representation.passes.lexing.Lexer
+import representation.passes.lexing.TokenType
 
 // The start token was just consumed. Continues until finding the end token.
 // consumer is a function that expects a T to be present, and consumes/parses it.

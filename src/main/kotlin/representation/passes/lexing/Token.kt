@@ -1,4 +1,4 @@
-package ast.lexing
+package representation.passes.lexing
 
 import errors.LexingException
 import java.math.BigInteger
