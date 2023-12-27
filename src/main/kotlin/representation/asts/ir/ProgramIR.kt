@@ -1,5 +1,6 @@
 package representation.asts.ir
 
+import org.objectweb.asm.MethodVisitor
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -29,7 +30,7 @@ sealed interface Instruction {
     // A collection of other instructions
     data class CodeBlock(val instructions: ConsList<Instruction>): Instruction
     // Some raw bytecodes supplied by the enclosing program
-    data class Bytecodes(val cost: Long, val bytecodes: (Array<Byte>) -> Unit): Instruction
+    data class Bytecodes(val cost: Long, val bytecodes: (MethodVisitor) -> Unit): Instruction
     // Import the file of the given name
     data class RunImport(val fileName: String): Instruction
     // A virtual method call on the given method

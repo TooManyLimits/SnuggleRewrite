@@ -1,6 +1,7 @@
 package representation.asts.typed
 
 import builtins.BuiltinType
+import org.objectweb.asm.MethodVisitor
 import representation.passes.lexing.Loc
 import representation.passes.typing.TypeDefCache
 import util.Promise
@@ -68,7 +69,7 @@ sealed interface MethodDef {
     // Override vals on the first line, important things on later lines
 
     data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
-                                 val bytecode: (Array<Byte>) -> Unit): MethodDef
+                                 val bytecode: (MethodVisitor) -> Unit): MethodDef
     data class ConstMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                               val bytecode: (TypedExpr.MethodCall) -> TypedExpr): MethodDef
     data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
