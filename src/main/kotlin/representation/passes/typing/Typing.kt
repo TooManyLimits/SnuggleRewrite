@@ -47,11 +47,17 @@ fun getTypeDef(type: ResolvedType, typeCache: TypeDefCache): TypeDef = when (typ
 /**
  * Handle adding an indirection to the instantiation process.
  */
-private inline fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache,
+private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache,
                             instantiator: (TypeDef.Indirection) -> TypeDef
 ): TypeDef {
+    // Create the basic indirection. Depends on knowledge of the base type.
+    fun createIndirection(base: ResolvedTypeDef): TypeDef.Indirection = when (base) {
+        is ResolvedTypeDef.Indirection -> createIndirection(base.promise.expect())
+        is ResolvedTypeDef.Builtin -> TypeDef.Indirection(base.builtin.stackSlots)
+        is ResolvedTypeDef.Class -> TypeDef.Indirection(1)
+    }
     // Create the indirection and add it to the cache
-    val indirection = TypeDef.Indirection()
+    val indirection = createIndirection(base)
     typeCache.put(base, generics, indirection)
     // Instantiate, fill in the indirection with the result, and return.
     val instantiated = instantiator(indirection)
@@ -78,7 +84,7 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
             TypeDef.ClassDef(
                 base.loc, base.name, superType, generics,
                 // Map the fields
-                base.fields.map { throw RuntimeException("Fields not implemented yet") },
+                base.fields.map { TODO() },
                 // Map the methods, using the indirection as the "this"/owning type.
                 base.methods.map { typeMethod(indirection, it, typeCache) }
             )

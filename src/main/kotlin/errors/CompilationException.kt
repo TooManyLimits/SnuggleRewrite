@@ -10,7 +10,7 @@ class LexingException(message: String, loc: Loc)
     : CompilationException(message, loc)
 class UnknownTokenException(unrecognized: String, loc: Loc)
     : CompilationException("Unrecognized ${if (unrecognized.length == 1) "character" else "token"} \"$unrecognized\"", loc)
-class ParsingException(string: String, loc: Loc): CompilationException(string, loc) {
+class ParsingException(message: String, loc: Loc): CompilationException(message, loc) {
     constructor(expected: String, found: String, loc: Loc): this("Expected $expected, found $found", loc)
 }
 class ResolutionException(filePath: String, loc: Loc)

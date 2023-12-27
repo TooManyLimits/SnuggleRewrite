@@ -34,7 +34,7 @@ fun parseMembers(lexer: Lexer): Pair<List<ParsedFieldDef>, List<ParsedMethodDef>
             // This is a method definition. Parse its name, params, and return type...
             val methodName = lexer.expect(TokenType.IDENTIFIER, "for function name")
             val params = parseParams(lexer)
-            val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer) else throw RuntimeException("Unit not yet implemented")
+            val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer) else TODO()
             // Now parse its body:
             val body = parseExpr(lexer)
             // And add it to the list.
@@ -42,7 +42,7 @@ fun parseMembers(lexer: Lexer): Pair<List<ParsedFieldDef>, List<ParsedMethodDef>
         } else {
             // Otherwise, we must have field(s).
             // TODO: Parse fields
-            throw RuntimeException("Fields not yet implemented")
+            TODO()
         }
     }
     return fields to methods

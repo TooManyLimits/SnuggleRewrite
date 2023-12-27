@@ -40,10 +40,10 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
 
     // Variable looks up its name in scope, errors if none is there
-    is ResolvedExpr.Variable -> just(
-        TypedExpr.Variable(expr.loc, expr.name,
-        (scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)).type,
-    ))
+    is ResolvedExpr.Variable -> {
+        val binding = scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)
+        just(TypedExpr.Variable(expr.loc, expr.name, binding.index, binding.type))
+    }
 
     // Blocks maintain their own scope, infer each element. Type of block is type of last expr inside
     is ResolvedExpr.Block -> {
@@ -85,16 +85,19 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             // Check the pattern against the inferred type:
             typedPattern = checkPattern(expr.pattern, typedInitializer.type, typeCache)
         }
-        // Create the new typed expr, type is always bool
-        val typed = TypedExpr.Declaration(expr.loc, typedPattern, typedInitializer, getBasicBuiltin(BoolType, typeCache))
         // Fetch the bindings if this "let" succeeds
-        val patternBindings = bindings(typedPattern)
+        val patternBindings = bindings(typedPattern, scope)
+        // Create the new typed expr, type is always bool.
+        // Use the index that's the second output of bindings().
+        val typed = TypedExpr.Declaration(expr.loc, typedPattern, patternBindings.second,
+            typedInitializer, getBasicBuiltin(BoolType, typeCache))
+
         // If it's fallible, only output the results if true.
         // Otherwise, always output the results.
         if (isFallible(typedPattern))
-            TypingResult.WithVars(typed, patternBindings, ConsMap.of())
+            TypingResult.WithVars(typed, patternBindings.first, ConsMap.of())
         else
-            TypingResult.WithVars(typed, patternBindings, patternBindings)
+            TypingResult.WithVars(typed, patternBindings.first, patternBindings.first)
     }
 
     is ResolvedExpr.MethodCall -> {

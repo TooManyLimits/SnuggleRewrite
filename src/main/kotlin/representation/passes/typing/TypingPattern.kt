@@ -5,7 +5,7 @@ import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedPattern
 import util.ConsMap
 
-data class VariableBinding(val type: TypeDef, val mutable: Boolean)
+data class VariableBinding(val type: TypeDef, val mutable: Boolean, val index: Int)
 
 /**
  * Code to deal with Patterns in the Typing phase.
@@ -57,7 +57,12 @@ fun isFallible(pattern: TypedPattern): Boolean = when (pattern) {
 
 /**
  * Get the bindings that will be added if the pattern successfully matches.
+ * Returns the bindings as well as the local variable index where it's stored.
  */
-fun bindings(pattern: TypedPattern): ConsMap<String, VariableBinding> = when (pattern) {
-    is TypedPattern.BindingPattern -> ConsMap.of(pattern.name to VariableBinding(pattern.type, pattern.isMut))
+fun bindings(pattern: TypedPattern, curScope: ConsMap<String, VariableBinding>): Pair<ConsMap<String, VariableBinding>, Int> {
+    // Top index is the index of the thing on top of the stack, plus its # of stack slots.
+    val topIndex = curScope.firstOrNull()?.second?.let { it.index + it.type.stackSlots } ?: 0
+    return when (pattern) {
+        is TypedPattern.BindingPattern -> ConsMap.of(pattern.name to VariableBinding(pattern.type, pattern.isMut, topIndex))
+    } to topIndex
 }

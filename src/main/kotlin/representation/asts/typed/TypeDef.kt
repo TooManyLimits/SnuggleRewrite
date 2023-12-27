@@ -11,6 +11,7 @@ sealed interface TypeDef {
 
     val name: String
     val runtimeName: String?
+    val stackSlots: Int
 
     val fields: List<FieldDef>
     val methods: List<MethodDef>
@@ -24,16 +25,21 @@ sealed interface TypeDef {
     // self-references inside of types, i.e. if class A uses the type
     // A inside its definition (which is likely), the things in A need to
     // refer to A, while A is still being constructed.
-    data class Indirection(val promise: Promise<TypeDef> = Promise()): TypeDef {
+    //
+    // However, certain aspects of the self-referring type def need to be
+    // known while the promise is still being fulfilled.
+    // This includes the # of stack slots.
+    data class Indirection(override val stackSlots: Int, val promise: Promise<TypeDef> = Promise()): TypeDef {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
         override val fields: List<FieldDef> get() = promise.expect().fields
         override val methods: List<MethodDef> get() = promise.expect().methods
     }
 
-    class InstantiatedBuiltin(builtin: BuiltinType, private val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
+    class InstantiatedBuiltin(builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
         override val name: String = toGeneric(builtin.name, generics)
         override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
+        override val stackSlots: Int = builtin.stackSlots
         override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
         override val methods: List<MethodDef> = builtin.getMethods(generics, typeCache)
     }
@@ -44,6 +50,7 @@ sealed interface TypeDef {
                    override val methods: List<MethodDef>
     ): TypeDef {
         override val runtimeName: String get() = name
+        override val stackSlots: Int get() = 1
     }
 
 

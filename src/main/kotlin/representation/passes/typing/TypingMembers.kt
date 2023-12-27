@@ -3,6 +3,7 @@ package representation.passes.typing
 import representation.asts.resolved.ResolvedMethodDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
+import util.ConsList
 import util.ConsMap
 import util.extend
 
@@ -24,12 +25,13 @@ fun typeMethod(owningType: TypeDef?, methodDef: ResolvedMethodDef, typeCache: Ty
     // Get the param types that are required to be passed to the function
     val paramTypes = typedParams.map { it.type }
     // Get the bindings for the body, from the params
-    var bodyBindings = ConsMap.fromIterable(typedParams.flatMap { bindings(it) })
-    // If non-static, add a "this" parameter as the first one
+    var bodyBindings: ConsMap<String, VariableBinding> = ConsMap.of()
+    // If non-static, add a "this" parameter as the first one in the bindings
     if (!methodDef.static)
-        bodyBindings = bodyBindings.extend("this", VariableBinding(owningType!!, false))
-    // Reverse order of bindings, even though this shouldn't technically matter...
-    bodyBindings = bodyBindings.reverse()
+        bodyBindings = bodyBindings.extend("this", VariableBinding(owningType!!, false, 0))
+    // Populate the bindings
+    for (typedParam in typedParams)
+        bodyBindings = bodyBindings.extend(bindings(typedParam, bodyBindings).first)
     // Get the return type of the method:
     val returnType = getTypeDef(methodDef.returnType, typeCache)
     // Type-check the method body to be the return type.

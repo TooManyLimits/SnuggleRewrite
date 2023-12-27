@@ -34,6 +34,11 @@ interface BuiltinType {
     // optional.
     val runtimeName: String?
 
+    // The number of slots on the stack this takes up.
+    // For most basic java types, it's 1. For longs and doubles,
+    // it's 2. For plural types, the value can be anything >= 0.
+    val stackSlots: Int
+
     // Get the fields of this type, given the generics.
     fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now
 

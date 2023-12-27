@@ -1,7 +1,6 @@
 package util
 
 class Promise<T>(private var element: T? = null) {
-//    fun get(): T? = element
     fun expect(): T {
         return element ?: throw IllegalStateException("Expected promise to be fulfilled, but wasn't")
     }
