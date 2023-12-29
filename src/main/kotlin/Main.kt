@@ -6,6 +6,8 @@ import representation.passes.typing.typeAST
 import builtins.BoolType
 import builtins.ObjectType
 import representation.passes.lowering.lower
+import representation.passes.output.output
+import runtime.SnuggleInstance
 import util.ConsList
 
 fun main() {
@@ -13,11 +15,10 @@ fun main() {
     val code = """
         let x: bool = true
         let y: bool = false
-//        let z: bool = x + y + false
-//        let w: Test = false // technically "isSubtype()" always returns true right now, which is why this is okay
-//        class Test {
-//            fn add(mut x: bool): bool false
-//        }
+        let z: bool = x * y + true
+        class Test {
+            fn add(mut x: bool): bool false
+        }
     """.trimIndent()
     val lexer = Lexer("main", code)
 
@@ -31,5 +32,7 @@ fun main() {
     println(typedAST)
     val ir = lower(typedAST)
     println(ir)
+    val instance = SnuggleInstance(output(ir))
+    instance.runtime.runCode()
 
 }

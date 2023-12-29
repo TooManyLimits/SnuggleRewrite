@@ -7,7 +7,6 @@ import representation.asts.ir.Program
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
-import util.Cache
 import util.ConsList
 import util.IdentityCache
 

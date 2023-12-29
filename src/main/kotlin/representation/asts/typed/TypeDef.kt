@@ -12,6 +12,8 @@ sealed interface TypeDef {
 
     val name: String
     val runtimeName: String?
+    val descriptor: List<String>
+
     val stackSlots: Int
 
     val fields: List<FieldDef>
@@ -33,13 +35,15 @@ sealed interface TypeDef {
     data class Indirection(override val stackSlots: Int, val promise: Promise<TypeDef> = Promise()): TypeDef {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
+        override val descriptor: List<String> get() = promise.expect().descriptor
         override val fields: List<FieldDef> get() = promise.expect().fields
         override val methods: List<MethodDef> get() = promise.expect().methods
     }
 
-    class InstantiatedBuiltin(builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
+    class InstantiatedBuiltin(val builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
         override val name: String = toGeneric(builtin.name, generics)
         override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
+        override val descriptor: List<String> = builtin.descriptor
         override val stackSlots: Int = builtin.stackSlots
         override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
         override val methods: List<MethodDef> = builtin.getMethods(generics, typeCache)
@@ -51,6 +55,7 @@ sealed interface TypeDef {
                    override val methods: List<MethodDef>
     ): TypeDef {
         override val runtimeName: String get() = name
+        override val descriptor: List<String> get() = listOf("L$runtimeName;")
         override val stackSlots: Int get() = 1
     }
 
@@ -62,17 +67,18 @@ sealed interface TypeDef {
 sealed interface MethodDef {
     val pub: Boolean //
     val static: Boolean
+    val owningType: TypeDef
     val name: String
     val returnType: TypeDef
     val argTypes: List<TypeDef>
 
     // Override vals on the first line, important things on later lines
 
-    data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
+    data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                  val bytecode: (MethodVisitor) -> Unit): MethodDef
-    data class ConstMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
+    data class ConstMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                               val bytecode: (TypedExpr.MethodCall) -> TypedExpr): MethodDef
-    data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
+    data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                 val loc: Loc, val body: TypedExpr): MethodDef
 }
 

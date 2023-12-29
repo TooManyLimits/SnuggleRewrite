@@ -34,6 +34,11 @@ interface BuiltinType {
     // optional.
     val runtimeName: String?
 
+    // The java descriptor of this type. For instance, booleans
+    // have "Z". Integers have "I". Longs are "J". Strings are
+    // "Ljava/lang/String;".
+    val descriptor: List<String>
+
     // The number of slots on the stack this takes up.
     // For most basic java types, it's 1. For longs and doubles,
     // it's 2. For plural types, the value can be anything >= 0.

@@ -23,6 +23,8 @@ private fun parseBinary(lexer: Lexer, precedence: Int): ParsedExpr {
         val methodName = when(tok.type) {
             TokenType.PLUS -> "add"
             TokenType.MINUS -> "sub"
+            TokenType.STAR -> "mul"
+            TokenType.SLASH -> "div"
             else -> throw IllegalStateException("Unexpected binary operator ${tok.type}. Bug in compiler, please report")
         }
         val rhs = parseBinary(lexer, rhsPrecedence)
@@ -85,7 +87,8 @@ private val TOKS_BY_PRECEDENCE: Array<Array<TokenType>> = arrayOf(
     arrayOf(),
     arrayOf(),
     arrayOf(),
-    arrayOf(TokenType.PLUS, TokenType.MINUS)
+    arrayOf(TokenType.PLUS, TokenType.MINUS),
+    arrayOf(TokenType.STAR, TokenType.SLASH)
 )
 
 private fun isRightAssociative(op: TokenType): Boolean {

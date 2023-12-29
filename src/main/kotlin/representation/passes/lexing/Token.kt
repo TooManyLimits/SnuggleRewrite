@@ -69,6 +69,8 @@ fun tokenOf(loc: Loc, string: String): Token? {
 
         "+" -> TokenType.PLUS
         "-" -> TokenType.MINUS
+        "*" -> TokenType.STAR
+        "/" -> TokenType.SLASH
         "=" -> TokenType.EQUALS
 
         "true" -> return Token(loc, TokenType.LITERAL, true)
@@ -141,6 +143,8 @@ enum class TokenType {
 
     PLUS,
     MINUS,
+    STAR,
+    SLASH,
     EQUALS,
 }
 

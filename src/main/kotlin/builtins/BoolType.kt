@@ -1,5 +1,6 @@
 package builtins
 
+import org.objectweb.asm.Opcodes
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.passes.typing.TypeDefCache
@@ -11,12 +12,20 @@ object BoolType: BuiltinType {
     override val name: String get() = "bool"
     override val nameable: Boolean get() = true
     override val runtimeName: String? get() = null
+    override val descriptor: List<String> = listOf("Z")
     override val stackSlots: Int get() = 1
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(
-            MethodDef.BytecodeMethodDef(true, false, "add", boolType, listOf(boolType)) {}
+            MethodDef.BytecodeMethodDef(pub = true, static = false, boolType, "add", boolType, listOf(boolType)) {
+                // [this, arg]
+                it.visitInsn(Opcodes.IOR) // [this | arg]
+            },
+            MethodDef.BytecodeMethodDef(pub = true, static = false, boolType, "mul", boolType, listOf(boolType)) {
+                // [this, arg]
+                it.visitInsn(Opcodes.IAND) // [this & arg]
+            }
         )
     }
 

@@ -1,6 +1,7 @@
 package representation.passes.lowering
 
 import representation.asts.ir.Instruction
+import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.passes.typing.isFallible
@@ -43,6 +44,11 @@ fun lowerExpr(expr: TypedExpr): Sequence<Instruction> = when (expr) {
         yieldAll(lowerExpr(expr.receiver))
         for (arg in expr.args)
             yieldAll(lowerExpr(arg))
-        yield(Instruction.VirtualCall(expr.methodDef))
+        when (expr.methodDef) {
+            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
+            is MethodDef.SnuggleMethodDef -> yield(Instruction.VirtualCall(expr.methodDef))
+            is MethodDef.ConstMethodDef -> TODO()
+        }
+
     }
 }
