@@ -45,7 +45,30 @@ private fun parseUnary(lexer: Lexer): ParsedExpr {
         val loc = tok.loc.merge(operand.loc)
         return ParsedExpr.MethodCall(loc, operand, methodName, listOf())
     }
-    return parseUnit(lexer)
+    return parseFieldAccessOrMethodCall(lexer)
+}
+
+private fun parseFieldAccessOrMethodCall(lexer: Lexer): ParsedExpr {
+    var expr = parseUnit(lexer)
+    while (lexer.consume(TokenType.DOT, TokenType.LEFT_PAREN)) when (lexer.last().type) {
+        TokenType.DOT -> {
+            val name = lexer.expect(TokenType.IDENTIFIER, "after DOT")
+            if (lexer.consume(TokenType.LEFT_PAREN)) {
+                val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it) }
+                expr = ParsedExpr.MethodCall(name.loc, expr, name.string(), args)
+            } else {
+                TODO() // Field
+            }
+        }
+        //invoke() overload
+        TokenType.LEFT_PAREN -> {
+            val loc = lexer.last().loc
+            val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it) }
+            expr = ParsedExpr.MethodCall(loc, expr, "invoke", args)
+        }
+        else -> throw IllegalStateException()
+    }
+    return expr
 }
 
 private fun parseUnit(lexer: Lexer): ParsedExpr {

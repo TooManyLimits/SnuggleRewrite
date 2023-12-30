@@ -20,9 +20,9 @@ object PrintType: BuiltinType {
         val thisType = getBasicBuiltin(this, typeCache)
         val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(
-            // Just have it output bool for now, since we dont have a unit/tuple type yet :P
-            // print.invoke(bool)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "add", boolType, listOf(boolType)) {
+            // Just have it output bool for now, since we don't have a unit/tuple type yet :P
+            // print(bool)
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", boolType, listOf(boolType)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]

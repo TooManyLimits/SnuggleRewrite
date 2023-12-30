@@ -17,10 +17,8 @@ fun main() {
         let x: bool = true
         let y: bool = false
         let z: bool = x * y + true
-        // I dont have any method call syntax other than "a + b" -> "a.add(b)"
-        // there's a type "print" with a static method "add(bool)" that prints the bool.
-        print + z
-        print + x * y
+        print(z)
+        print(x * y)
     """.trimIndent()
     val lexer = Lexer("main", code)
 
