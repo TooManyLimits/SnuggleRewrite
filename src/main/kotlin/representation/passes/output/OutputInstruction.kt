@@ -41,6 +41,12 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         val descriptor = getMethodDescriptor(inst.methodToCall)
         writer.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner, name, descriptor, false)
     }
+    is Instruction.StaticCall -> {
+        val owner = inst.methodToCall.owningType.runtimeName!!
+        val name = inst.methodToCall.name
+        val descriptor = getMethodDescriptor(inst.methodToCall)
+        writer.visitMethodInsn(Opcodes.INVOKESTATIC, owner, name, descriptor, false)
+    }
     // Helper function for push, it has lots of logic
     is Instruction.Push -> outputPush(inst, writer)
     // Pop the correct number of stack slots

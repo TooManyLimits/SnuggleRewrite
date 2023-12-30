@@ -33,6 +33,8 @@ sealed interface Instruction {
     data class RunImport(val fileName: String): Instruction
     // A virtual method call on the given method
     data class VirtualCall(val methodToCall: MethodDef): Instruction
+    // A static method call on the given method
+    data class StaticCall(val methodToCall: MethodDef): Instruction
 
     // Push the given value onto the stack
     data class Push(val valueToPush: Any): Instruction

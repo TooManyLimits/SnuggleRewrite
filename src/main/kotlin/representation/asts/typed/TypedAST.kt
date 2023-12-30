@@ -45,6 +45,7 @@ sealed interface TypedExpr {
     data class Variable(override val loc: Loc, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr
     data class MethodCall(override val loc: Loc, val receiver: TypedExpr, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
+    data class StaticMethodCall(override val loc: Loc, val receiverType: TypeDef, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
 }
 
 sealed interface TypedPattern {

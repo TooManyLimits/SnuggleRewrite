@@ -111,6 +111,14 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
+    is ResolvedExpr.StaticMethodCall -> {
+        // Largely same as above, MethodCall
+        val receiverType = getTypeDef(expr.receiverType, typeCache)
+        val methods = receiverType.methods.filter { it.static }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache)
+        just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
+    }
+
     is ResolvedExpr.Literal -> just(
         TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {
         is Boolean -> getBasicBuiltin(BoolType, typeCache)

@@ -120,15 +120,38 @@ fun resolveExpr(
     // Others are fairly straightforward; resolve the things inside, collect the results, and return.
 
     // Method calls:
-    is ParsedElement.ParsedExpr.MethodCall -> {
-        // Resolve the receiver and the args, collect results, and return.
-        val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
+    is ParsedElement.ParsedExpr.MethodCall -> run {
+
+        // Always resolve the arguments and collect the files and exposed types first
         val resolvedArgs = expr.args.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
-        val unitedFiles = union(resolvedReceiver.files, union(resolvedArgs.map { it.files }))
-        val unitedExposedTypes = resolvedReceiver.exposedTypes.extendMany(resolvedArgs.map { it.exposedTypes })
+        val unitedFiles = union(resolvedArgs.map { it.files })
+        val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>()
+            .extendMany(resolvedArgs.map { it.exposedTypes })
+
+        // Now, we need to check if this is a static method call; we do that by seeing if
+        // the receiver is the name of some type.
+        if (expr.receiver is ParsedElement.ParsedExpr.Variable) {
+            val type = currentMappings.lookup(expr.receiver.name)
+            if (type != null) {
+                // Return a static method call result
+                return@run ExprResolutionResult(
+                    ResolvedExpr.StaticMethodCall(
+                        expr.loc,
+                        ResolvedType.Basic(expr.receiver.loc, type, listOf()),
+                        expr.methodName,
+                        resolvedArgs.map { it.expr }
+                    ), unitedFiles, unitedExposedTypes
+                )
+            }
+        }
+
+        // Otherwise, this is a non-static method call.
+        // Resolve the receiver and return.
+        val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
         ExprResolutionResult(
             ResolvedExpr.MethodCall(expr.loc, resolvedReceiver.expr, expr.methodName, resolvedArgs.map { it.expr }),
-            unitedFiles, unitedExposedTypes
+            union(resolvedReceiver.files, unitedFiles), // Add its files
+            resolvedReceiver.exposedTypes.extend(unitedExposedTypes) // Add its exposed types
         )
     }
 

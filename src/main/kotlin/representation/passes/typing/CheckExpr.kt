@@ -51,6 +51,14 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
+    is ResolvedExpr.StaticMethodCall -> {
+        // Largely same as MethodCall above ^
+        val receiverType = getTypeDef(expr.receiverType, typeCache)
+        val methods = receiverType.methods.filter { it.static }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache)
+        just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
+    }
+
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
     // e.g. Import, Variable, Literal, Declaration.

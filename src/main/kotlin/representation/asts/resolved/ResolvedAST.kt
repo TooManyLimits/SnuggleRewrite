@@ -88,6 +88,7 @@ sealed interface ResolvedExpr {
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
     data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
+    data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
 }
 
 sealed interface ResolvedPattern {
