@@ -50,4 +50,13 @@ interface BuiltinType {
     // Get the methods of this type, given the generics.
     fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> = listOf() //listOf() for now
 
+    // Get the primary supertype of this type (used for inheritance purposes)
+    // Default is null.
+    fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef? = null
+
+    // Get all supertypes of this type (used for type-checking purposes)
+    // Default is just the primary supertype.
+    fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =
+        getPrimarySupertype(generics, typeCache)?.let { listOf(it) } ?: listOf()
+
 }

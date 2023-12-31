@@ -1,9 +1,11 @@
 package representation.passes.lowering
 
+import builtins.BoolType
 import representation.asts.ir.Instruction
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
+import representation.passes.typing.getBasicBuiltin
 import representation.passes.typing.isFallible
 import util.ConsMap
 
@@ -33,12 +35,12 @@ fun lowerExpr(expr: TypedExpr): Sequence<Instruction> = when (expr) {
             // Store/bind local variable
             yield(Instruction.StoreLocal(expr.variableIndex, expr.pattern.type))
             // Push true
-            yield(Instruction.Push(true))
+            yield(Instruction.Push(true, expr.type))
         }
     // Load the local variable, simple
     is TypedExpr.Variable -> sequenceOf(Instruction.LoadLocal(expr.variableIndex, expr.type))
     // Push the literal
-    is TypedExpr.Literal -> sequenceOf(Instruction.Push(expr.value))
+    is TypedExpr.Literal -> sequenceOf(Instruction.Push(expr.value, expr.type))
     // Compile arguments, make call
     is TypedExpr.MethodCall -> sequence {
         yieldAll(lowerExpr(expr.receiver))

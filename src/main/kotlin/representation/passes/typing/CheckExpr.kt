@@ -1,11 +1,15 @@
 package representation.passes.typing
 
+import builtins.IntLiteralType
+import builtins.IntType
+import errors.NumberRangeException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import util.ConsMap
 import util.extend
+import java.math.BigInteger
 import kotlin.math.max
 
 
@@ -59,21 +63,41 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
+    is ResolvedExpr.Literal -> run {
+        val res = inferExpr(expr, scope, typeCache)
+        // Special handling if we have an IntLiteral, and are expecting a numeric type
+        // TODO: Float literal, float numeric types
+        val litRes = res.expr as TypedExpr.Literal
+        if (res.expr.type.builtin == IntLiteralType) {
+            // Have IntLiteral, expect IntLiteral, we're done
+            if (expectedType.builtin == IntLiteralType)
+                return@run res
+            // Have IntLiteral, expect IntType. Check it fits, we're done.
+            if (expectedType.builtin is IntType) {
+                val expectedIntType = expectedType.builtin as IntType
+                if (!expectedIntType.fits(litRes.value as BigInteger))
+                    throw NumberRangeException(expectedIntType, litRes.value, expr.loc)
+                return@run just(TypedExpr.Literal(expr.loc, litRes.value, expectedType))
+            }
+        }
+        if (!res.expr.type.isSubtype(expectedType))
+            throw TypeCheckingException(expectedType, res.expr.type, "Literal", expr.loc)
+        res
+    }
+
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
-    // e.g. Import, Variable, Literal, Declaration.
+    // e.g. Import, Variable, Declaration.
     // Usually, inferring and checking work similarly.
     else -> {
         val res = inferExpr(expr, scope, typeCache)
-        if (!res.expr.type.isSubtype(expectedType, typeCache))
+        if (!res.expr.type.isSubtype(expectedType))
             throw TypeCheckingException(expectedType, res.expr.type, when(expr) {
                 is ResolvedExpr.Import -> "Import expression"
                 is ResolvedExpr.Variable -> "Variable \"${expr.name}\""
-                is ResolvedExpr.Literal -> "Literal"
                 is ResolvedExpr.Declaration -> "Let expression"
                 else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
             }, expr.loc)
-        // TODO: Ensure that res.expr.type is a subtype of expectedType
         res
     }
 }

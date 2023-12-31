@@ -16,12 +16,29 @@ sealed interface TypeDef {
 
     val stackSlots: Int
 
+    val primarySupertype: TypeDef?
+    val supertypes: List<TypeDef>
+
     val fields: List<FieldDef>
     val methods: List<MethodDef>
 
-    fun isSubtype(other: TypeDef, cache: TypeDefCache): Boolean {
-        //TODO
-        return true
+    // For most types, their builtin is null. For instantiated builtins,
+    // it's non-null. Including this property greatly reduces boilerplate
+    // in some situations, where we need to check if a type is an instance
+    // of InstantiatedBuiltin and smart-cast it before checking its builtin.
+    val builtin: BuiltinType? get() = null
+
+    fun isSubtype(other: TypeDef): Boolean {
+        fun unwrap(typeDef: TypeDef): TypeDef =
+            if (typeDef is Indirection) typeDef.promise.expect() else typeDef
+
+        val thisUnwrapped = unwrap(this)
+        val otherUnwrapped = unwrap(other)
+        if (thisUnwrapped == otherUnwrapped) return true
+        for (supertype in supertypes)
+            if (supertype.isSubtype(otherUnwrapped))
+                return true
+        return false
     }
 
     // An indirection which points to another TypeDef. Needed because of
@@ -36,15 +53,20 @@ sealed interface TypeDef {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
         override val descriptor: List<String> get() = promise.expect().descriptor
+        override val primarySupertype: TypeDef? get() = promise.expect().primarySupertype
+        override val supertypes: List<TypeDef> get() = promise.expect().supertypes
         override val fields: List<FieldDef> get() = promise.expect().fields
         override val methods: List<MethodDef> get() = promise.expect().methods
+        override val builtin: BuiltinType? get() = promise.expect().builtin
     }
 
-    class InstantiatedBuiltin(val builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
+    class InstantiatedBuiltin(override val builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
         override val name: String = toGeneric(builtin.name, generics)
         override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
         override val descriptor: List<String> = builtin.descriptor
         override val stackSlots: Int = builtin.stackSlots
+        override val primarySupertype: TypeDef? = builtin.getPrimarySupertype(generics, typeCache)
+        override val supertypes: List<TypeDef> = builtin.getAllSupertypes(generics, typeCache)
         override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
         override val methods: List<MethodDef> = builtin.getMethods(generics, typeCache)
     }
@@ -57,10 +79,9 @@ sealed interface TypeDef {
         override val runtimeName: String get() = name
         override val descriptor: List<String> get() = listOf("L$runtimeName;")
         override val stackSlots: Int get() = 1
+        override val primarySupertype: TypeDef get() = supertype
+        override val supertypes: List<TypeDef> = listOf(primarySupertype)
     }
-
-
-
 }
 
 // A method definition,

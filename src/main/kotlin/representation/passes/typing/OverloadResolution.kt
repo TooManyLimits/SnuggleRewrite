@@ -108,8 +108,7 @@ private fun getApplicableMethods(
 
         // If we have an expected result,
         // Wrong return type:
-        if (expectedResult != null &&
-            !method.returnType.isSubtype(expectedResult, typeCache)) { return@filter false }
+        if (expectedResult != null && !method.returnType.isSubtype(expectedResult)) { return@filter false }
 
         // Final filter: check that all arguments match the expected type.
         arguments.allIndexed { index, arg ->

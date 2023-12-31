@@ -77,7 +77,7 @@ private fun parseUnit(lexer: Lexer): ParsedExpr {
 
         TokenType.IMPORT -> parseImport(lexer)
 
-        TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value ?: println(lexer.last().type))
+        TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value!!)
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
         TokenType.LET -> parseDeclaration(lexer)

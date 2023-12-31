@@ -37,7 +37,7 @@ sealed interface Instruction {
     data class StaticCall(val methodToCall: MethodDef): Instruction
 
     // Push the given value onto the stack
-    data class Push(val valueToPush: Any): Instruction
+    data class Push(val valueToPush: Any, val type: TypeDef): Instruction
     // Pop the given type from the top of the stack
     data class Pop(val typeToPop: TypeDef): Instruction
 

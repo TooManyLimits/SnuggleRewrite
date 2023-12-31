@@ -1,5 +1,8 @@
 package representation.passes.typing
 
+import builtins.IntLiteralType
+import errors.CompilationException
+import errors.InferenceException
 import representation.asts.resolved.ResolvedPattern
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedPattern
@@ -30,9 +33,11 @@ fun isExplicitlyTyped(pattern: ResolvedPattern): Boolean = when (pattern) {
  */
 fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, typeCache: TypeDefCache): TypedPattern = when (pattern) {
     is ResolvedPattern.BindingPattern -> {
+        // If scrutinee is an unstorable type, like IntLiteral, error here
+        if (scrutineeType.builtin == IntLiteralType)
+            throw InferenceException("Cannot infer type of int literal - try adding more annotations", pattern.loc)
         // TODO: Check that the scrutinee is a subtype of the type annotation, if this has one
-        val type = getTypeDef(pattern.typeAnnotation!!, typeCache)
-        TypedPattern.BindingPattern(pattern.loc, type, pattern.name, pattern.isMut)
+        TypedPattern.BindingPattern(pattern.loc, scrutineeType, pattern.name, pattern.isMut)
     }
 }
 

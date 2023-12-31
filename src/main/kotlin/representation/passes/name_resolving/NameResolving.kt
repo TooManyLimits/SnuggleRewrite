@@ -21,9 +21,8 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ResolvedAST
 
     // Get the starting map of type definitions.
     val startingMappings: ConsMap<String, ResolvedTypeDef.Builtin> = builtinTypes
-        .filter { it.nameable } // Only nameable types should be in here
         .map { ResolvedTypeDef.Builtin(it) } // Wrap in Builtin()
-        .associateBy { t -> t.name } // Associate by name
+        .associateBy { t -> if (t.builtin.nameable) t.name else "" } // Associate by name (or empty string if not nameable)
 
     val mainFile: ParsedFile = ast.files["main"]?.value ?: throw IllegalArgumentException("Expected \"main\" file, but did not find one")
 

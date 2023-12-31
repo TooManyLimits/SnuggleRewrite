@@ -1,12 +1,14 @@
 package representation.passes.output
 
-import builtins.BoolType
-import builtins.ObjectType
+import builtins.*
+import errors.NumberRangeException
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.Instruction
 import representation.asts.typed.TypeDef
+import representation.passes.typing.typeAST
+import java.math.BigInteger
 
 fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (inst) {
 
@@ -77,9 +79,12 @@ private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: Metho
         is TypeDef.InstantiatedBuiltin -> when (type.builtin) {
             // Builtin types:
             is BoolType -> writer.visitVarInsn(choose(Opcodes.ISTORE, Opcodes.ILOAD), index)
-
+            is IntType -> if (type.builtin.bits <= 32)
+                writer.visitVarInsn(choose(Opcodes.ISTORE, Opcodes.ILOAD), index)
+            else
+                writer.visitVarInsn(choose(Opcodes.LSTORE, Opcodes.LLOAD), index)
             is ObjectType -> writer.visitVarInsn(choose(Opcodes.ASTORE, Opcodes.ALOAD), index)
-            else -> throw RuntimeException("Unknown builtin type by LoadLocal \"${type.builtin.name}, bug in compiler, please report")
+            else -> throw RuntimeException("Unknown builtin type by LoadLocal \"${type.builtin.name}\", bug in compiler, please report")
         }
         is TypeDef.ClassDef -> writer.visitVarInsn(choose(Opcodes.ASTORE, Opcodes.ALOAD), index)
         is TypeDef.Indirection -> throw IllegalStateException("Should not be indirect here, bug in compiler, please report")
@@ -92,6 +97,36 @@ private fun outputPush(inst: Instruction.Push, writer: MethodVisitor) = when (in
 
     // Boolean, push 1 or 0
     is Boolean -> writer.visitInsn(if (inst.valueToPush) Opcodes.ICONST_1 else Opcodes.ICONST_0)
+    // Big integer. Output proper thing based on the type
+    is BigInteger -> {
+        val intType = inst.type.builtin as IntType
+        val v = inst.valueToPush
+        if (intType.bits <= 32) {
+            if (!intType.fits(v))
+                throw IllegalStateException("Number literal out of range - but this should have been caught earlier. Bug in compiler, please report")
+            when {
+                // LDC, SIPUSH
+                !I16Type.fits(v) -> writer.visitLdcInsn(v.intValueExact())
+                !I8Type.fits(v) -> writer.visitIntInsn(Opcodes.SIPUSH, v.shortValueExact().toInt())
+                // ICONST
+                v == BigInteger.ZERO -> writer.visitInsn(Opcodes.ICONST_0)
+                v == BigInteger.ONE -> writer.visitInsn(Opcodes.ICONST_1)
+                v == BigInteger.TWO -> writer.visitInsn(Opcodes.ICONST_2)
+                v == BigInteger.valueOf(-1) -> writer.visitInsn(Opcodes.ICONST_M1)
+                v == BigInteger.valueOf(3) -> writer.visitInsn(Opcodes.ICONST_3)
+                v == BigInteger.valueOf(4) -> writer.visitInsn(Opcodes.ICONST_4)
+                v == BigInteger.valueOf(5) -> writer.visitInsn(Opcodes.ICONST_5)
+                // BIPUSH
+                else -> writer.visitIntInsn(Opcodes.BIPUSH, v.byteValueExact().toInt())
+            }
+        } else {
+            when (v) {
+                BigInteger.ZERO -> writer.visitInsn(Opcodes.LCONST_0)
+                BigInteger.ONE -> writer.visitInsn(Opcodes.LCONST_1)
+                else -> writer.visitLdcInsn(v.longValueExact())
+            }
+        }
+    }
 
     else -> throw IllegalStateException("Unrecognized literal class: ${inst.valueToPush.javaClass.name}")
 }

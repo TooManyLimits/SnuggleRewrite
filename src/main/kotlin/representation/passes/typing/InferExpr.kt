@@ -1,14 +1,16 @@
 package representation.passes.typing
 
+import builtins.*
 import representation.asts.resolved.ResolvedExpr
-import builtins.BoolType
 import errors.NoSuchVariableException
 import representation.asts.typed.TypedExpr
 import representation.asts.typed.TypedPattern
+import representation.passes.lexing.IntLiteralData
 import util.ConsList
 import util.ConsMap
 import util.extend
 import util.lookup
+import java.math.BigInteger
 
 /**
  * The output of type-checking an expression. Always results in a TypedExpr,
@@ -119,11 +121,24 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
 
-    is ResolvedExpr.Literal -> just(
-        TypedExpr.Literal(expr.loc, expr.value, when (expr.value) {
-        is Boolean -> getBasicBuiltin(BoolType, typeCache)
-
-        else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
-    }))
+    is ResolvedExpr.Literal -> {
+        var value = expr.value
+        val type = when (expr.value) {
+            is Boolean -> getBasicBuiltin(BoolType, typeCache)
+            is BigInteger -> getBasicBuiltin(IntLiteralType, typeCache)
+            is IntLiteralData -> {
+                value = expr.value.value // Unwrap value
+                getBasicBuiltin(when (expr.value.bits) {
+                    8 -> if (expr.value.signed) I8Type else U8Type
+                    16 -> if (expr.value.signed) I16Type else U16Type
+                    32 -> if (expr.value.signed) I32Type else U32Type
+                    64 -> if (expr.value.signed) I64Type else U64Type
+                    else -> throw IllegalStateException()
+                }, typeCache)
+            }
+            else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
+        }
+        just(TypedExpr.Literal(expr.loc, value, type))
+    }
 
 }
