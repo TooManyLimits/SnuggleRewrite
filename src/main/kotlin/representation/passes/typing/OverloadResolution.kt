@@ -201,5 +201,28 @@ private fun getMostSpecific(applicable: ApplicableMethodsResult): BestMethodData
  * If A is more specific than B, output a negative number.
  */
 private fun compareMethods(a: MethodDef, b: MethodDef): Int {
-    return 0; // Return 0 for now
+    // Return -1 if t1 is more specific than t2, etc.
+    fun compareTypes(t1: TypeDef, t2: TypeDef) =
+        if (t1.isSubtype(t2)) {
+            if (t2.isSubtype(t1))
+                0
+            else
+                -1
+        } else {
+            if (t2.isSubtype(t1))
+                0
+            else
+                1
+        }
+    // Compare each arg, also negation of the return types
+    val comparedArgs = a.argTypes.asSequence().zip(b.argTypes.asSequence()).map {
+        compareTypes(it.first, it.second)
+    } + -compareTypes(a.returnType, b.returnType)
+    val hasM1 = -1 in comparedArgs
+    val has1 = 1 in comparedArgs
+    // If there's some both ways, then neither is more specific
+    if (hasM1 && has1) return 0
+    if (hasM1) return -1
+    if (has1) return 1
+    return 0
 }

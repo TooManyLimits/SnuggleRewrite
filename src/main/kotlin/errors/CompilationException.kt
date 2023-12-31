@@ -31,14 +31,14 @@ class NoApplicableMethodException(methodName: String, argTypes: List<TypeDef?>, 
         overloadString(methodName, argTypes, returnType)
     }${
         if (tried.isNotEmpty()) "\nTried:\n${
-            tried.joinToString { "- " + overloadString(it.name, it.argTypes, it.returnType) + "\n" }
+            tried.joinToString(separator = "") { "- " + overloadString(it.name, it.argTypes, it.returnType) + "\n" }
         }"
         else "\n"
     }", loc
 )
 class TooManyMethodsException(potential: List<MethodDef>, loc: Loc): CompilationException(
     "Too many valid overloads for method call; cannot choose between:\n ${
-        potential.joinToString { "- " + overloadString(it.name, it.argTypes, it.returnType) + "\n" }
+        potential.joinToString(separator = "") { "- " + overloadString(it.name, it.argTypes, it.returnType) + "\n" }
     }",
     loc
 )

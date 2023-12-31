@@ -35,7 +35,7 @@ fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, typeCache: Ty
     is ResolvedPattern.BindingPattern -> {
         // If scrutinee is an unstorable type, like IntLiteral, error here
         if (scrutineeType.builtin == IntLiteralType)
-            throw InferenceException("Cannot infer type of int literal - try adding more annotations", pattern.loc)
+            throw InferenceException("Cannot infer type of literal - try adding more annotations", pattern.loc)
         // TODO: Check that the scrutinee is a subtype of the type annotation, if this has one
         TypedPattern.BindingPattern(pattern.loc, scrutineeType, pattern.name, pattern.isMut)
     }

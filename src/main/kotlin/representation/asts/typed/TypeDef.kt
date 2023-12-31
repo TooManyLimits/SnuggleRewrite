@@ -98,7 +98,7 @@ sealed interface MethodDef {
     data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                  val bytecode: (MethodVisitor) -> Unit): MethodDef
     data class ConstMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
-                              val bytecode: (TypedExpr.MethodCall) -> TypedExpr): MethodDef
+                              val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef
     data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                 val loc: Loc, val body: TypedExpr): MethodDef
 }

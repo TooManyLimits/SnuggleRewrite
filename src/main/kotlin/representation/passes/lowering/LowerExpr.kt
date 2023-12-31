@@ -49,7 +49,7 @@ fun lowerExpr(expr: TypedExpr): Sequence<Instruction> = when (expr) {
         when (expr.methodDef) {
             is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
             is MethodDef.SnuggleMethodDef -> yield(Instruction.VirtualCall(expr.methodDef))
-            is MethodDef.ConstMethodDef -> TODO()
+            is MethodDef.ConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
         }
     }
     is TypedExpr.StaticMethodCall -> sequence {
@@ -58,7 +58,7 @@ fun lowerExpr(expr: TypedExpr): Sequence<Instruction> = when (expr) {
         when (expr.methodDef) {
             is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) // TODO: Cost
             is MethodDef.SnuggleMethodDef -> yield(Instruction.StaticCall(expr.methodDef))
-            is MethodDef.ConstMethodDef -> TODO()
+            is MethodDef.ConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
         }
     }
 }

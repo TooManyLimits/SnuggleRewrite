@@ -3,6 +3,7 @@ package representation.passes.typing
 import builtins.*
 import representation.asts.resolved.ResolvedExpr
 import errors.NoSuchVariableException
+import representation.asts.typed.MethodDef
 import representation.asts.typed.TypedExpr
 import representation.asts.typed.TypedPattern
 import representation.passes.lexing.IntLiteralData
@@ -109,8 +110,19 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val methods = typedReceiver.type.methods.filter { !it.static }
         // Choose the best method from among them
         val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache)
-        // Return the typed method call
-        just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
+        // Create a method call
+        val call = TypedExpr.MethodCall(
+            expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
+
+        // Repeatedly replace const method calls until done
+        var resultExpr: TypedExpr = call
+        while (resultExpr is TypedExpr.MethodCall && resultExpr.methodDef is MethodDef.ConstMethodDef) {
+            // If the best method is a const method, then we essentially
+            // apply it like a macro, replacing the expression with a new one.
+            resultExpr = (resultExpr.methodDef as MethodDef.ConstMethodDef).replacer(resultExpr)
+        }
+
+        just(resultExpr)
     }
 
     is ResolvedExpr.StaticMethodCall -> {

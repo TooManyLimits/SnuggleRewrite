@@ -5,8 +5,10 @@ import builtins.IntType
 import errors.NumberRangeException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
+import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
+import representation.passes.name_resolving.ExprResolutionResult
 import util.ConsMap
 import util.extend
 import java.math.BigInteger
@@ -51,8 +53,16 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val methods = typedReceiver.type.methods.filter { !it.static }
         // Choose the best method from among them
         val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache)
-        // Return the typed method call
-        just(TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
+        val call = TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
+
+        // Repeatedly replace const method calls until done
+        var resultExpr: TypedExpr = call
+        while (resultExpr is TypedExpr.MethodCall && resultExpr.methodDef is MethodDef.ConstMethodDef) {
+            // If the best method is a const method, then we essentially
+            // apply it like a macro, replacing the expression with a new one.
+            resultExpr = (resultExpr.methodDef as MethodDef.ConstMethodDef).replacer(resultExpr)
+        }
+        pullUpLiteral(just(resultExpr), expectedType)
     }
 
     is ResolvedExpr.StaticMethodCall -> {
@@ -60,44 +70,44 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val receiverType = getTypeDef(expr.receiverType, typeCache)
         val methods = receiverType.methods.filter { it.static }
         val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache)
-        just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
-    }
-
-    is ResolvedExpr.Literal -> run {
-        val res = inferExpr(expr, scope, typeCache)
-        // Special handling if we have an IntLiteral, and are expecting a numeric type
-        // TODO: Float literal, float numeric types
-        val litRes = res.expr as TypedExpr.Literal
-        if (res.expr.type.builtin == IntLiteralType) {
-            // Have IntLiteral, expect IntLiteral, we're done
-            if (expectedType.builtin == IntLiteralType)
-                return@run res
-            // Have IntLiteral, expect IntType. Check it fits, we're done.
-            if (expectedType.builtin is IntType) {
-                val expectedIntType = expectedType.builtin as IntType
-                if (!expectedIntType.fits(litRes.value as BigInteger))
-                    throw NumberRangeException(expectedIntType, litRes.value, expr.loc)
-                return@run just(TypedExpr.Literal(expr.loc, litRes.value, expectedType))
-            }
-        }
-        if (!res.expr.type.isSubtype(expectedType))
-            throw TypeCheckingException(expectedType, res.expr.type, "Literal", expr.loc)
-        res
+        pullUpLiteral(just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType)), expectedType)
     }
 
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
-    // e.g. Import, Variable, Declaration.
+    // e.g. Import, Literal, Variable, Declaration.
     // Usually, inferring and checking work similarly.
     else -> {
         val res = inferExpr(expr, scope, typeCache)
         if (!res.expr.type.isSubtype(expectedType))
             throw TypeCheckingException(expectedType, res.expr.type, when(expr) {
                 is ResolvedExpr.Import -> "Import expression"
+                is ResolvedExpr.Literal -> "Literal"
                 is ResolvedExpr.Variable -> "Variable \"${expr.name}\""
                 is ResolvedExpr.Declaration -> "Let expression"
                 else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
             }, expr.loc)
-        res
+        pullUpLiteral(res, expectedType)
     }
+}
+
+/**
+ * Pull a literal upwards into having a different type
+ */
+fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult {
+    return if (result.expr is TypedExpr.Literal && result.expr.type.builtin == IntLiteralType && expectedType.builtin != IntLiteralType) {
+        // If not in range, throw
+        if (expectedType.builtin is IntType && !(expectedType.builtin as IntType).fits((result.expr as TypedExpr.Literal).value as BigInteger))
+            throw NumberRangeException(expectedType.builtin as IntType, (result.expr as TypedExpr.Literal).value as BigInteger, result.expr.loc)
+        // Otherwise, return with altered type
+        if (result is TypingResult.JustExpr)
+            just(TypedExpr.Literal(result.expr.loc, (result.expr as TypedExpr.Literal).value, expectedType))
+        else
+            TypingResult.WithVars(
+                TypedExpr.Literal(result.expr.loc, (result.expr as TypedExpr.Literal).value, expectedType),
+                result.newVarsIfTrue,
+                result.newVarsIfFalse
+            )
+    }
+    else result
 }

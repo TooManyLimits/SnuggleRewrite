@@ -1,5 +1,6 @@
 package builtins
 
+import builtins.helpers.constBinary
 import org.objectweb.asm.Opcodes
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -18,14 +19,10 @@ object BoolType: BuiltinType {
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(
-            MethodDef.BytecodeMethodDef(pub = true, static = false, boolType, "add", boolType, listOf(boolType)) {
-                // [this, arg]
-                it.visitInsn(Opcodes.IOR) // [this | arg]
-            },
-            MethodDef.BytecodeMethodDef(pub = true, static = false, boolType, "mul", boolType, listOf(boolType)) {
-                // [this, arg]
-                it.visitInsn(Opcodes.IAND) // [this & arg]
-            }
+            constBinary(static = false, boolType, "add", boolType, listOf(boolType), Boolean::or)
+                    orBytecode {it.visitInsn(Opcodes.IOR)},
+            constBinary(static = false, boolType, "mul", boolType, listOf(boolType), Boolean::and)
+                    orBytecode {it.visitInsn(Opcodes.IAND)}
         )
     }
 

@@ -12,12 +12,8 @@ import util.ConsList
 fun main() {
 
     val code = """
-        let x: i32 = 10
-        let y = 20i32
-        // let z = 30 // error, doesnt know which int type
+        let x: i32 = 99999999 * 999999999 * 99999999999 * 999999999 * 999999999999 / 10000000000000000000000000000000000000000
         print(x)
-        print(y)
-        print(30) // fine since there's only one print() for any numeric type
     """.trimIndent()
     val lexer = Lexer("main", code)
 
