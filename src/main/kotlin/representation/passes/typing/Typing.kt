@@ -24,7 +24,8 @@ fun typeAST(ast: ResolvedAST): TypedAST {
     val typeCache = TypeDefCache(IdentityCache(), ast.builtinMap)
 
     return TypedAST(ast.allFiles.mapValues {
-        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache).expr)
+        // Top-level code does not have any currentTypeGenerics.
+        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache, listOf()).expr)
     })
 }
 
@@ -33,15 +34,17 @@ fun typeAST(ast: ResolvedAST): TypedAST {
  *
  * Small amount of mutability, from the cache.
  */
-fun getTypeDef(type: ResolvedType, typeCache: TypeDefCache): TypeDef = when (type) {
-
+fun getTypeDef(type: ResolvedType, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): TypeDef = when (type) {
     is ResolvedType.Basic -> {
         // Recursively get type defs for the generics, then pass that
         // to type def instantiation.
-        val mappedGenerics = type.generics.map { getTypeDef(it, typeCache) }
-        instantiateTypeDef(type.base, mappedGenerics, typeCache)
+        val mappedGenerics = type.generics.map { getTypeDef(it, typeCache, currentTypeGenerics) }
+        instantiateTypeDef(type.base, mappedGenerics, typeCache, currentTypeGenerics)
     }
-
+    is ResolvedType.TypeGeneric -> {
+        // Get the correct type generic from the list and output it.
+        currentTypeGenerics[type.index]
+    }
 }
 
 /**
@@ -70,23 +73,27 @@ private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: 
  * instantiate a given type with the given generics
  * and cache the result.
  */
-private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef = typeCache.get(base, generics) { _, _ ->
+private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): TypeDef = typeCache.get(base, generics) { _, _ ->
     when (base) {
         // Indirections just recurse:
-        is ResolvedTypeDef.Indirection -> instantiateTypeDef(base.promise.expect(), generics, typeCache)
+        is ResolvedTypeDef.Indirection -> instantiateTypeDef(base.promise.expect(), generics, typeCache, currentTypeGenerics)
         // Builtins are easy, just remember to indirect:
         is ResolvedTypeDef.Builtin -> indirect(base, generics, typeCache) {
             TypeDef.InstantiatedBuiltin(base.builtin, generics, typeCache)
         }
         // Other types need more work replacing generics.
         is ResolvedTypeDef.Class -> indirect(base, generics, typeCache) { indirection ->
-            val superType = getTypeDef(base.superType, typeCache)
+            val superType = getTypeDef(base.superType, typeCache, currentTypeGenerics)
             TypeDef.ClassDef(
                 base.loc, base.name, superType, generics,
+
+                // Note: This is where the currentTypeGenerics start out! The generics
+                // passed into this method are used as currentTypeGenerics when instantiating/typing methods and fields.
+
                 // Map the fields
                 base.fields.map { TODO() },
                 // Map the methods, using the indirection as the "this"/owning type.
-                base.methods.map { typeMethod(indirection, it, typeCache) }
+                base.methods.map { typeMethod(indirection, it, typeCache, generics) }
             )
         }
     }
@@ -94,7 +101,7 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
 
 // Helpers for quickly instantiating BuiltinType into TypeDef where it's needed.
 fun getGenericBuiltin(type: BuiltinType, generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef =
-    instantiateTypeDef(typeCache.builtins[type]!!, generics, typeCache)
+    instantiateTypeDef(typeCache.builtins[type]!!, generics, typeCache, listOf())
 fun getBasicBuiltin(type: BuiltinType, cache: TypeDefCache): TypeDef =
     getGenericBuiltin(type, listOf(), cache)
 

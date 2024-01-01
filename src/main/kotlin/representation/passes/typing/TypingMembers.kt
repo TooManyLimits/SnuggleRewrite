@@ -17,10 +17,11 @@ import util.extend
  * - owningType: The type that this is a method of, so we know what type to use for "this"
  * - methodDef: The method def that is to be type-checked.
  * - typeCache: The cache of TypeDefs that have been created while typing this AST.
+ * - currentTypeGenerics: The generics of the owningType that we're currently instantiating with.
  */
-fun typeMethod(owningType: TypeDef, methodDef: ResolvedMethodDef, typeCache: TypeDefCache): MethodDef.SnuggleMethodDef {
+fun typeMethod(owningType: TypeDef, methodDef: ResolvedMethodDef, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): MethodDef.SnuggleMethodDef {
     // Type the patterns that are the params
-    val typedParams = methodDef.params.map { inferPattern(it, typeCache) }
+    val typedParams = methodDef.params.map { inferPattern(it, typeCache, currentTypeGenerics) }
     // Get the param types that are required to be passed to the function
     val paramTypes = typedParams.map { it.type }
     // Get the bindings for the body, from the params
@@ -32,9 +33,9 @@ fun typeMethod(owningType: TypeDef, methodDef: ResolvedMethodDef, typeCache: Typ
     for (typedParam in typedParams)
         bodyBindings = bodyBindings.extend(bindings(typedParam, bodyBindings).first)
     // Get the return type of the method:
-    val returnType = getTypeDef(methodDef.returnType, typeCache)
+    val returnType = getTypeDef(methodDef.returnType, typeCache, currentTypeGenerics)
     // Type-check the method body to be the return type.
-    val typedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache).expr
+    val typedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache, currentTypeGenerics).expr
     // And return the method def.
     return MethodDef.SnuggleMethodDef(
         methodDef.pub, methodDef.static, owningType, methodDef.name,

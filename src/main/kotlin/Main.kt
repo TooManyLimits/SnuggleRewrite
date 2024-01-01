@@ -12,7 +12,7 @@ import util.ConsList
 fun main() {
 
     val code = """
-        let x: i32 = 99999999 * 999999999 * 99999999999 * 999999999 * 999999999999 / 10000000000000000000000000000000000000000
+        let x: i32 = 1000
         print(x)
     """.trimIndent()
     val lexer = Lexer("main", code)

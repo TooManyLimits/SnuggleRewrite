@@ -67,6 +67,8 @@ fun tokenOf(loc: Loc, string: String): Token? {
         ")" -> TokenType.RIGHT_PAREN
         "{" -> TokenType.LEFT_CURLY
         "}" -> TokenType.RIGHT_CURLY
+        "<" -> TokenType.LESS
+        ">" -> TokenType.GREATER
 
         "+" -> TokenType.PLUS
         "-" -> TokenType.MINUS
@@ -142,6 +144,8 @@ enum class TokenType {
     RIGHT_PAREN,
     LEFT_CURLY,
     RIGHT_CURLY,
+    LESS,
+    GREATER,
 
     PLUS,
     MINUS,

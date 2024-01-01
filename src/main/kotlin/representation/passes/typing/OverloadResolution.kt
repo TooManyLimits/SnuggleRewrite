@@ -27,11 +27,12 @@ fun getBestMethod(
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
     typeCache: TypeDefCache,
+    currentTypeGenerics: List<TypeDef>
 ): BestMethodData {
     // Find which methods are applicable.
-    val applicableResult = getApplicableMethods(methodsToCheck, methodName, arguments, expectedResult, scope, typeCache)
+    val applicableResult = getApplicableMethods(methodsToCheck, methodName, arguments, expectedResult, scope, typeCache, currentTypeGenerics)
     // Try to choose the best from among them.
-    return tryChooseBestMethod(applicableResult, callLoc, methodName, arguments, expectedResult, scope, typeCache)
+    return tryChooseBestMethod(applicableResult, callLoc, methodName, arguments, expectedResult, scope, typeCache, currentTypeGenerics)
 }
 
 // Return type encapsulating the best method
@@ -86,7 +87,10 @@ private fun getApplicableMethods(
     scope: ConsMap<String, VariableBinding>,
 
     // The TypeDefCache holding data for all types in this AST.
-    typeCache: TypeDefCache
+    typeCache: TypeDefCache,
+
+    // The type generics we're currently instantiating with.
+    currentTypeGenerics: List<TypeDef>
 ): ApplicableMethodsResult {
 
     // Create a cache for storing type-checked arguments,
@@ -118,7 +122,7 @@ private fun getApplicableMethods(
             // Get the result of the check, either from the cache or by computing it
             val checkResult = cacheForThisArg.get(expectedArgType) {
                 try {
-                    val checked = checkExpr(arg, expectedArgType, scope, typeCache).expr
+                    val checked = checkExpr(arg, expectedArgType, scope, typeCache, currentTypeGenerics).expr
                     Optional.of(checked)
                 } catch (ex: CompilationException) {
                     // If it failed, then add this method to the tried methods set
@@ -159,7 +163,8 @@ private fun tryChooseBestMethod(
     arguments: List<ResolvedExpr>,
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
-    typeCache: TypeDefCache
+    typeCache: TypeDefCache,
+    currentTypeGenerics: List<TypeDef>
 ): BestMethodData {
     // If there's only 1 method, just return it.
     if (applicableResult.applicableMethods.size == 1)
@@ -173,7 +178,7 @@ private fun tryChooseBestMethod(
     // Otherwise, there are no applicable methods, so error with that.
     // Attempt to infer the types of the arguments, to include in the error message.
     val inferredArguments = arguments.map { try {
-        inferExpr(it, scope, typeCache).expr.type
+        inferExpr(it, scope, typeCache, currentTypeGenerics).expr.type
     } catch (e: CompilationException) {
         null
     }}

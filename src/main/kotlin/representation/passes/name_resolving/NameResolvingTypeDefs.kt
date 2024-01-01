@@ -25,7 +25,7 @@ fun resolveTypeDef(
         val resolvedFields = typeDef.fields.map { resolveFieldDef(it, startingMappings, currentMappings, ast, cache) }
         val resolvedMethods = typeDef.methods.map { resolveMethodDef(it, startingMappings, currentMappings, ast, cache) }
         TypeDefResolutionResult(
-            ResolvedTypeDef.Class(typeDef.loc, typeDef.pub, typeDef.name,
+            ResolvedTypeDef.Class(typeDef.loc, typeDef.pub, typeDef.name, typeDef.numGenerics,
                 resolvedSupertype,
                 resolvedFields.map { it.first },
                 resolvedMethods.map { it.first }

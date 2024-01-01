@@ -44,6 +44,9 @@ interface BuiltinType {
     // it's 2. For plural types, the value can be anything >= 0.
     val stackSlots: Int
 
+    // The number of generics this type has. 0 by default.
+    val numGenerics: Int get() = 0
+
     // Get the fields of this type, given the generics.
     fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now
 

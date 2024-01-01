@@ -9,14 +9,14 @@ import errors.ParsingException
  * Expression parsing !
  */
 
-fun parseExpr(lexer: Lexer): ParsedExpr {
-    return parseBinary(lexer, 0)
+fun parseExpr(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
+    return parseBinary(lexer, typeGenerics, 0)
 }
 
-private fun parseBinary(lexer: Lexer, precedence: Int): ParsedExpr {
+private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, precedence: Int): ParsedExpr {
     if (precedence >= TOKS_BY_PRECEDENCE.size)
-        return parseUnary(lexer)
-    var lhs = parseBinary(lexer, precedence + 1)
+        return parseUnary(lexer, typeGenerics)
+    var lhs = parseBinary(lexer, typeGenerics, precedence + 1)
     while (lexer.consume(*TOKS_BY_PRECEDENCE[precedence])) {
         val tok = lexer.last()
         val rhsPrecedence = if (isRightAssociative(tok.type)) precedence else precedence + 1
@@ -27,34 +27,34 @@ private fun parseBinary(lexer: Lexer, precedence: Int): ParsedExpr {
             TokenType.SLASH -> "div"
             else -> throw IllegalStateException("Unexpected binary operator ${tok.type}. Bug in compiler, please report")
         }
-        val rhs = parseBinary(lexer, rhsPrecedence)
+        val rhs = parseBinary(lexer, typeGenerics, rhsPrecedence)
         val loc = lhs.loc.merge(rhs.loc)
         lhs = ParsedExpr.MethodCall(loc, lhs, methodName, listOf(rhs))
     }
     return lhs
 }
 
-private fun parseUnary(lexer: Lexer): ParsedExpr {
+private fun parseUnary(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
     if (lexer.consume(TokenType.MINUS)) {
         val tok = lexer.last()
         val methodName = when(tok.type) {
             TokenType.MINUS -> "neg"
             else -> throw IllegalStateException("Unexpected unary operator ${tok.type}. Bug in compiler, please report")
         }
-        val operand = parseUnary(lexer)
+        val operand = parseUnary(lexer, typeGenerics)
         val loc = tok.loc.merge(operand.loc)
         return ParsedExpr.MethodCall(loc, operand, methodName, listOf())
     }
-    return parseFieldAccessOrMethodCall(lexer)
+    return parseFieldAccessOrMethodCall(lexer, typeGenerics)
 }
 
-private fun parseFieldAccessOrMethodCall(lexer: Lexer): ParsedExpr {
-    var expr = parseUnit(lexer)
+private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
+    var expr = parseUnit(lexer, typeGenerics)
     while (lexer.consume(TokenType.DOT, TokenType.LEFT_PAREN)) when (lexer.last().type) {
         TokenType.DOT -> {
             val name = lexer.expect(TokenType.IDENTIFIER, "after DOT")
             if (lexer.consume(TokenType.LEFT_PAREN)) {
-                val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it) }
+                val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) }
                 expr = ParsedExpr.MethodCall(name.loc, expr, name.string(), args)
             } else {
                 TODO() // Field
@@ -63,7 +63,7 @@ private fun parseFieldAccessOrMethodCall(lexer: Lexer): ParsedExpr {
         //invoke() overload
         TokenType.LEFT_PAREN -> {
             val loc = lexer.last().loc
-            val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it) }
+            val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) }
             expr = ParsedExpr.MethodCall(loc, expr, "invoke", args)
         }
         else -> throw IllegalStateException()
@@ -71,7 +71,7 @@ private fun parseFieldAccessOrMethodCall(lexer: Lexer): ParsedExpr {
     return expr
 }
 
-private fun parseUnit(lexer: Lexer): ParsedExpr {
+private fun parseUnit(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
     return when(lexer.take()?.type) {
         null -> throw ParsingException(expected = "Expression", found = "End of file", loc = lexer.curLoc)
 
@@ -80,7 +80,7 @@ private fun parseUnit(lexer: Lexer): ParsedExpr {
         TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value!!)
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
-        TokenType.LET -> parseDeclaration(lexer)
+        TokenType.LET -> parseDeclaration(lexer, typeGenerics)
 
 
         else -> throw ParsingException(expected = "Expression", found = lexer.last().type.toString(), loc = lexer.last().loc)
@@ -93,11 +93,11 @@ private fun parseImport(lexer: Lexer): ParsedExpr {
     return ParsedExpr.Import(loc, lit.string())
 }
 
-private fun parseDeclaration(lexer: Lexer): ParsedExpr {
+private fun parseDeclaration(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
     val let = lexer.last()
-    val pat = parsePattern(lexer)
+    val pat = parsePattern(lexer, typeGenerics)
     lexer.expect(TokenType.EQUALS)
-    val initializer = parseExpr(lexer)
+    val initializer = parseExpr(lexer, typeGenerics)
     return ParsedExpr.Declaration(let.loc, pat, initializer)
 }
 

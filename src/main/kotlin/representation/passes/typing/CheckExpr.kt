@@ -15,7 +15,7 @@ import java.math.BigInteger
 import kotlin.math.max
 
 
-fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypingResult = when(expr) {
+fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): TypingResult = when(expr) {
 
     // Very similar to inferring a block; we just need to
     // checkExpr() on the last expression, not infer it.
@@ -24,7 +24,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // DIFFERENCE: Map _all but the last expression_ to their inferred forms.
         val typedExprs = expr.exprs.subList(0, max(0, expr.exprs.size - 1)).mapTo(ArrayList(expr.exprs.size+1)) {
             // Infer the inner expression
-            val inferred = inferExpr(it, scope, typeCache)
+            val inferred = inferExpr(it, scope, typeCache, currentTypeGenerics)
             // Check its new vars. If neither side is empty, add the vars in.
             if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                 // Extend the scope with the new vars
@@ -38,7 +38,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         }
         // DIFFERENCE: On the last expr, check it instead.
         val lastExpr = if (expr.exprs.isNotEmpty())
-            checkExpr(expr.exprs.last(), expectedType, scope, typeCache).expr
+            checkExpr(expr.exprs.last(), expectedType, scope, typeCache, currentTypeGenerics).expr
         else throw IllegalStateException("Unit not yet implemented")
         typedExprs.add(lastExpr)
         // Return as usual.
@@ -48,11 +48,11 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     is ResolvedExpr.MethodCall -> {
         // Largely the same as the infer() version, just passes the "expectedType" parameter
         // Infer the type of the receiver
-        val typedReceiver = inferExpr(expr.receiver, scope, typeCache).expr
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, currentTypeGenerics).expr
         // Gather the set of non-static methods on the receiver
         val methods = typedReceiver.type.methods.filter { !it.static }
         // Choose the best method from among them
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache)
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, currentTypeGenerics)
         val call = TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
 
         // Repeatedly replace const method calls until done
@@ -67,9 +67,9 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
 
     is ResolvedExpr.StaticMethodCall -> {
         // Largely same as MethodCall above ^
-        val receiverType = getTypeDef(expr.receiverType, typeCache)
+        val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics)
         val methods = receiverType.methods.filter { it.static }
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache)
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, currentTypeGenerics)
         pullUpLiteral(just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType)), expectedType)
     }
 
@@ -78,7 +78,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     // e.g. Import, Literal, Variable, Declaration.
     // Usually, inferring and checking work similarly.
     else -> {
-        val res = inferExpr(expr, scope, typeCache)
+        val res = inferExpr(expr, scope, typeCache, currentTypeGenerics)
         if (!res.expr.type.isSubtype(expectedType))
             throw TypeCheckingException(expectedType, res.expr.type, when(expr) {
                 is ResolvedExpr.Import -> "Import expression"

@@ -55,19 +55,23 @@ data class ResolvedFile(val name: String, val code: ResolvedExpr)
 sealed interface ResolvedTypeDef {
     val pub: Boolean
     val name: String
+    val numGenerics: Int
 
     // Indirection type, required for self-referencing data.
     // See TypeDef.Indirection
     data class Indirection(val promise: Promise<ResolvedTypeDef> = Promise()): ResolvedTypeDef {
         override val pub: Boolean get() = promise.expect().pub
         override val name: String get() = promise.expect().name
+        override val numGenerics: Int get() = promise.expect().numGenerics
     }
 
     data class Builtin(val builtin: BuiltinType): ResolvedTypeDef {
         override val name: String get() = builtin.name
         override val pub: Boolean get() = true
+        override val numGenerics: Int get() = builtin.numGenerics
     }
     data class Class(val loc: Loc, override val pub: Boolean, override val name: String,
+                     override val numGenerics: Int,
                      val superType: ResolvedType,
                      val fields: List<ResolvedFieldDef>,
                      val methods: List<ResolvedMethodDef>): ResolvedTypeDef
@@ -102,4 +106,5 @@ sealed interface ResolvedType {
 
     //Note: Now a DIRECT REFERENCE to a ResolvedTypeDef, rather than a mere String. This is the *primary reason for this AST pass*.
     data class Basic(override val loc: Loc, val base: ResolvedTypeDef, val generics: List<ResolvedType>): ResolvedType
+    data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
 }

@@ -27,8 +27,7 @@ sealed interface ParsedElement {
         val pub: Boolean
         val name: String
 
-        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val superType: ParsedType, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>):
-            ParsedTypeDef
+        data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val numGenerics: Int, val superType: ParsedType, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
 //        data class Struct(override val loc: Loc, override val pub: Boolean, override val name: String, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
 
     }
@@ -81,7 +80,9 @@ sealed interface ParsedType {
     }
 //    data class Tuple(override val loc: Loc, val elementTypes: List<ParsedType>): ParsedType
 //    data class Func(override val loc: Loc, val paramTypes: List<ParsedType>, val returnType: ParsedType): ParsedType
-//    data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType
+    data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType {
+        override fun toString(): String = "Generic $name"
+    }
 //    data class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType
 
 }
