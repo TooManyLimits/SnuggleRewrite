@@ -29,17 +29,18 @@ sealed interface TypeDef {
     val builtin: BuiltinType? get() = null
 
     fun isSubtype(other: TypeDef): Boolean {
-        fun unwrap(typeDef: TypeDef): TypeDef =
-            if (typeDef is Indirection) typeDef.promise.expect() else typeDef
-
-        val thisUnwrapped = unwrap(this)
-        val otherUnwrapped = unwrap(other)
+        val thisUnwrapped = this.unwrap()
+        val otherUnwrapped = other.unwrap()
         if (thisUnwrapped == otherUnwrapped) return true
         for (supertype in supertypes)
             if (supertype.isSubtype(otherUnwrapped))
                 return true
         return false
     }
+
+    // Unwrap the typedef's indirections
+    fun unwrap(): TypeDef =
+        if (this is TypeDef.Indirection) promise.expect() else this
 
     // An indirection which points to another TypeDef. Needed because of
     // self-references inside of types, i.e. if class A uses the type
@@ -97,8 +98,14 @@ sealed interface MethodDef {
 
     data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                  val bytecode: (MethodVisitor) -> Unit): MethodDef
-    data class ConstMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
-                              val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef
+    data class ConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
+                              val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef {
+        override val static: Boolean get() = false
+    }
+    data class StaticConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
+                              val replacer: (TypedExpr.StaticMethodCall) -> TypedExpr): MethodDef {
+        override val static: Boolean get() = true
+    }
     data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
                                 val loc: Loc, val body: TypedExpr): MethodDef
 }

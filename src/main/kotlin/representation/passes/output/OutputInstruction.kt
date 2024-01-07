@@ -1,13 +1,11 @@
 package representation.passes.output
 
 import builtins.*
-import errors.NumberRangeException
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.Instruction
 import representation.asts.typed.TypeDef
-import representation.passes.typing.typeAST
 import java.math.BigInteger
 
 fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (inst) {
@@ -36,18 +34,12 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         // End of the import
         writer.visitLabel(afterImport)
     }
-    // Make the call
-    is Instruction.VirtualCall -> {
+    // Make the call with the proper bytecode
+    is Instruction.MethodCall -> {
         val owner = inst.methodToCall.owningType.runtimeName!!
         val name = inst.methodToCall.name
         val descriptor = getMethodDescriptor(inst.methodToCall)
-        writer.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner, name, descriptor, false)
-    }
-    is Instruction.StaticCall -> {
-        val owner = inst.methodToCall.owningType.runtimeName!!
-        val name = inst.methodToCall.name
-        val descriptor = getMethodDescriptor(inst.methodToCall)
-        writer.visitMethodInsn(Opcodes.INVOKESTATIC, owner, name, descriptor, false)
+        writer.visitMethodInsn(inst.invokeBytecode, owner, name, descriptor, false)
     }
     // Helper function for push, it has lots of logic
     is Instruction.Push -> outputPush(inst, writer)
@@ -60,20 +52,22 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
             else -> throw IllegalStateException("Types should always be 1, 2, or plural slots")
         }
     }
+    is Instruction.NewRefAndDup -> {
+        writer.visitTypeInsn(Opcodes.NEW, inst.typeToCreate.runtimeName!!)
+        writer.visitInsn(Opcodes.DUP)
+    }
+
     // Store/load local variables. Have a helper function for it, because of repetition
     is Instruction.StoreLocal -> handleLocal(inst.index, inst.type, store = true, writer)
     is Instruction.LoadLocal -> handleLocal(inst.index, inst.type, store = false, writer)
 }
 
 private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor) {
-    // Unwrap the type def's indirections
-    fun unwrap(typeDef: TypeDef): TypeDef =
-        if (typeDef is TypeDef.Indirection) typeDef.promise.expect() else typeDef
     // Helper to pick the correct opcode
     fun choose(storeVersion: Int, loadVersion: Int) =
         if (store) storeVersion else loadVersion
 
-    val type = unwrap(type) // Unwrap type
+    val type = type.unwrap() // Unwrap type
     // TODO: Plural case, recurse
     when (type) {
         is TypeDef.InstantiatedBuiltin -> when (type.builtin) {

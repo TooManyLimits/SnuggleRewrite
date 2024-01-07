@@ -12,6 +12,7 @@ import representation.asts.parsed.ParsedType
 import util.*
 import util.ConsList.Companion.fromIterable
 import util.ConsList.Companion.nil
+import kotlin.math.exp
 
 /**
  * The result of resolving an expression or a block.
@@ -152,6 +153,21 @@ fun resolveExpr(
             ResolvedExpr.MethodCall(expr.loc, resolvedReceiver.expr, expr.methodName, resolvedArgs.map { it.expr }),
             union(resolvedReceiver.files, unitedFiles), // Add its files
             resolvedReceiver.exposedTypes.extend(unitedExposedTypes) // Add its exposed types
+        )
+    }
+
+    // Constructor calls:
+    is ParsedElement.ParsedExpr.ConstructorCall -> {
+        // Resolve, collect, return.
+        val resolvedType = resolveType(expr.type, currentMappings)
+        val resolvedArgs = expr.args.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
+        val unitedFiles = union(resolvedArgs.map { it.files })
+        val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>()
+            .extendMany(resolvedArgs.map { it.exposedTypes })
+
+        ExprResolutionResult(
+            ResolvedExpr.ConstructorCall(expr.loc, resolvedType, resolvedArgs.map { it.expr }),
+            unitedFiles, unitedExposedTypes
         )
     }
 

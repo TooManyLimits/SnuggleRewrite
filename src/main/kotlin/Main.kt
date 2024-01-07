@@ -14,19 +14,20 @@ fun main() {
     val code = """
         let x: i32 = 1000
         print(x)
+        print(let y: i32 = 10)
     """.trimIndent()
     val lexer = Lexer("main", code)
 
     val file = parseFileLazy(lexer)
     val parsedAST = ParsedAST(mapOf("main" to file))
     parsedAST.debugReadAllFiles() // Remove lazy wrapping
-    println(parsedAST)
+//    println(parsedAST)
     val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType, ObjectType, PrintType, IntLiteralType, *INT_TYPES))
-    println(resolvedAST)
+//    println(resolvedAST)
     val typedAST = typeAST(resolvedAST)
-    println(typedAST)
+//    println(typedAST)
     val ir = lower(typedAST)
-    println(ir)
+//    println(ir)
     val instance = SnuggleInstance(output(ir))
     instance.runtime.runCode()
 

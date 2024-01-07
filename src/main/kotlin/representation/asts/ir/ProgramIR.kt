@@ -1,6 +1,7 @@
 package representation.asts.ir
 
 import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -31,15 +32,28 @@ sealed interface Instruction {
     data class Bytecodes(val cost: Long, val bytecodes: (MethodVisitor) -> Unit): Instruction
     // Import the file of the given name
     data class RunImport(val fileName: String): Instruction
-    // A virtual method call on the given method
-    data class VirtualCall(val methodToCall: MethodDef): Instruction
-    // A static method call on the given method
-    data class StaticCall(val methodToCall: MethodDef): Instruction
+
+    // Call the given method
+    sealed interface MethodCall: Instruction {
+        val methodToCall: MethodDef
+        val invokeBytecode: Int
+        data class Virtual(override val methodToCall: MethodDef): MethodCall {
+            override val invokeBytecode: Int get() = Opcodes.INVOKEVIRTUAL
+        }
+        data class Static(override val methodToCall: MethodDef): MethodCall {
+            override val invokeBytecode: Int get() = Opcodes.INVOKESTATIC
+        }
+        data class Special(override val methodToCall: MethodDef): MethodCall {
+            override val invokeBytecode: Int get() = Opcodes.INVOKESPECIAL
+        }
+    }
 
     // Push the given value onto the stack
     data class Push(val valueToPush: Any, val type: TypeDef): Instruction
     // Pop the given type from the top of the stack
     data class Pop(val typeToPop: TypeDef): Instruction
+    // Create a new, uninitialized instance of the given type on the stack
+    data class NewRefAndDup(val typeToCreate: TypeDef): Instruction
 
     // Store a value of the given type as a local variable at the given index
     data class StoreLocal(val index: Int, val type: TypeDef): Instruction

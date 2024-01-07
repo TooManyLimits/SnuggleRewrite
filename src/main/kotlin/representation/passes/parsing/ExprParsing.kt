@@ -80,8 +80,9 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
         TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value!!)
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
-        TokenType.LET -> parseDeclaration(lexer, typeGenerics)
+        TokenType.NEW -> parseConstructor(lexer, typeGenerics)
 
+        TokenType.LET -> parseDeclaration(lexer, typeGenerics)
 
         else -> throw ParsingException(expected = "Expression", found = lexer.last().type.toString(), loc = lexer.last().loc)
     }
@@ -91,6 +92,13 @@ private fun parseImport(lexer: Lexer): ParsedExpr {
     val loc = lexer.last().loc
     val lit = lexer.expect(TokenType.STRING_LITERAL)
     return ParsedExpr.Import(loc, lit.string())
+}
+
+private fun parseConstructor(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
+    val type = parseType(lexer, typeGenerics, "for constructor")
+    lexer.expect(TokenType.LEFT_PAREN)
+    val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) }
+    return ParsedExpr.ConstructorCall(type.loc, type, args)
 }
 
 private fun parseDeclaration(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {

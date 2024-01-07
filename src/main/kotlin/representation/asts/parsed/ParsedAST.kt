@@ -48,6 +48,9 @@ sealed interface ParsedElement {
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
         data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr
+
+        data class ConstructorCall(override val loc: Loc, val type: ParsedType, val args: List<ParsedExpr>): ParsedExpr
+
         //... etc
     }
 

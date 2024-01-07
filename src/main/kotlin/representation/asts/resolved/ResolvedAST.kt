@@ -2,6 +2,7 @@ package representation.asts.resolved
 
 import representation.passes.lexing.Loc
 import builtins.BuiltinType
+import representation.asts.typed.TypeDef
 import util.IdentityCache
 import util.Promise
 import java.util.IdentityHashMap
@@ -93,6 +94,9 @@ sealed interface ResolvedExpr {
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
     data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
     data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
+    data class ConstructorCall(override val loc: Loc, val type: ResolvedType, val args: List<ResolvedExpr>): ResolvedExpr
+
+
 }
 
 sealed interface ResolvedPattern {

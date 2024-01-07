@@ -35,7 +35,7 @@ fun typeMethod(owningType: TypeDef, methodDef: ResolvedMethodDef, typeCache: Typ
     // Get the return type of the method:
     val returnType = getTypeDef(methodDef.returnType, typeCache, currentTypeGenerics)
     // Type-check the method body to be the return type.
-    val typedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache, currentTypeGenerics).expr
+    val typedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache, owningType, currentTypeGenerics).expr
     // And return the method def.
     return MethodDef.SnuggleMethodDef(
         methodDef.pub, methodDef.static, owningType, methodDef.name,

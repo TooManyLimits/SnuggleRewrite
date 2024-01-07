@@ -25,6 +25,8 @@ class NumberRangeException(expectedType: IntType, value: BigInteger, loc: Loc)
     : CompilationException("Expected ${expectedType.name}, but literal $value is out of range " +
         "(${expectedType.minValue} to ${expectedType.maxValue}).", loc)
 class InferenceException(message: String, loc: Loc): CompilationException(message, loc)
+class FieldCountException(type: TypeDef, realFieldCount: Int, suppliedFieldCount: Int, loc: Loc)
+    : CompilationException("Type ${type.name} has $realFieldCount non-static fields, but $suppliedFieldCount were supplied in the constructor.", loc)
 class NoSuchVariableException(varName: String, loc: Loc): CompilationException("No variable with name \"$varName\" is in the current scope", loc)
 class NoApplicableMethodException(methodName: String, argTypes: List<TypeDef?>, returnType: TypeDef?, tried: List<MethodDef>, loc: Loc): CompilationException(
     "Unable to find valid overload for method call\n  ${

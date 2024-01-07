@@ -25,7 +25,7 @@ fun typeAST(ast: ResolvedAST): TypedAST {
 
     return TypedAST(ast.allFiles.mapValues {
         // Top-level code does not have any currentTypeGenerics.
-        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache, listOf()).expr)
+        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache, null, listOf()).expr)
     })
 }
 
