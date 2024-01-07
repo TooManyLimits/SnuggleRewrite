@@ -14,6 +14,7 @@ object IntLiteralType: BuiltinType {
     override val runtimeName: String? get() = null
     override val descriptor: List<String> get() = listOf()
     override val stackSlots: Int get() = -1000
+    override val isPlural: Boolean get() = false
 
     // Supertypes are the various int types
     override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =

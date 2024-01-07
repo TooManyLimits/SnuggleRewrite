@@ -45,12 +45,14 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.Push -> outputPush(inst, writer)
     // Pop the correct number of stack slots
     is Instruction.Pop -> {
-        // TODO: plural case, recurse
-        when {
-            inst.typeToPop.stackSlots == 2 -> writer.visitInsn(Opcodes.POP2)
-            inst.typeToPop.stackSlots == 1 -> writer.visitInsn(Opcodes.POP)
+        // Need to recurse for plural types
+        fun popRecursive(writer: MethodVisitor, type: TypeDef): Unit = when {
+            type.isPlural -> type.fields.asSequence().filter{ !it.static }.forEach { popRecursive(writer, it.type) }
+            type.stackSlots == 2 -> writer.visitInsn(Opcodes.POP2)
+            type.stackSlots == 1 -> writer.visitInsn(Opcodes.POP)
             else -> throw IllegalStateException("Types should always be 1, 2, or plural slots")
         }
+        popRecursive(writer, inst.typeToPop)
     }
     is Instruction.NewRefAndDup -> {
         writer.visitTypeInsn(Opcodes.NEW, inst.typeToCreate.runtimeName!!)
@@ -63,25 +65,38 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
 }
 
 private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor) {
-    // Helper to pick the correct opcode
-    fun choose(storeVersion: Int, loadVersion: Int) =
-        if (store) storeVersion else loadVersion
-
     val type = type.unwrap() // Unwrap type
-    // TODO: Plural case, recurse
-    when (type) {
+    if (type.isPlural) {
+        // Plural case, we recurse
+        if (store) {
+            // Iterate backwards through the fields, decrementing index
+            var currentIndex = index + type.stackSlots
+            type.fields.asReversed().asSequence().filter { !it.static }.forEach {
+                // Decrement before handling
+                currentIndex -= it.type.stackSlots
+                handleLocal(currentIndex, it.type, true, writer)
+            }
+        } else {
+            var currentIndex = index
+            type.fields.asSequence().filter { !it.static }.forEach {
+                // Increment after handling
+                handleLocal(currentIndex, it.type, false, writer)
+                currentIndex += it.type.stackSlots
+            }
+        }
+    } else when (type) {
         is TypeDef.InstantiatedBuiltin -> when (type.builtin) {
             // Builtin types:
-            is BoolType -> writer.visitVarInsn(choose(Opcodes.ISTORE, Opcodes.ILOAD), index)
+            is BoolType -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
             is IntType -> if (type.builtin.bits <= 32)
-                writer.visitVarInsn(choose(Opcodes.ISTORE, Opcodes.ILOAD), index)
+                writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
             else
-                writer.visitVarInsn(choose(Opcodes.LSTORE, Opcodes.LLOAD), index)
-            is ObjectType -> writer.visitVarInsn(choose(Opcodes.ASTORE, Opcodes.ALOAD), index)
+                writer.visitVarInsn(if (store) Opcodes.LSTORE else Opcodes.LLOAD, index)
+            is ObjectType -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
             else -> throw RuntimeException("Unknown builtin type by LoadLocal \"${type.builtin.name}\", bug in compiler, please report")
         }
-        is TypeDef.ClassDef -> writer.visitVarInsn(choose(Opcodes.ASTORE, Opcodes.ALOAD), index)
-        is TypeDef.Indirection -> throw IllegalStateException("Should not be indirect here, bug in compiler, please report")
+        is TypeDef.ClassDef -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
+        is TypeDef.Indirection, is TypeDef.Tuple -> throw IllegalStateException("Unexpected TypeDef here, bug in compiler, please report")
     }
 }
 

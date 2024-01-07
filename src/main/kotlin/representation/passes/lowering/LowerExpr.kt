@@ -66,7 +66,13 @@ fun lowerExpr(expr: TypedExpr): Sequence<Instruction> = when (expr) {
         // Push args
         for (arg in expr.args)
             yieldAll(lowerExpr(arg))
-        // Invoke the constructor, ✨special✨
-        yield(Instruction.MethodCall.Special(expr.constructorMethodDef))
+        when (expr.constructorMethodDef) {
+            // Bytecode, emit the bytecode directly
+            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.constructorMethodDef.bytecode)) // TODO: Cost
+            // Invoke the constructor, ✨special✨
+            is MethodDef.SnuggleMethodDef -> yield(Instruction.MethodCall.Special(expr.constructorMethodDef))
+            is MethodDef.ConstMethodDef,
+            is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
+        }
     }
 }

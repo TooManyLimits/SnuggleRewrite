@@ -194,5 +194,6 @@ fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ResolvedTypeD
         val resolvedGenerics = type.generics.map { resolveType(it, currentMappings) }
         ResolvedType.Basic(type.loc, resolvedBase, resolvedGenerics)
     }
+    is ParsedType.Tuple -> ResolvedType.Tuple(type.loc, type.elementTypes.map { resolveType(it, currentMappings) })
     is ParsedType.TypeGeneric -> ResolvedType.TypeGeneric(type.loc, type.name, type.index)
 }

@@ -6,6 +6,7 @@ import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getBasicBuiltin
+import representation.passes.typing.getUnit
 import java.io.PrintStream
 import java.io.PrintWriter
 
@@ -16,15 +17,17 @@ object PrintType: BuiltinType {
     override val runtimeName: String? get() = null
     override val descriptor: List<String> get() = listOf()
     override val stackSlots: Int get() = 1
+    override val isPlural: Boolean get() = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val thisType = getBasicBuiltin(this, typeCache)
         val boolType = getBasicBuiltin(BoolType, typeCache)
+        val unitType = getUnit(typeCache)
         val i32Type = getBasicBuiltin(I32Type, typeCache)
+        val objectType = getBasicBuiltin(ObjectType, typeCache)
         return listOf(
-            // Just have it output bool for now, since we don't have a unit/tuple type yet :P
             // print(bool)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", boolType, listOf(boolType)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(boolType)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]
@@ -32,10 +35,9 @@ object PrintType: BuiltinType {
                 // [System.out, arg]
                 it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(PrintStream::class.java), "println", "(Z)V", false)
                 // []
-                it.visitInsn(Opcodes.ICONST_0) // push a bool on the stack, since again we dont have a tuple yet :P
             },
             // print(i32)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", boolType, listOf(i32Type)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(i32Type)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]
@@ -43,7 +45,18 @@ object PrintType: BuiltinType {
                 // [System.out, arg]
                 it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(PrintStream::class.java), "println", "(I)V", false)
                 // []
-                it.visitInsn(Opcodes.ICONST_0) // push a bool on the stack, since again we dont have a tuple yet :P
+            },
+            // print(Object)
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(objectType)) {
+                // [arg]
+                it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
+                // [arg, System.out]
+                it.visitInsn(Opcodes.SWAP)
+                // [System.out, arg]
+                it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false)
+                // [System.out, arg.toString()]
+                it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(PrintStream::class.java), "println", "(Ljava/lang/String;)V", false)
+                // []
             },
         )
     }

@@ -159,9 +159,9 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             TODO()
         } else {
             // Regular ol' java style constructor
-            // Look for a non-static method "new"
+            // Look for a non-static method "new" that returns unit
             val methods = type.methods.filter { !it.static }
-            val expectedResult = null //TODO: that returns unit
+            val expectedResult = getUnit(typeCache)
             val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, currentType, currentTypeGenerics)
             just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, type))
         }

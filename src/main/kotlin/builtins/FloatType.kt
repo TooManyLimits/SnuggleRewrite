@@ -10,6 +10,8 @@ open class FloatType(val bits: Int): BuiltinType {
         else -> throw IllegalStateException()
     })
     override val stackSlots: Int = if (bits == 64) 2 else 1
+    override val isPlural: Boolean get() = false
+
 }
 
 val FLOAT_TYPES = arrayOf(F32Type, F64Type)

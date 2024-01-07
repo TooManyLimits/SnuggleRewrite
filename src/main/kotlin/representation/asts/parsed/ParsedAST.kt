@@ -76,12 +76,16 @@ sealed interface ParsedType {
 
     val loc: Loc
 
+
+
     data class Basic(override val loc: Loc, val base: String, val generics: List<ParsedType>): ParsedType {
         override fun toString(): String {
-            return base + if (generics.isNotEmpty()) "<" + generics.joinToString(separator = ",") { it.toString() } + ">" else ""
+            return base + if (generics.isNotEmpty()) "<" + generics.joinToString() + ">" else ""
         }
     }
-//    data class Tuple(override val loc: Loc, val elementTypes: List<ParsedType>): ParsedType
+    data class Tuple(override val loc: Loc, val elementTypes: List<ParsedType>): ParsedType {
+        override fun toString(): String = "(${elementTypes.joinToString()})"
+    }
 //    data class Func(override val loc: Loc, val paramTypes: List<ParsedType>, val returnType: ParsedType): ParsedType
     data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType {
         override fun toString(): String = "Generic $name"

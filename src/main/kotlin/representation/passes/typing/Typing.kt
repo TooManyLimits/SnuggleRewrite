@@ -17,11 +17,12 @@ import util.IdentityCache
  * While doing so, it's important to create a cache for TypeDef, so that multiple instances
  * of the same ResolvedType will map to the same TypeDef in the end.
  * This will be a 2-level cache.
- * ResolvedTypeDef, compare by identity -> List<TypeDef>, compare by equality -> TypeDef
+ * ResolvedTypeDef, compare by identity -> List<TypeDef>, compare by equality -> TypeDef.
+ * Other special types like Tuple and Function will also have their own caches.
  */
 fun typeAST(ast: ResolvedAST): TypedAST {
 
-    val typeCache = TypeDefCache(IdentityCache(), ast.builtinMap)
+    val typeCache = TypeDefCache(IdentityCache(), EqualityCache(), ast.builtinMap)
 
     return TypedAST(ast.allFiles.mapValues {
         // Top-level code does not have any currentTypeGenerics.
@@ -45,6 +46,11 @@ fun getTypeDef(type: ResolvedType, typeCache: TypeDefCache, currentTypeGenerics:
         // Get the correct type generic from the list and output it.
         currentTypeGenerics[type.index]
     }
+    is ResolvedType.Tuple -> {
+        // Map the elements and query the tuple cache
+        val mappedElements = type.elements.map { getTypeDef(it, typeCache, currentTypeGenerics) }
+        typeCache.getTuple(mappedElements) { TypeDef.Tuple(it) }
+    }
 }
 
 /**
@@ -61,7 +67,7 @@ private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: 
     }
     // Create the indirection and add it to the cache
     val indirection = createIndirection(base)
-    typeCache.put(base, generics, indirection)
+    typeCache.putBasic(base, generics, indirection)
     // Instantiate, fill in the indirection with the result, and return.
     val instantiated = instantiator(indirection)
     indirection.promise.fulfill(instantiated)
@@ -73,7 +79,7 @@ private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: 
  * instantiate a given type with the given generics
  * and cache the result.
  */
-private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): TypeDef = typeCache.get(base, generics) { _, _ ->
+private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): TypeDef = typeCache.getBasic(base, generics) { _, _ ->
     when (base) {
         // Indirections just recurse:
         is ResolvedTypeDef.Indirection -> instantiateTypeDef(base.promise.expect(), generics, typeCache, currentTypeGenerics)
@@ -93,28 +99,36 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
                 // Map the fields
                 base.fields.map { TODO() },
                 // Map the methods, using the indirection as the "this"/owning type.
-                base.methods.map { typeMethod(indirection, it, typeCache, generics) }
+                base.methods.map { typeMethod(indirection, base.methods, it, typeCache, generics) }
             )
         }
     }
 }
 
-// Helpers for quickly instantiating BuiltinType into TypeDef where it's needed.
+// Helpers for quickly getting certain TypeDefs where they're needed.
 fun getGenericBuiltin(type: BuiltinType, generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef =
     instantiateTypeDef(typeCache.builtins[type]!!, generics, typeCache, listOf())
 fun getBasicBuiltin(type: BuiltinType, cache: TypeDefCache): TypeDef =
     getGenericBuiltin(type, listOf(), cache)
+fun getTuple(elements: List<TypeDef>, cache: TypeDefCache): TypeDef.Tuple =
+    cache.getTuple(elements) { TypeDef.Tuple(it) }
+fun getUnit(cache: TypeDefCache): TypeDef.Tuple = getTuple(listOf(), cache)
 
 
 // The type def cache, with related useful extension methods get() and put().
 // It also stores the mapping of builtin objects to their corresponding resolved type defs.
 data class TypeDefCache(
-    val typeDefs: IdentityCache<ResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>,
+    val basicCache: IdentityCache<ResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>,
+    val tupleCache: EqualityCache<List<TypeDef>, TypeDef.Tuple>,
     val builtins: Map<BuiltinType, ResolvedTypeDef>
 )
-private fun TypeDefCache.get(base: ResolvedTypeDef, generics: List<TypeDef>, func: (ResolvedTypeDef, List<TypeDef>) -> TypeDef) =
-    this.typeDefs.get(base) {EqualityCache()}.get(generics) {func(base, it)}
-private fun TypeDefCache.put(base: ResolvedTypeDef, generics: List<TypeDef>, value: TypeDef) =
-    this.get(base, generics) {_, _ -> value}
+private fun TypeDefCache.getBasic(base: ResolvedTypeDef, generics: List<TypeDef>, func: (ResolvedTypeDef, List<TypeDef>) -> TypeDef) =
+    this.basicCache.get(base) {EqualityCache()}.get(generics) {func(base, it)}
+private fun TypeDefCache.putBasic(base: ResolvedTypeDef, generics: List<TypeDef>, value: TypeDef) =
+    this.getBasic(base, generics) { _, _ -> value}
+private fun TypeDefCache.getTuple(elements: List<TypeDef>, func: (List<TypeDef>) -> TypeDef.Tuple) =
+    this.tupleCache.get(elements) {func(elements)}
+private fun TypeDefCache.putTuple(elements: List<TypeDef>, value: TypeDef.Tuple) =
+    this.getTuple(elements) { value }
 
 

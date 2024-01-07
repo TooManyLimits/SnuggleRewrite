@@ -41,7 +41,8 @@ private fun parseMembers(lexer: Lexer, typeGenerics: List<String>): Pair<List<Pa
             // This is a method definition. Parse its name, params, and return type...
             val methodName = lexer.expect(TokenType.IDENTIFIER, "for function name")
             val params = parseParams(lexer, typeGenerics)
-            val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer, typeGenerics) else TODO()
+            // Return type is unit by default
+            val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer, typeGenerics) else ParsedType.Tuple(Loc.NEVER, listOf())
             // Now parse its body:
             val body = parseExpr(lexer, typeGenerics)
             // And add it to the list.

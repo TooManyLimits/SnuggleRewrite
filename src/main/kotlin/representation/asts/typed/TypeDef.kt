@@ -15,6 +15,7 @@ sealed interface TypeDef {
     val descriptor: List<String>
 
     val stackSlots: Int
+    val isPlural: Boolean
 
     val primarySupertype: TypeDef?
     val supertypes: List<TypeDef>
@@ -40,7 +41,7 @@ sealed interface TypeDef {
 
     // Unwrap the typedef's indirections
     fun unwrap(): TypeDef =
-        if (this is TypeDef.Indirection) promise.expect() else this
+        if (this is Indirection) promise.expect() else this
 
     // An indirection which points to another TypeDef. Needed because of
     // self-references inside of types, i.e. if class A uses the type
@@ -48,12 +49,13 @@ sealed interface TypeDef {
     // refer to A, while A is still being constructed.
     //
     // However, certain aspects of the self-referring type def need to be
-    // known while the promise is still being fulfilled.
+    // known while the promise is still waiting to be fulfilled.
     // This includes the # of stack slots.
     data class Indirection(override val stackSlots: Int, val promise: Promise<TypeDef> = Promise()): TypeDef {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
         override val descriptor: List<String> get() = promise.expect().descriptor
+        override val isPlural: Boolean get() = promise.expect().isPlural
         override val primarySupertype: TypeDef? get() = promise.expect().primarySupertype
         override val supertypes: List<TypeDef> get() = promise.expect().supertypes
         override val fields: List<FieldDef> get() = promise.expect().fields
@@ -61,11 +63,25 @@ sealed interface TypeDef {
         override val builtin: BuiltinType? get() = promise.expect().builtin
     }
 
+    data class Tuple(val innerTypes: List<TypeDef>): TypeDef {
+        override val name: String = toGeneric("", innerTypes)
+        override val runtimeName: String = "tuples/$name"
+        override val descriptor: List<String> = innerTypes.flatMap { it.descriptor }
+        override val stackSlots: Int = innerTypes.sumOf { it.stackSlots }
+        override val isPlural: Boolean get() = true
+        override val primarySupertype: TypeDef? get() = null
+        override val supertypes: List<TypeDef> get() = listOf()
+        override val fields: List<FieldDef> = innerTypes.mapIndexed { index, type ->
+            FieldDef.BuiltinField(pub = true, static = false, type, "v$index") }
+        override val methods: List<MethodDef> get() = listOf()
+    }
+
     class InstantiatedBuiltin(override val builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef {
         override val name: String = toGeneric(builtin.name, generics)
         override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
         override val descriptor: List<String> = builtin.descriptor
         override val stackSlots: Int = builtin.stackSlots
+        override val isPlural: Boolean = builtin.isPlural
         override val primarySupertype: TypeDef? = builtin.getPrimarySupertype(generics, typeCache)
         override val supertypes: List<TypeDef> = builtin.getAllSupertypes(generics, typeCache)
         override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
@@ -80,6 +96,7 @@ sealed interface TypeDef {
         override val runtimeName: String get() = name
         override val descriptor: List<String> get() = listOf("L$runtimeName;")
         override val stackSlots: Int get() = 1
+        override val isPlural: Boolean get() = false
         override val primarySupertype: TypeDef get() = supertype
         override val supertypes: List<TypeDef> = listOf(primarySupertype)
     }
@@ -106,8 +123,12 @@ sealed interface MethodDef {
                               val replacer: (TypedExpr.StaticMethodCall) -> TypedExpr): MethodDef {
         override val static: Boolean get() = true
     }
+    // runtimeName field: often, SnuggleMethodDef will need to have a different name
+    // at runtime than in the internal representation. These are the case for:
+    // - constructors, whose names are changed to "<init>" to match java's requirement
+    // - overloaded methods, whose names are changed to have a disambiguation number appended
     data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
-                                val loc: Loc, val body: TypedExpr): MethodDef
+                                val runtimeName: String, val loc: Loc, val body: TypedExpr): MethodDef
 }
 
 sealed interface FieldDef {

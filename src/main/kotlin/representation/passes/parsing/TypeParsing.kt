@@ -6,9 +6,13 @@ import representation.passes.lexing.TokenType
 
 internal fun parseType(lexer: Lexer, typeGenerics: List<String>, extraInfo: String? = null): ParsedType {
 
-//    if (lexer.consume(LEFT_PAREN)) {
-//
-//    }
+    if (lexer.consume(TokenType.LEFT_PAREN)) {
+        val loc = lexer.last().loc
+        // This is a tuple or func
+        val elements = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseType(it, typeGenerics, extraInfo = "for tuple/func type") }
+        // TODO: Check for arrow, func type
+        return ParsedType.Tuple(loc.merge(lexer.last().loc), elements)
+    }
 
     // Grab identifier
     val ident = lexer.expect(TokenType.IDENTIFIER, extraInfo)
@@ -22,5 +26,5 @@ internal fun parseType(lexer: Lexer, typeGenerics: List<String>, extraInfo: Stri
     val basicGenerics = if (lexer.consume(TokenType.LESS))
         commaSeparated(lexer, TokenType.GREATER) { parseType(it, typeGenerics, "for generic args") }
     else listOf()
-    return ParsedType.Basic(ident.loc, ident.string(), basicGenerics)
+    return ParsedType.Basic(ident.loc.merge(lexer.last().loc), ident.string(), basicGenerics)
 }

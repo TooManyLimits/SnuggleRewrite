@@ -44,6 +44,12 @@ interface BuiltinType {
     // it's 2. For plural types, the value can be anything >= 0.
     val stackSlots: Int
 
+    // If a type is plural, that means it consists of multiple
+    // JVM values, stored together on the stack. For example,
+    // structs are plural types. When translating to the jvm,
+    // special care needs to be given for plural types.
+    val isPlural: Boolean
+
     // The number of generics this type has. 0 by default.
     val numGenerics: Int get() = 0
 

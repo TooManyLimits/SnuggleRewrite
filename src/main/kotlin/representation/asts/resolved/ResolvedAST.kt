@@ -110,5 +110,6 @@ sealed interface ResolvedType {
 
     //Note: Now a DIRECT REFERENCE to a ResolvedTypeDef, rather than a mere String. This is the *primary reason for this AST pass*.
     data class Basic(override val loc: Loc, val base: ResolvedTypeDef, val generics: List<ResolvedType>): ResolvedType
+    data class Tuple(override val loc: Loc, val elements: List<ResolvedType>): ResolvedType
     data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
 }

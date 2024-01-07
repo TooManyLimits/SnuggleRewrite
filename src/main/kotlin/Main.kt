@@ -15,6 +15,8 @@ fun main() {
         let x: i32 = 1000
         print(x)
         print(let y: i32 = 10)
+        let z = new Object()
+        print(z)
     """.trimIndent()
     val lexer = Lexer("main", code)
 
