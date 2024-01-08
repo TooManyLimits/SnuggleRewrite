@@ -59,6 +59,7 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         writer.visitTypeInsn(Opcodes.NEW, inst.typeToCreate.runtimeName!!)
         writer.visitInsn(Opcodes.DUP)
     }
+    is Instruction.LoadRefType -> writer.visitVarInsn(Opcodes.ALOAD, inst.index)
 
     // Store/load local variables. Have a helper function for it, because of repetition
     is Instruction.StoreLocal -> handleLocal(inst.index, inst.type, store = true, writer)

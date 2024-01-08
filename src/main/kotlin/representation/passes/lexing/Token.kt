@@ -57,6 +57,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "fn" -> TokenType.FN
 
         "new" -> TokenType.NEW
+        "super" -> TokenType.SUPER
 
         "let" -> TokenType.LET
         "mut" -> TokenType.MUT
@@ -136,6 +137,7 @@ enum class TokenType {
     FN,
 
     NEW,
+    SUPER,
 
     LET,
     MUT,

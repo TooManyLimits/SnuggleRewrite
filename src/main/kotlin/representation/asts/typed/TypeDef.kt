@@ -50,12 +50,14 @@ sealed interface TypeDef {
     //
     // However, certain aspects of the self-referring type def need to be
     // known while the promise is still waiting to be fulfilled.
-    // This includes the # of stack slots, and whether it's plural.
-    data class Indirection(override val stackSlots: Int, override val isPlural: Boolean, val promise: Promise<TypeDef> = Promise()): TypeDef {
+    // This includes:
+    // - The # of stack slots (for variable indices)
+    // - Whether it's plural (for getting method def runtimeName, "new" -> "<init>")
+    // - The primary supertype (for super methods)
+    data class Indirection(override val stackSlots: Int, override val isPlural: Boolean, override val primarySupertype: TypeDef?, val promise: Promise<TypeDef> = Promise()): TypeDef {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
         override val descriptor: List<String> get() = promise.expect().descriptor
-        override val primarySupertype: TypeDef? get() = promise.expect().primarySupertype
         override val supertypes: List<TypeDef> get() = promise.expect().supertypes
         override val fields: List<FieldDef> get() = promise.expect().fields
         override val methods: List<MethodDef> get() = promise.expect().methods

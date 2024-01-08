@@ -55,6 +55,9 @@ sealed interface Instruction {
     data class Pop(val typeToPop: TypeDef): Instruction
     // Create a new, uninitialized instance of the given type on the stack
     data class NewRefAndDup(val typeToCreate: TypeDef): Instruction
+    // Load a reference type. Used by SuperMethodCall to load the receiver on the stack,
+    // and the receiver should always be a reference type.
+    data class LoadRefType(val index: Int): Instruction
 
     // Store a value of the given type as a local variable at the given index
     data class StoreLocal(val index: Int, val type: TypeDef): Instruction

@@ -46,6 +46,7 @@ sealed interface TypedExpr {
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr
     data class MethodCall(override val loc: Loc, val receiver: TypedExpr, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
     data class StaticMethodCall(override val loc: Loc, val receiverType: TypeDef, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
+    data class SuperMethodCall(override val loc: Loc, val thisVariableIndex: Int, val methodDef: MethodDef, val args: List<TypedExpr>, override val type: TypeDef): TypedExpr
     data class ClassConstructorCall(override val loc: Loc, val constructorMethodDef: MethodDef, val args: List<TypedExpr>, override val type: TypeDef): TypedExpr
 }
 

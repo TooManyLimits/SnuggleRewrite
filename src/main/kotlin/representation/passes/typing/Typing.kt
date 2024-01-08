@@ -64,9 +64,13 @@ private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: 
         is ResolvedTypeDef.Indirection -> createIndirection(base.promise.expect())
         is ResolvedTypeDef.Builtin -> TypeDef.Indirection(
             base.builtin.stackSlots(generics, typeCache),
-            base.builtin.isPlural(generics, typeCache)
+            base.builtin.isPlural(generics, typeCache),
+            base.builtin.getPrimarySupertype(generics, typeCache)
         )
-        is ResolvedTypeDef.Class -> TypeDef.Indirection(1, false)
+        is ResolvedTypeDef.Class -> TypeDef.Indirection(
+            1, false,
+            getTypeDef(base.superType, typeCache, generics)
+        )
     }
     // Create the indirection and add it to the cache
     val indirection = createIndirection(base)
@@ -92,9 +96,9 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
         }
         // Other types need more work replacing generics.
         is ResolvedTypeDef.Class -> indirect(base, generics, typeCache) { indirection ->
-            val superType = getTypeDef(base.superType, typeCache, currentTypeGenerics)
+
             TypeDef.ClassDef(
-                base.loc, base.name, superType, generics,
+                base.loc, base.name, indirection.primarySupertype!!, generics,
 
                 // Note: This is where the currentTypeGenerics start out! The generics
                 // passed into this method are used as currentTypeGenerics when instantiating/typing methods and fields.

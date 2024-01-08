@@ -141,7 +141,18 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics)
         val methods = receiverType.methods.filter { it.static }
         val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, currentType, currentTypeGenerics)
+        // TODO: Const static method calls
         just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
+    }
+
+    is ResolvedExpr.SuperMethodCall -> {
+        // Ensure we can use super here
+        val superType = (currentType ?: throw ParsingException("Cannot use keyword \"super\" outside of a type definition", expr.loc))
+            .primarySupertype ?: throw ParsingException("Cannot use keyword \"super\" here. Type \"${currentType.name} does not have a supertype.", expr.loc)
+        val methods = superType.methods.filter { !it.static }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, currentType, currentTypeGenerics)
+        val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
+        just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, best.method.returnType))
     }
 
     is ResolvedExpr.ConstructorCall -> {

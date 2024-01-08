@@ -60,11 +60,13 @@ private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String
                 TODO() // Field
             }
         }
-        //invoke() overload
+        //invoke() overload (or new(), if receiver is super)
         TokenType.LEFT_PAREN -> {
             val loc = lexer.last().loc
             val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) }
-            expr = ParsedExpr.MethodCall(loc, expr, "invoke", args)
+            // Special case: super() becomes super.new(), NOT super.invoke().
+            val methodName = if (expr is ParsedExpr.Super) "new" else "invoke"
+            expr = ParsedExpr.MethodCall(loc, expr, methodName, args)
         }
         else -> throw IllegalStateException()
     }
@@ -81,6 +83,7 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
         TokenType.NEW -> parseConstructor(lexer, typeGenerics)
+        TokenType.SUPER -> ParsedExpr.Super(lexer.last().loc)
 
         TokenType.LET -> parseDeclaration(lexer, typeGenerics)
 

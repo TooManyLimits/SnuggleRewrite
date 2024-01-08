@@ -3,6 +3,7 @@ package representation.passes.typing
 import builtins.IntLiteralType
 import builtins.IntType
 import errors.NumberRangeException
+import errors.ParsingException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.MethodDef
@@ -11,6 +12,7 @@ import representation.asts.typed.TypedExpr
 import representation.passes.name_resolving.ExprResolutionResult
 import util.ConsMap
 import util.extend
+import util.lookup
 import java.math.BigInteger
 import kotlin.math.max
 
@@ -45,6 +47,10 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         just(TypedExpr.Block(expr.loc, typedExprs, lastExpr.type))
     }
 
+    // Checking vs inferring method calls is very similar.
+    // The only real difference is that check() passes expectedType
+    // as the required result, while infer() passes null.
+
     is ResolvedExpr.MethodCall -> {
         // Largely the same as the infer() version, just passes the "expectedType" parameter
         // Infer the type of the receiver
@@ -66,11 +72,20 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     }
 
     is ResolvedExpr.StaticMethodCall -> {
-        // Largely same as MethodCall above ^
         val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics)
         val methods = receiverType.methods.filter { it.static }
         val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, currentType, currentTypeGenerics)
+        // TODO: Const static method calls
         pullUpLiteral(just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType)), expectedType)
+    }
+
+    is ResolvedExpr.SuperMethodCall -> {
+        val superType = (currentType ?: throw ParsingException("Cannot use keyword \"super\" outside of a type definition", expr.loc))
+            .primarySupertype ?: throw ParsingException("Cannot use keyword \"super\" here. Type \"${currentType.name} does not have a supertype.", expr.loc)
+        val methods = superType.methods.filter { !it.static }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, currentType, currentTypeGenerics)
+        val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
+        just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, best.method.returnType))
     }
 
     // Some expressions can just be inferred,

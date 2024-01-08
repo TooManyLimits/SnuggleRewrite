@@ -68,7 +68,21 @@ fun lowerExpr(expr: TypedExpr, typeCalc: IdentityIncrementalCalculator<TypeDef, 
             is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
         }
     }
-    // Call the super() section, then set fields
+    is TypedExpr.SuperMethodCall -> sequence {
+        // Load "this" on the stack
+        yield(Instruction.LoadRefType(expr.thisVariableIndex))
+        // Push args
+        for (arg in expr.args)
+            yieldAll(lowerExpr(arg, typeCalc))
+        when (expr.methodDef) {
+            // Bytecode, emit directly
+            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) // TODO: Cost
+            // Special call!
+            is MethodDef.SnuggleMethodDef -> yield(Instruction.MethodCall.Special(expr.methodDef))
+            is MethodDef.ConstMethodDef,
+            is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
+        }
+    }
     is TypedExpr.ClassConstructorCall -> sequence {
         lowerTypeDef(expr.type, typeCalc)
         // Push and dup the receiver

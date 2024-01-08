@@ -46,6 +46,7 @@ sealed interface ParsedElement {
         data class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
+        data class Super(override val loc: Loc): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
         data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr
 

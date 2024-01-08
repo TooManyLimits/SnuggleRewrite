@@ -1,5 +1,6 @@
 package representation.passes.name_resolving
 
+import errors.ParsingException
 import errors.ResolutionException
 import errors.UnknownTypeException
 import representation.asts.resolved.ResolvedExpr
@@ -129,23 +130,35 @@ fun resolveExpr(
         val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>()
             .extendMany(resolvedArgs.map { it.exposedTypes })
 
-        // Now, we need to check if this is a static method call; we do that by seeing if
-        // the receiver is the name of some type.
-        if (expr.receiver is ParsedElement.ParsedExpr.Variable) {
-            val type = currentMappings.lookup(expr.receiver.name)
-            if (type != null) {
-                // Return a static method call result
+        // Now, we need to check for other types of method calls.
+        when (expr.receiver) {
+            // Check if this is a static method call; we do that by seeing if
+            // the receiver is the name of some type.
+            is ParsedElement.ParsedExpr.Variable -> {
+                val type = currentMappings.lookup(expr.receiver.name)
+                if (type != null) {
+                    // Return a static method call result
+                    return@run ExprResolutionResult(
+                        ResolvedExpr.StaticMethodCall(
+                            expr.loc,
+                            ResolvedType.Basic(expr.receiver.loc, type, listOf()),
+                            expr.methodName,
+                            resolvedArgs.map { it.expr }
+                        ), unitedFiles, unitedExposedTypes
+                    )
+                }
+            }
+            // Check if this is a super method call - pretty straight forward,
+            // just see if the receiver is a Super.
+            is ParsedElement.ParsedExpr.Super -> {
+                // This is a super method call.
                 return@run ExprResolutionResult(
-                    ResolvedExpr.StaticMethodCall(
-                        expr.loc,
-                        ResolvedType.Basic(expr.receiver.loc, type, listOf()),
-                        expr.methodName,
-                        resolvedArgs.map { it.expr }
-                    ), unitedFiles, unitedExposedTypes
+                    ResolvedExpr.SuperMethodCall(expr.loc, expr.methodName, resolvedArgs.map { it.expr }),
+                    unitedFiles, unitedExposedTypes
                 )
             }
+            else -> {}
         }
-
         // Otherwise, this is a non-static method call.
         // Resolve the receiver and return.
         val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
@@ -185,6 +198,10 @@ fun resolveExpr(
     // For ones where there's no nested expressions or other things, it's just a 1-liner.
     is ParsedElement.ParsedExpr.Literal -> ExprResolutionResult(ResolvedExpr.Literal(expr.loc, expr.value))
     is ParsedElement.ParsedExpr.Variable -> ExprResolutionResult(ResolvedExpr.Variable(expr.loc, expr.name))
+
+    // Should not encounter a Super unless as a receiver of a ParsedMethodCall.
+    is ParsedElement.ParsedExpr.Super
+        -> throw ParsingException("Unexpected \"super\" - should only be used for method calls in a superclass.", expr.loc)
 }
 
 // Returns the resolved type, as well as a set of types that were reached while resolving this type

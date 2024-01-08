@@ -18,7 +18,7 @@ fun main() {
         let z = new Object()
         print(z)
         class Silly {
-            fn new() print(100)
+            fn new() super()
         }
         print(new Silly())
     """.trimIndent()
