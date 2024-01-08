@@ -62,8 +62,11 @@ private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: 
     // Create the basic indirection. Depends on knowledge of the base type.
     fun createIndirection(base: ResolvedTypeDef): TypeDef.Indirection = when (base) {
         is ResolvedTypeDef.Indirection -> createIndirection(base.promise.expect())
-        is ResolvedTypeDef.Builtin -> TypeDef.Indirection(base.builtin.stackSlots)
-        is ResolvedTypeDef.Class -> TypeDef.Indirection(1)
+        is ResolvedTypeDef.Builtin -> TypeDef.Indirection(
+            base.builtin.stackSlots(generics, typeCache),
+            base.builtin.isPlural(generics, typeCache)
+        )
+        is ResolvedTypeDef.Class -> TypeDef.Indirection(1, false)
     }
     // Create the indirection and add it to the cache
     val indirection = createIndirection(base)

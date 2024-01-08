@@ -39,19 +39,19 @@ interface BuiltinType {
     // "Ljava/lang/String;".
     val descriptor: List<String>
 
+    // The number of generics this type has. 0 by default.
+    val numGenerics: Int get() = 0
+
     // The number of slots on the stack this takes up.
     // For most basic java types, it's 1. For longs and doubles,
     // it's 2. For plural types, the value can be anything >= 0.
-    val stackSlots: Int
+    fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int
 
     // If a type is plural, that means it consists of multiple
     // JVM values, stored together on the stack. For example,
     // structs are plural types. When translating to the jvm,
     // special care needs to be given for plural types.
-    val isPlural: Boolean
-
-    // The number of generics this type has. 0 by default.
-    val numGenerics: Int get() = 0
+    fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
 
     // Get the fields of this type, given the generics.
     fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now

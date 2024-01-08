@@ -29,8 +29,8 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
         64 -> "J"
         else -> throw IllegalStateException()
     })
-    override val stackSlots: Int = if (bits == 64) 2 else 1
-    override val isPlural: Boolean get() = false
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = if (bits == 64) 2 else 1
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val intType = getBasicBuiltin(this, typeCache)

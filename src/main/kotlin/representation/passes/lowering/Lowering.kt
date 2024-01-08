@@ -9,6 +9,9 @@ import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
 import util.ConsList
 import util.IdentityCache
+import util.IdentityIncrementalCalculator
+import util.insertionSort
+import java.util.Objects
 
 /**
  * Near final stage - lowering the TypedAST into
@@ -16,14 +19,26 @@ import util.IdentityCache
  */
 
 fun lower(ast: TypedAST): Program {
-    // Create some caches, so we can keep track of methods and such that are converted.
-    val typeCache = IdentityCache<TypeDef, GeneratedType>()
-    val methodCache = IdentityCache<MethodDef, GeneratedMethod>()
+    // Create an incremental calculator for the types
+    val typeCalc = IdentityIncrementalCalculator<TypeDef, GeneratedType>()
     // Compile the top-level code into instructions
     val topLevelCode = ast.allFiles.mapValues {
         // Lower the expr and wrap it in a code block
-        val loweredCode = lowerExpr(it.value.code)
+        val loweredCode = lowerExpr(it.value.code, typeCalc)
         Instruction.CodeBlock(ConsList.fromIterable(loweredCode.asIterable()))
     }
-    return Program(listOf(), topLevelCode)
+    // Get the types list, and sort it so subtypes come after their supertypes
+    val typesList = typeCalc.freeze().toList().filter { it.second != null }.toMutableList()
+    typesList.insertionSort { pair, pair2 ->
+        val a = pair.first
+        val b = pair2.first
+        if (a.isSubtype(b))
+            if (b.isSubtype(a)) 0
+            else 1
+        else
+            if (b.isSubtype(a)) -1
+            else 0
+    }
+    // Return the program
+    return Program(typesList.map { it.second!! }, topLevelCode)
 }

@@ -1,5 +1,6 @@
 package representation.passes.parsing
 
+import errors.ParsingException
 import representation.asts.parsed.ParsedElement
 import representation.asts.parsed.ParsedFieldDef
 import representation.asts.parsed.ParsedMethodDef
@@ -18,7 +19,7 @@ fun parseClass(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedTypeDef.Class 
     else
         ParsedType.Basic(Loc.NEVER, "Object", listOf()) // Default superclass to Object if none is given
     lexer.expect(TokenType.LEFT_CURLY, "to begin class definition")
-    val members = parseMembers(lexer, typeGenerics)
+    val members = parseMembers(lexer, typeGenerics, TypeType.CLASS)
     return ParsedElement.ParsedTypeDef.Class(classLoc, isPub, className, typeGenerics.size, supertype, members.first, members.second)
 }
 
@@ -28,8 +29,12 @@ private fun parseGenerics(lexer: Lexer): List<String> {
     return listOf()
 }
 
+enum class TypeType {
+    CLASS, STRUCT, ENUM
+}
+
 // Parses members. The { was just consumed. Continues until finding a }.
-private fun parseMembers(lexer: Lexer, typeGenerics: List<String>): Pair<List<ParsedFieldDef>, List<ParsedMethodDef>> {
+private fun parseMembers(lexer: Lexer, typeGenerics: List<String>, typeType: TypeType): Pair<List<ParsedFieldDef>, List<ParsedMethodDef>> {
     val fields = ArrayList<ParsedFieldDef>()
     val methods = ArrayList<ParsedMethodDef>()
     while (!lexer.consume(TokenType.RIGHT_CURLY)) {
@@ -38,15 +43,25 @@ private fun parseMembers(lexer: Lexer, typeGenerics: List<String>): Pair<List<Pa
         val isStatic = lexer.consume(TokenType.STATIC)
 
         if (lexer.consume(TokenType.FN)) {
-            // This is a method definition. Parse its name, params, and return type...
-            val methodName = lexer.expect(TokenType.IDENTIFIER, "for function name")
-            val params = parseParams(lexer, typeGenerics)
-            // Return type is unit by default
-            val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer, typeGenerics) else ParsedType.Tuple(Loc.NEVER, listOf())
-            // Now parse its body:
-            val body = parseExpr(lexer, typeGenerics)
-            // And add it to the list.
-            methods += ParsedMethodDef(methodName.loc, isPub, isStatic, methodName.string(), params, returnType, body)
+            // Special treatment/requirements for constructors vs regular methods
+            if (lexer.consume(TokenType.NEW)) {
+                val loc = lexer.last().loc
+                if (typeType == TypeType.ENUM) throw ParsingException("Cannot have constructors for enum type", lexer.last().loc)
+                if (typeType == TypeType.CLASS && isStatic) throw ParsingException("Constructors in classes cannot be static", lexer.last().loc)
+                if (typeType == TypeType.STRUCT && !isStatic) throw ParsingException("Constructors in structs must be static", lexer.last().loc)
+                val params = parseParams(lexer, typeGenerics)
+                val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer, typeGenerics) else ParsedType.Tuple(Loc.NEVER, listOf())
+                if (typeType == TypeType.CLASS && (returnType !is ParsedType.Tuple || returnType.elementTypes.isNotEmpty()))
+                    throw ParsingException("Class constructor must return unit, but found $returnType", returnType.loc)
+                val body = parseExpr(lexer, typeGenerics)
+                methods += ParsedMethodDef(loc, isPub, isStatic, "new", params, returnType, body)
+            } else {
+                val nameTok = lexer.expect(TokenType.IDENTIFIER, "for function name")
+                val params = parseParams(lexer, typeGenerics)
+                val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer, typeGenerics) else ParsedType.Tuple(Loc.NEVER, listOf())
+                val body = parseExpr(lexer, typeGenerics)
+                methods += ParsedMethodDef(nameTok.loc, isPub, isStatic, nameTok.string(), params, returnType, body)
+            }
         } else {
             // Otherwise, we must have field(s).
             // TODO: Parse fields

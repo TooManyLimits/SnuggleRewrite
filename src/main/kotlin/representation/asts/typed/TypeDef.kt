@@ -50,12 +50,11 @@ sealed interface TypeDef {
     //
     // However, certain aspects of the self-referring type def need to be
     // known while the promise is still waiting to be fulfilled.
-    // This includes the # of stack slots.
-    data class Indirection(override val stackSlots: Int, val promise: Promise<TypeDef> = Promise()): TypeDef {
+    // This includes the # of stack slots, and whether it's plural.
+    data class Indirection(override val stackSlots: Int, override val isPlural: Boolean, val promise: Promise<TypeDef> = Promise()): TypeDef {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
         override val descriptor: List<String> get() = promise.expect().descriptor
-        override val isPlural: Boolean get() = promise.expect().isPlural
         override val primarySupertype: TypeDef? get() = promise.expect().primarySupertype
         override val supertypes: List<TypeDef> get() = promise.expect().supertypes
         override val fields: List<FieldDef> get() = promise.expect().fields
@@ -80,8 +79,8 @@ sealed interface TypeDef {
         override val name: String = toGeneric(builtin.name, generics)
         override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
         override val descriptor: List<String> = builtin.descriptor
-        override val stackSlots: Int = builtin.stackSlots
-        override val isPlural: Boolean = builtin.isPlural
+        override val stackSlots: Int = builtin.stackSlots(generics, typeCache)
+        override val isPlural: Boolean = builtin.isPlural(generics, typeCache)
         override val primarySupertype: TypeDef? = builtin.getPrimarySupertype(generics, typeCache)
         override val supertypes: List<TypeDef> = builtin.getAllSupertypes(generics, typeCache)
         override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
@@ -108,6 +107,7 @@ sealed interface MethodDef {
     val static: Boolean
     val owningType: TypeDef
     val name: String
+    val runtimeName: String get() = name // For most, the runtime name is the same as the name.
     val returnType: TypeDef
     val argTypes: List<TypeDef>
 
@@ -128,7 +128,7 @@ sealed interface MethodDef {
     // - constructors, whose names are changed to "<init>" to match java's requirement
     // - overloaded methods, whose names are changed to have a disambiguation number appended
     data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val argTypes: List<TypeDef>,
-                                val runtimeName: String, val loc: Loc, val body: TypedExpr): MethodDef
+                                override val runtimeName: String, val loc: Loc, val body: TypedExpr): MethodDef
 }
 
 sealed interface FieldDef {

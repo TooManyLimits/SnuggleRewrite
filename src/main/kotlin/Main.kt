@@ -17,6 +17,10 @@ fun main() {
         print(let y: i32 = 10)
         let z = new Object()
         print(z)
+        class Silly {
+            fn new() print(100)
+        }
+        print(new Silly())
     """.trimIndent()
     val lexer = Lexer("main", code)
 

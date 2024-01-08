@@ -47,7 +47,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
     // Get its runtime name:
     val runtimeName = when {
         // If this is a class, and the name is "new", make it "<init>"
-        owningType is TypeDef.ClassDef && methodDef.name == "new" -> "<init>"
+        !owningType.isPlural && methodDef.name == "new" -> "<init>"
         // If the disambiguation index is > 0, use it
         disambiguationIndex > 0 -> methodDef.name + "$" + disambiguationIndex
         // Default, just the name

@@ -1,5 +1,8 @@
 package builtins
 
+import representation.asts.typed.TypeDef
+import representation.passes.typing.TypeDefCache
+
 open class FloatType(val bits: Int): BuiltinType {
     override val name: String = "f$bits"
     override val nameable: Boolean get() = true
@@ -9,8 +12,8 @@ open class FloatType(val bits: Int): BuiltinType {
         64 -> "D"
         else -> throw IllegalStateException()
     })
-    override val stackSlots: Int = if (bits == 64) 2 else 1
-    override val isPlural: Boolean get() = false
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = if (bits == 64) 2 else 1
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
 }
 

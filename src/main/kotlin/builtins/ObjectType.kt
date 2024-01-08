@@ -15,8 +15,8 @@ object ObjectType: BuiltinType {
     override val nameable: Boolean get() = true
     override val runtimeName: String get() = "java/lang/Object"
     override val descriptor: List<String> = listOf("L$runtimeName;")
-    override val stackSlots: Int get() = 1
-    override val isPlural: Boolean get() = false
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val objType = getBasicBuiltin(ObjectType, typeCache)

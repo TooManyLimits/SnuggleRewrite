@@ -19,6 +19,9 @@ fun outputType(type: GeneratedType): ByteArray = when (type) {
         writer.visitEnd()
         writer.toByteArray()
     }
+    is GeneratedType.GeneratedValueType -> {
+        TODO()
+    }
 }
 
 private fun outputField(field: GeneratedField, classWriter: ClassWriter, prefix: String = "") {
@@ -28,7 +31,7 @@ private fun outputField(field: GeneratedField, classWriter: ClassWriter, prefix:
 private fun outputMethod(method: GeneratedMethod, classWriter: ClassWriter) {
     val writer = classWriter.visitMethod(
         Opcodes.ACC_PUBLIC + if (method.methodDef.static) Opcodes.ACC_STATIC else 0,
-        method.methodDef.name,
+        method.methodDef.runtimeName,
         getMethodDescriptor(method.methodDef), null, null)
     writer.visitCode()
     outputInstruction(method.body, writer)

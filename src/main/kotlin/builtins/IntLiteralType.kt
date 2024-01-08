@@ -13,8 +13,10 @@ object IntLiteralType: BuiltinType {
     override val nameable: Boolean get() = false // Not nameable, can't refer to type "IntLiteral" in code
     override val runtimeName: String? get() = null
     override val descriptor: List<String> get() = listOf()
-    override val stackSlots: Int get() = -1000
-    override val isPlural: Boolean get() = false
+
+    // If we ever use this value anyway, something has already gone terribly wrong
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = -1000
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     // Supertypes are the various int types
     override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =

@@ -18,8 +18,9 @@ data class Program(
 sealed interface GeneratedType {
     val runtimeName: String
     data class GeneratedClass(override val runtimeName: String, val supertypeName: String,
-                              val fields: List<GeneratedField>,
-                              val methods: List<GeneratedMethod>): GeneratedType
+                              val fields: List<GeneratedField>, val methods: List<GeneratedMethod>): GeneratedType
+    data class GeneratedValueType(override val runtimeName: String,
+                                  val fields: List<GeneratedField>, val methods: List<GeneratedMethod>): GeneratedType
 }
 
 @JvmInline value class GeneratedField(val fieldDef: FieldDef)

@@ -14,8 +14,8 @@ object BoolType: BuiltinType {
     override val nameable: Boolean get() = true
     override val runtimeName: String? get() = null
     override val descriptor: List<String> = listOf("Z")
-    override val stackSlots: Int get() = 1
-    override val isPlural: Boolean get() = false
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val boolType = getBasicBuiltin(BoolType, typeCache)

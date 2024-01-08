@@ -5,6 +5,7 @@ import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.Instruction
+import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import java.math.BigInteger
 
@@ -37,7 +38,7 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     // Make the call with the proper bytecode
     is Instruction.MethodCall -> {
         val owner = inst.methodToCall.owningType.runtimeName!!
-        val name = inst.methodToCall.name
+        val name = inst.methodToCall.runtimeName
         val descriptor = getMethodDescriptor(inst.methodToCall)
         writer.visitMethodInsn(inst.invokeBytecode, owner, name, descriptor, false)
     }
