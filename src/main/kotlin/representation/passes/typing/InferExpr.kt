@@ -1,15 +1,15 @@
 package representation.passes.typing
 
 import builtins.*
-import errors.FieldCountException
-import representation.asts.resolved.ResolvedExpr
-import errors.NoSuchVariableException
+import errors.CompilationException
 import errors.ParsingException
+import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.asts.typed.TypedPattern
 import representation.passes.lexing.IntLiteralData
+import representation.passes.lexing.Loc
 import util.ConsList
 import util.ConsMap
 import util.extend
@@ -40,6 +40,9 @@ fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
  * @param scope The current set of variables in scope. Immutable, notably.
  * @param typeCache The cache used for keeping track of the types that have been instantiated.
  *                  (A small amount of mutable state.)
+ * @param returnType If we're inside a method definition, the expected return type of the method
+ *                   definition. Used for checking "return ..." expressions. If not inside a method
+ *                   definition, is null.
  * @param currentType The type which is currently being type-checked inside. Deals with things
  *                    like the "super" keyword, since it needs to know where it's used in order
  *                    to be able to understand its meaning.
@@ -48,7 +51,7 @@ fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
  *                            inferring expressions inside of List<String>, then this param will
  *                            be the list of 1 element [String TypeDef].
  */
-fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>): TypingResult = when (expr) {
+fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>): TypingResult = when (expr) {
 
     // Import has type bool
     is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
@@ -64,7 +67,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         var scope = scope // Shadow scope
         val inferredExprs = expr.exprs.map {
             // Infer the inner expression
-            val inferred = inferExpr(it, scope, typeCache, currentType, currentTypeGenerics)
+            val inferred = inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics)
             // Check its new vars. If neither side is empty, add the vars in.
             if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                 // Extend the scope with the new vars
@@ -92,10 +95,10 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             // If the pattern is explicitly typed, then infer its type:
             typedPattern = inferPattern(expr.pattern, typeCache, currentTypeGenerics)
             // Check the right side against that:
-            typedInitializer = checkExpr(expr.initializer, typedPattern.type, scope, typeCache, currentType, currentTypeGenerics).expr
+            typedInitializer = checkExpr(expr.initializer, typedPattern.type, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
         } else {
             // The pattern is not explicitly typed, so instead infer the RHS:
-            typedInitializer = inferExpr(expr.initializer, scope, typeCache, currentType, currentTypeGenerics).expr
+            typedInitializer = inferExpr(expr.initializer, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
             // Check the pattern against the inferred type:
             typedPattern = checkPattern(expr.pattern, typedInitializer.type, typeCache, currentTypeGenerics)
         }
@@ -114,13 +117,25 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             TypingResult.WithVars(typed, patternBindings.first, patternBindings.first)
     }
 
+    is ResolvedExpr.FieldAccess -> {
+        val receiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+        val bestField = findField(receiver.type, false, expr.fieldName, expr.loc)
+        just(TypedExpr.FieldAccess(expr.loc, receiver, expr.fieldName, bestField, bestField.type))
+    }
+
+    is ResolvedExpr.StaticFieldAccess -> {
+        val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics)
+        val bestField = findField(receiverType, true, expr.fieldName, expr.loc)
+        just(TypedExpr.StaticFieldAccess(expr.loc, receiverType, expr.fieldName, bestField, bestField.type))
+    }
+
     is ResolvedExpr.MethodCall -> {
         // Infer the type of the receiver
-        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, currentType, currentTypeGenerics).expr
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.type.methods.filter { !it.static }
+        val methods = typedReceiver.type.nonStaticMethods
         // Choose the best method from among them
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, currentType, currentTypeGenerics)
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics)
         // Create a method call
         val call = TypedExpr.MethodCall(
             expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
@@ -139,8 +154,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     is ResolvedExpr.StaticMethodCall -> {
         // Largely same as above, MethodCall
         val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics)
-        val methods = receiverType.methods.filter { it.static }
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, currentType, currentTypeGenerics)
+        val methods = receiverType.staticMethods
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics)
         // TODO: Const static method calls
         just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
     }
@@ -149,13 +164,16 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Ensure we can use super here
         val superType = (currentType ?: throw ParsingException("Cannot use keyword \"super\" outside of a type definition", expr.loc))
             .primarySupertype ?: throw ParsingException("Cannot use keyword \"super\" here. Type \"${currentType.name} does not have a supertype.", expr.loc)
-        val methods = superType.methods.filter { !it.static }
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, currentType, currentTypeGenerics)
+        val methods = superType.nonStaticMethods
+        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics)
         val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
         just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, best.method.returnType))
     }
 
     is ResolvedExpr.ConstructorCall -> {
+        if (expr.type == null)
+            throw CompilationException("Cannot infer type of constructor - try making it explicitly typed, or adding more type annotations", expr.loc)
+
         val type = getTypeDef(expr.type, typeCache, currentTypeGenerics)
 
         // Different situations depending on the type.
@@ -163,19 +181,43 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             // Special constructor. Some builtins
             // have these.
             TODO()
-        } else if (/*type is TypeDef.StructDef*/ false) {
+        } else if (type.unwrap() is TypeDef.StructDef) {
             // StructDef constructors work differently.
             // Instead of being nonstatic methods that initialize
-            // an object, they're static methods that return a struct.
-            TODO()
+            // an object, they're static methods that return the struct.
+            val methods = type.staticMethods
+            val expectedResult = type.unwrap()
+            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+            just(TypedExpr.StaticMethodCall(expr.loc, type, "new", best.checkedArgs, best.method, best.method.returnType))
         } else {
             // Regular ol' java style constructor
             // Look for a non-static method "new" that returns unit
-            val methods = type.methods.filter { !it.static }
+            val methods = type.nonStaticMethods
             val expectedResult = getUnit(typeCache)
-            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, currentType, currentTypeGenerics)
+            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
             just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, type))
         }
+    }
+
+    is ResolvedExpr.RawStructConstructor -> {
+        if (expr.type == null)
+            throw CompilationException("Cannot infer type of raw struct constructor - try making it explicitly typed, or adding more type annotations", expr.loc)
+        val type = getTypeDef(expr.type, typeCache, currentTypeGenerics)
+        if (type.unwrap() !is TypeDef.StructDef)
+            throw CompilationException("Raw struct constructors can only create structs, but type \"${type.name}\" is not a struct", expr.loc)
+        if (type.nonStaticFields.size != expr.fieldValues.size)
+            throw CompilationException("Struct \"${type.name}\" has ${type.nonStaticFields.size} non-static fields, but ${expr.fieldValues.size} fields were provided in the raw constructor!", expr.loc)
+        val checkedFieldValues = type.nonStaticFields.zip(expr.fieldValues).map { (field, value) ->
+            checkExpr(value, field.type, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+        }
+        just(TypedExpr.RawStructConstructor(expr.loc, checkedFieldValues, type))
+    }
+
+    is ResolvedExpr.Return -> {
+        if (returnType == null)
+            throw ParsingException("Can only use \"return\" inside of a method definition", expr.loc)
+        val typedRhs = checkExpr(expr.rhs, returnType, scope, typeCache, returnType, currentType, currentTypeGenerics)
+        just(TypedExpr.Return(expr.loc, typedRhs.expr, typedRhs.expr.type))
     }
 
     is ResolvedExpr.Literal -> {
@@ -199,3 +241,6 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     }
 
 }
+
+class NoSuchVariableException(varName: String, loc: Loc)
+    : CompilationException("No variable with name \"$varName\" is in the current scope", loc)

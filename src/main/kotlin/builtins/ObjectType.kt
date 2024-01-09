@@ -17,12 +17,13 @@ object ObjectType: BuiltinType {
     override val descriptor: List<String> = listOf("L$runtimeName;")
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val objType = getBasicBuiltin(ObjectType, typeCache)
         val unitType = getUnit(typeCache)
         return listOf(
-            MethodDef.BytecodeMethodDef(true, false, objType, "new", unitType, listOf()) {
+            MethodDef.BytecodeMethodDef(true, false, 0, objType, "new", unitType, listOf()) {
                 it.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
             }
         )

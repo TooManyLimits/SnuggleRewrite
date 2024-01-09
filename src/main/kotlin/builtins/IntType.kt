@@ -31,6 +31,7 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
     })
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = if (bits == 64) 2 else 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val intType = getBasicBuiltin(this, typeCache)

@@ -16,6 +16,7 @@ object BoolType: BuiltinType {
     override val descriptor: List<String> = listOf("Z")
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val boolType = getBasicBuiltin(BoolType, typeCache)

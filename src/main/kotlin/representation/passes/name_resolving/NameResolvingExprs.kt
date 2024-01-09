@@ -1,8 +1,7 @@
 package representation.passes.name_resolving
 
+import errors.CompilationException
 import errors.ParsingException
-import errors.ResolutionException
-import errors.UnknownTypeException
 import representation.asts.resolved.ResolvedExpr
 import representation.asts.resolved.ResolvedType
 import representation.asts.resolved.ResolvedTypeDef
@@ -10,10 +9,11 @@ import representation.asts.parsed.ParsedAST
 import representation.asts.parsed.ParsedElement
 import representation.asts.parsed.ParsedFile
 import representation.asts.parsed.ParsedType
+import representation.passes.lexing.Loc
 import util.*
 import util.ConsList.Companion.fromIterable
 import util.ConsList.Companion.nil
-import kotlin.math.exp
+import util.caching.IdentityCache
 
 /**
  * The result of resolving an expression or a block.
@@ -121,6 +121,31 @@ fun resolveExpr(
 
     // Others are fairly straightforward; resolve the things inside, collect the results, and return.
 
+    is ParsedElement.ParsedExpr.FieldAccess -> run {
+        when (expr.receiver) {
+            is ParsedElement.ParsedExpr.Variable -> {
+                val type = currentMappings.lookup(expr.receiver.name)
+                if (type != null) {
+                    return@run ExprResolutionResult(
+                        ResolvedExpr.StaticFieldAccess(
+                            expr.loc,
+                            ResolvedType.Basic(expr.receiver.loc, type, listOf()),
+                            expr.fieldName
+                        ), setOf(), ConsMap.of()
+                    )
+                }
+            }
+            else -> {}
+        }
+        // Otherwise, this is a non-static field access.
+        // Resolve the receiver and return.
+        val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
+        ExprResolutionResult(
+            ResolvedExpr.FieldAccess(expr.loc, resolvedReceiver.expr, expr.fieldName),
+            resolvedReceiver.files, resolvedReceiver.exposedTypes
+        )
+    }
+
     // Method calls:
     is ParsedElement.ParsedExpr.MethodCall -> run {
 
@@ -172,7 +197,7 @@ fun resolveExpr(
     // Constructor calls:
     is ParsedElement.ParsedExpr.ConstructorCall -> {
         // Resolve, collect, return.
-        val resolvedType = resolveType(expr.type, currentMappings)
+        val resolvedType = expr.type?.let { resolveType(it, currentMappings) }
         val resolvedArgs = expr.args.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
         val unitedFiles = union(resolvedArgs.map { it.files })
         val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>()
@@ -180,6 +205,19 @@ fun resolveExpr(
 
         ExprResolutionResult(
             ResolvedExpr.ConstructorCall(expr.loc, resolvedType, resolvedArgs.map { it.expr }),
+            unitedFiles, unitedExposedTypes
+        )
+    }
+
+    is ParsedElement.ParsedExpr.RawStructConstructor -> {
+        // Same as regular constructor, really.
+        val resolvedType = expr.type?.let { resolveType(it, currentMappings) }
+        val resolvedArgs = expr.fieldValues.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
+        val unitedFiles = union(resolvedArgs.map { it.files })
+        val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>()
+            .extendMany(resolvedArgs.map { it.exposedTypes })
+        ExprResolutionResult(
+            ResolvedExpr.RawStructConstructor(expr.loc, resolvedType, resolvedArgs.map { it.expr }),
             unitedFiles, unitedExposedTypes
         )
     }
@@ -193,6 +231,10 @@ fun resolveExpr(
             initializer.files,
             initializer.exposedTypes
         )
+    }
+
+    is ParsedElement.ParsedExpr.Return -> resolveExpr(expr.rhs, startingMappings, currentMappings, ast, cache).let {
+        ExprResolutionResult(ResolvedExpr.Return(it.expr.loc, it.expr), it.files, it.exposedTypes)
     }
 
     // For ones where there's no nested expressions or other things, it's just a 1-liner.
@@ -214,3 +256,8 @@ fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ResolvedTypeD
     is ParsedType.Tuple -> ResolvedType.Tuple(type.loc, type.elementTypes.map { resolveType(it, currentMappings) })
     is ParsedType.TypeGeneric -> ResolvedType.TypeGeneric(type.loc, type.name, type.index)
 }
+
+class ResolutionException(filePath: String, loc: Loc)
+    : CompilationException("No file with name \"$filePath\" was provided", loc)
+class UnknownTypeException(typeName: String, loc: Loc)
+    : CompilationException("No type with name \"$typeName\" is in the current scope", loc)

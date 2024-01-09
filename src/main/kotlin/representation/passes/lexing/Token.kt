@@ -1,7 +1,6 @@
 package representation.passes.lexing
 
-import errors.LexingException
-import errors.UnknownTokenException
+import errors.CompilationException
 import java.math.BigInteger
 import java.util.regex.Pattern
 
@@ -61,6 +60,8 @@ fun tokenOf(loc: Loc, string: String): Token? {
 
         "let" -> TokenType.LET
         "mut" -> TokenType.MUT
+
+        "return" -> TokenType.RETURN
 
         ":" -> TokenType.COLON
         ";" -> TokenType.SEMICOLON
@@ -142,6 +143,8 @@ enum class TokenType {
     LET,
     MUT,
 
+    RETURN,
+
     COLON,
     SEMICOLON,
     COMMA,
@@ -210,3 +213,8 @@ private fun handleEscape(string: String, startIndex: Int, loc: Loc): Pair<Char, 
         else -> throw LexingException("Illegal escape character \"\\$next\"", loc)
     } to index
 }
+
+class LexingException(message: String, loc: Loc)
+    : CompilationException(message, loc)
+class UnknownTokenException(unrecognized: String, loc: Loc)
+    : CompilationException("Unrecognized ${if (unrecognized.length == 1) "character" else "token"} \"$unrecognized\"", loc)

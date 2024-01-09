@@ -42,12 +42,18 @@ sealed interface TypedExpr {
     data class Block(override val loc: Loc, val exprs: List<TypedExpr>, override val type: TypeDef): TypedExpr
     data class Declaration(override val loc: Loc, val pattern: TypedPattern, val variableIndex: Int, val initializer: TypedExpr, override val type: TypeDef): TypedExpr
 
+    data class Return(override val loc: Loc, val rhs: TypedExpr, override val type: TypeDef): TypedExpr
+
     data class Variable(override val loc: Loc, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr
+
+    data class FieldAccess(override val loc: Loc, val receiver: TypedExpr, val fieldName: String, val fieldDef: FieldDef, override val type: TypeDef): TypedExpr
+    data class StaticFieldAccess(override val loc: Loc, val receiverType: TypeDef, val fieldName: String, val fieldDef: FieldDef, override val type: TypeDef): TypedExpr
     data class MethodCall(override val loc: Loc, val receiver: TypedExpr, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
     data class StaticMethodCall(override val loc: Loc, val receiverType: TypeDef, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
     data class SuperMethodCall(override val loc: Loc, val thisVariableIndex: Int, val methodDef: MethodDef, val args: List<TypedExpr>, override val type: TypeDef): TypedExpr
     data class ClassConstructorCall(override val loc: Loc, val constructorMethodDef: MethodDef, val args: List<TypedExpr>, override val type: TypeDef): TypedExpr
+    data class RawStructConstructor(override val loc: Loc, val fieldValues: List<TypedExpr>, override val type: TypeDef): TypedExpr
 }
 
 sealed interface TypedPattern {

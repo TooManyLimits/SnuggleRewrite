@@ -2,10 +2,7 @@ package representation.asts.resolved
 
 import representation.passes.lexing.Loc
 import builtins.BuiltinType
-import representation.asts.typed.TypeDef
-import util.IdentityCache
 import util.Promise
-import java.util.IdentityHashMap
 
 /**
  * Here, the raw string data of the previous AST (ParsedAST)
@@ -77,10 +74,15 @@ sealed interface ResolvedTypeDef {
                      val fields: List<ResolvedFieldDef>,
                      val methods: List<ResolvedMethodDef>): ResolvedTypeDef
 
+    data class Struct(val loc: Loc, override val pub: Boolean, override val name: String,
+                     override val numGenerics: Int,
+                     val fields: List<ResolvedFieldDef>,
+                     val methods: List<ResolvedMethodDef>): ResolvedTypeDef
+
 }
 
-data class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ResolvedType, val initializer: ResolvedExpr?)
-data class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
+data class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ResolvedType)
+data class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
 
 sealed interface ResolvedExpr {
     val loc: Loc
@@ -90,12 +92,18 @@ sealed interface ResolvedExpr {
     data class Block(override val loc: Loc, val exprs: List<ResolvedExpr>): ResolvedExpr
     data class Declaration(override val loc: Loc, val pattern: ResolvedPattern, val initializer: ResolvedExpr): ResolvedExpr
 
+    data class Return(override val loc: Loc, val rhs: ResolvedExpr): ResolvedExpr
+
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
+
+    data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
+    data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
     data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
     data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
     data class SuperMethodCall(override val loc: Loc, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
-    data class ConstructorCall(override val loc: Loc, val type: ResolvedType, val args: List<ResolvedExpr>): ResolvedExpr
+    data class ConstructorCall(override val loc: Loc, val type: ResolvedType?, val args: List<ResolvedExpr>): ResolvedExpr
+    data class RawStructConstructor(override val loc: Loc, val type: ResolvedType?, val fieldValues: List<ResolvedExpr>): ResolvedExpr
 
 
 }

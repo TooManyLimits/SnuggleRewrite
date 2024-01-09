@@ -1,17 +1,13 @@
 package representation.passes.lowering
 
-import representation.asts.ir.GeneratedMethod
 import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
 import representation.asts.ir.Program
-import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
 import util.ConsList
-import util.IdentityCache
-import util.IdentityIncrementalCalculator
+import util.caching.IdentityIncrementalCalculator
 import util.insertionSort
-import java.util.Objects
 
 /**
  * Near final stage - lowering the TypedAST into
@@ -24,7 +20,7 @@ fun lower(ast: TypedAST): Program {
     // Compile the top-level code into instructions
     val topLevelCode = ast.allFiles.mapValues {
         // Lower the expr and wrap it in a code block
-        val loweredCode = lowerExpr(it.value.code, typeCalc)
+        val loweredCode = lowerExpr(it.value.code, ConsList.nil(), typeCalc)
         Instruction.CodeBlock(ConsList.fromIterable(loweredCode.asIterable()))
     }
     // Get the types list, and sort it so subtypes come after their supertypes

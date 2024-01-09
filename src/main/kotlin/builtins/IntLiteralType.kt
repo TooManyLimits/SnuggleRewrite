@@ -17,6 +17,7 @@ object IntLiteralType: BuiltinType {
     // If we ever use this value anyway, something has already gone terribly wrong
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = -1000
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     // Supertypes are the various int types
     override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =

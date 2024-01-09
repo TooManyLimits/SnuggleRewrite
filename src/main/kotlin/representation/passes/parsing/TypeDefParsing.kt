@@ -23,6 +23,15 @@ fun parseClass(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedTypeDef.Class 
     return ParsedElement.ParsedTypeDef.Class(classLoc, isPub, className, typeGenerics.size, supertype, members.first, members.second)
 }
 
+fun parseStruct(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedTypeDef.Struct {
+    val structLoc = lexer.last().loc
+    val structName = lexer.expect(TokenType.IDENTIFIER, extraInfo = "after \"struct\"").string()
+    val typeGenerics = parseGenerics(lexer)
+    lexer.expect(TokenType.LEFT_CURLY, "to begin class definition")
+    val members = parseMembers(lexer, typeGenerics, TypeType.STRUCT)
+    return ParsedElement.ParsedTypeDef.Struct(structLoc, isPub, structName, typeGenerics.size, members.first, members.second)
+}
+
 private fun parseGenerics(lexer: Lexer): List<String> {
     if (lexer.consume(TokenType.LESS))
         return commaSeparated(lexer, TokenType.GREATER) { it.expect(TokenType.IDENTIFIER, "for generic").string() }
@@ -54,18 +63,22 @@ private fun parseMembers(lexer: Lexer, typeGenerics: List<String>, typeType: Typ
                 if (typeType == TypeType.CLASS && (returnType !is ParsedType.Tuple || returnType.elementTypes.isNotEmpty()))
                     throw ParsingException("Class constructor must return unit, but found $returnType", returnType.loc)
                 val body = parseExpr(lexer, typeGenerics)
-                methods += ParsedMethodDef(loc, isPub, isStatic, "new", params, returnType, body)
+                val numGenerics = 0 // TODO
+                methods += ParsedMethodDef(loc, isPub, isStatic, numGenerics, "new", params, returnType, body)
             } else {
                 val nameTok = lexer.expect(TokenType.IDENTIFIER, "for function name")
                 val params = parseParams(lexer, typeGenerics)
                 val returnType = if (lexer.consume(TokenType.COLON)) parseType(lexer, typeGenerics) else ParsedType.Tuple(Loc.NEVER, listOf())
                 val body = parseExpr(lexer, typeGenerics)
-                methods += ParsedMethodDef(nameTok.loc, isPub, isStatic, nameTok.string(), params, returnType, body)
+                val numGenerics = 0 // TODO
+                methods += ParsedMethodDef(nameTok.loc, isPub, isStatic, numGenerics, nameTok.string(), params, returnType, body)
             }
         } else {
             // Otherwise, we must have field(s).
-            // TODO: Parse fields
-            TODO()
+            val fieldName = lexer.expect(TokenType.IDENTIFIER, "to begin field name, or a function definition")
+            lexer.expect(TokenType.COLON, "for mandatory field type annotation")
+            val typeAnnotation = parseType(lexer, typeGenerics)
+            fields += ParsedFieldDef(fieldName.loc, isPub, isStatic, fieldName.string(), typeAnnotation)
         }
     }
     return fields to methods

@@ -14,9 +14,11 @@ fun parseElement(lexer: Lexer, typeGenerics: List<String>): ParsedElement {
     return when {
         lexer.consume(TokenType.PUB) -> when {
             lexer.consume(TokenType.CLASS) -> parseClass(lexer, true)
+            lexer.consume(TokenType.STRUCT) -> parseStruct(lexer, true)
             else -> throw ParsingException("Expected type definition after \"pub\"", lexer.last().loc)
         }
         lexer.consume(TokenType.CLASS) -> parseClass(lexer, false)
+        lexer.consume(TokenType.STRUCT) -> parseStruct(lexer, false)
         else -> parseExpr(lexer, typeGenerics)
     }
 }

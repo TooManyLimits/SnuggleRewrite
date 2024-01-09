@@ -5,7 +5,7 @@ import representation.asts.resolved.ResolvedMethodDef
 import representation.asts.resolved.ResolvedTypeDef
 import representation.asts.parsed.*
 import util.ConsMap
-import util.IdentityCache
+import util.caching.IdentityCache
 import util.union
 
 data class TypeDefResolutionResult(
@@ -33,7 +33,18 @@ fun resolveTypeDef(
             union(resolvedFields.map { it.second }, resolvedMethods.map { it.second })
         )
     }
-
+    // Same as above, just without the supertype. Who ever said not to repeat yourself, smh
+    is ParsedElement.ParsedTypeDef.Struct -> {
+        val resolvedFields = typeDef.fields.map { resolveFieldDef(it, startingMappings, currentMappings, ast, cache) }
+        val resolvedMethods = typeDef.methods.map { resolveMethodDef(it, startingMappings, currentMappings, ast, cache) }
+        TypeDefResolutionResult(
+            ResolvedTypeDef.Struct(typeDef.loc, typeDef.pub, typeDef.name, typeDef.numGenerics,
+                resolvedFields.map { it.first },
+                resolvedMethods.map { it.first }
+            ),
+            union(resolvedFields.map { it.second }, resolvedMethods.map { it.second })
+        )
+    }
 }
 
 private fun resolveFieldDef(fieldDef: ParsedFieldDef,
@@ -43,10 +54,7 @@ private fun resolveFieldDef(fieldDef: ParsedFieldDef,
                             cache: IdentityCache<ParsedFile, PublicMembers>
 ): Pair<ResolvedFieldDef, Set<ParsedFile>> {
     val resolvedType = resolveType(fieldDef.annotatedType, currentMappings)
-    val resolvedInitializer = fieldDef.initializer?.let { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
-    return ResolvedFieldDef(
-        fieldDef.loc, fieldDef.pub, fieldDef.static, fieldDef.name, resolvedType, resolvedInitializer?.expr
-    ) to (resolvedInitializer?.files ?: setOf())
+    return ResolvedFieldDef(fieldDef.loc, fieldDef.pub, fieldDef.static, fieldDef.name, resolvedType) to setOf()
 }
 
 private fun resolveMethodDef(
@@ -60,6 +68,6 @@ private fun resolveMethodDef(
     val resolvedReturnType = resolveType(methodDef.returnType, currentMappings)
     val resolvedBody = resolveExpr(methodDef.body, startingMappings, currentMappings, ast, cache)
     return ResolvedMethodDef(
-        methodDef.loc, methodDef.pub, methodDef.static, methodDef.name, resolvedParams, resolvedReturnType, resolvedBody.expr
+        methodDef.loc, methodDef.pub, methodDef.static, methodDef.numGenerics, methodDef.name, resolvedParams, resolvedReturnType, resolvedBody.expr
     ) to resolvedBody.files
 }

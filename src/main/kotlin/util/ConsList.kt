@@ -7,29 +7,57 @@ sealed interface ConsList<out T> : Iterable<T> {
 
     fun <R> map(func: (elem: T) -> R): ConsList<R> {
         return when (this) {
-            is Nil<T> -> nil()
             is Cons<T> -> Cons(func(elem), rest.map(func))
+            is Nil<T> -> nil()
         }
     }
 
     fun <R> mapIndexed(index: Int = 0, func: (index: Int, elem: T) -> R): ConsList<R> {
         return when (this) {
-            is Nil<T> -> nil()
             is Cons<T> -> Cons(func(index, elem), rest.mapIndexed(index + 1, func))
+            is Nil<T> -> nil()
         }
     }
 
     fun <R> flatMap(func: (elem: T) -> ConsList<R>): ConsList<R> {
         return when (this) {
-            is Nil<T> -> nil()
             is Cons<T> -> func(elem).append(rest.flatMap(func))
+            is Nil<T> -> nil()
         }
+    }
+
+    fun <R> fold(initial: R, func: (accum: R, elem: T) -> R): R {
+        var cur = this
+        var res = initial
+        while (cur is Cons) {
+            res = func(res, cur.elem)
+            cur = cur.rest
+        }
+        return res
+    }
+
+    fun forEach(consumer: (T) -> Unit) {
+        var cur = this
+        while (cur is Cons) {
+            consumer(cur.elem)
+            cur = cur.rest
+        }
+    }
+
+    fun lastOrNull(): T? {
+        var cur = this
+        while (cur is Cons) {
+            if (cur.rest is Nil)
+                return cur.elem
+            cur = cur.rest
+        }
+        return null
     }
 
     fun filter(func: (T) -> Boolean): ConsList<T> {
         return when (this) {
-            is Nil<T> -> nil()
             is Cons<T> -> if (func(elem)) Cons(elem, rest.filter(func)) else rest.filter(func)
+            is Nil<T> -> nil()
         }
     }
 

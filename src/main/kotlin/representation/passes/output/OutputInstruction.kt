@@ -42,13 +42,16 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         val descriptor = getMethodDescriptor(inst.methodToCall)
         writer.visitMethodInsn(inst.invokeBytecode, owner, name, descriptor, false)
     }
+
+    // Helper function for return
+    is Instruction.Return -> outputReturn(inst, writer)
     // Helper function for push, it has lots of logic
     is Instruction.Push -> outputPush(inst, writer)
     // Pop the correct number of stack slots
     is Instruction.Pop -> {
         // Need to recurse for plural types
         fun popRecursive(writer: MethodVisitor, type: TypeDef): Unit = when {
-            type.isPlural -> type.fields.asSequence().filter{ !it.static }.forEach { popRecursive(writer, it.type) }
+            type.isPlural -> type.nonStaticFields.forEach { popRecursive(writer, it.type) }
             type.stackSlots == 2 -> writer.visitInsn(Opcodes.POP2)
             type.stackSlots == 1 -> writer.visitInsn(Opcodes.POP)
             else -> throw IllegalStateException("Types should always be 1, 2, or plural slots")
@@ -59,11 +62,26 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         writer.visitTypeInsn(Opcodes.NEW, inst.typeToCreate.runtimeName!!)
         writer.visitInsn(Opcodes.DUP)
     }
+    is Instruction.DupRef -> writer.visitInsn(Opcodes.DUP)
     is Instruction.LoadRefType -> writer.visitVarInsn(Opcodes.ALOAD, inst.index)
 
     // Store/load local variables. Have a helper function for it, because of repetition
     is Instruction.StoreLocal -> handleLocal(inst.index, inst.type, store = true, writer)
     is Instruction.LoadLocal -> handleLocal(inst.index, inst.type, store = false, writer)
+
+    // Field instructions
+    is Instruction.GetReferenceTypeField -> {
+        if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetReferenceTypeField with plural type? Bug in compiler, please report")
+        writer.visitFieldInsn(Opcodes.GETFIELD, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
+    }
+    is Instruction.GetStaticField -> {
+        if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetStaticField with plural type? Bug in compiler, please report")
+        writer.visitFieldInsn(Opcodes.GETSTATIC, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
+    }
+    is Instruction.PutStaticField -> {
+        if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to PutStaticField with plural type? Bug in compiler, please report")
+        writer.visitFieldInsn(Opcodes.PUTSTATIC, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
+    }
 }
 
 private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor) {
@@ -73,14 +91,14 @@ private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: Metho
         if (store) {
             // Iterate backwards through the fields, decrementing index
             var currentIndex = index + type.stackSlots
-            type.fields.asReversed().asSequence().filter { !it.static }.forEach {
+            type.nonStaticFields.asReversed().forEach {
                 // Decrement before handling
                 currentIndex -= it.type.stackSlots
                 handleLocal(currentIndex, it.type, true, writer)
             }
         } else {
             var currentIndex = index
-            type.fields.asSequence().filter { !it.static }.forEach {
+            type.nonStaticFields.forEach {
                 // Increment after handling
                 handleLocal(currentIndex, it.type, false, writer)
                 currentIndex += it.type.stackSlots
@@ -98,7 +116,22 @@ private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: Metho
             else -> throw RuntimeException("Unknown builtin type by LoadLocal \"${type.builtin.name}\", bug in compiler, please report")
         }
         is TypeDef.ClassDef -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
-        is TypeDef.Indirection, is TypeDef.Tuple -> throw IllegalStateException("Unexpected TypeDef here, bug in compiler, please report")
+        // Indirection should have been unwrapped, others are plural. Should not happen
+        is TypeDef.Indirection, is TypeDef.Tuple, is TypeDef.StructDef -> throw IllegalStateException("Unexpected TypeDef here, bug in compiler, please report")
+    }
+}
+
+private fun outputReturn(inst: Instruction.Return, writer: MethodVisitor) {
+    if (inst.basicTypeToReturn == null)
+        writer.visitInsn(Opcodes.RETURN)
+    else {
+        val type = inst.basicTypeToReturn.unwrap()
+        val builtin = type.builtin
+        if (builtin == BoolType) writer.visitInsn(Opcodes.IRETURN)
+        else if (builtin is IntType) writer.visitInsn(if (builtin.bits <= 32) Opcodes.IRETURN else Opcodes.LRETURN)
+        else if (builtin is FloatType) writer.visitInsn(if (builtin.bits <= 32) Opcodes.FRETURN else Opcodes.DRETURN)
+        else if (type.isReferenceType) writer.visitInsn(Opcodes.ARETURN)
+        else throw IllegalStateException("Unexpected type \"${type.name}\" made it to IR.Return - bug in compiler, please report")
     }
 }
 

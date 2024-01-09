@@ -4,7 +4,7 @@ import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedPattern
-import util.IdentityIncrementalCalculator
+import util.caching.IdentityIncrementalCalculator
 
 /**
  * For now, there are no fallible patterns. So do nothing.

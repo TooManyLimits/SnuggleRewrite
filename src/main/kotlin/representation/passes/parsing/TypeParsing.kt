@@ -4,7 +4,7 @@ import representation.asts.parsed.ParsedType
 import representation.passes.lexing.Lexer
 import representation.passes.lexing.TokenType
 
-internal fun parseType(lexer: Lexer, typeGenerics: List<String>, extraInfo: String? = null): ParsedType {
+internal fun parseType(lexer: Lexer, typeGenerics: List<String>, extraInfo: String = ""): ParsedType {
 
     if (lexer.consume(TokenType.LEFT_PAREN)) {
         val loc = lexer.last().loc
@@ -15,7 +15,7 @@ internal fun parseType(lexer: Lexer, typeGenerics: List<String>, extraInfo: Stri
     }
 
     // Grab identifier
-    val ident = lexer.expect(TokenType.IDENTIFIER, extraInfo)
+    val ident = lexer.expect(TokenType.IDENTIFIER, "for type${if (extraInfo != "") " $extraInfo" else ""}")
 
     // Check if it's a known generic:
     val typeGenericIndex = typeGenerics.indexOf(ident.string())

@@ -2,7 +2,6 @@ package representation.passes.typing
 
 import builtins.IntLiteralType
 import errors.CompilationException
-import errors.InferenceException
 import representation.asts.resolved.ResolvedPattern
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedPattern
@@ -35,7 +34,7 @@ fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, typeCache: Ty
     is ResolvedPattern.BindingPattern -> {
         // If scrutinee is an unstorable type, like IntLiteral, error here
         if (scrutineeType.builtin == IntLiteralType)
-            throw InferenceException("Cannot infer type of literal - try adding more annotations", pattern.loc)
+            throw CompilationException("Cannot infer type of literal - try adding more annotations", pattern.loc)
         // TODO: Check that the scrutinee is a subtype of the type annotation, if this has one
         TypedPattern.BindingPattern(pattern.loc, scrutineeType, pattern.name, pattern.isMut)
     }

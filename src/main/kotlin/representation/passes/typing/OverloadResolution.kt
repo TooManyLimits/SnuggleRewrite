@@ -1,14 +1,15 @@
 package representation.passes.typing
 
-import representation.asts.resolved.ResolvedExpr
-import representation.passes.lexing.Loc
 import errors.CompilationException
-import errors.NoApplicableMethodException
-import errors.TooManyMethodsException
+import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
-import util.*
+import representation.passes.lexing.Loc
+import util.ConsMap
+import util.caching.IdentityCache
+import util.allIndexed
+import util.insertionSort
 import java.util.*
 
 /**
@@ -27,13 +28,14 @@ fun getBestMethod(
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
     typeCache: TypeDefCache,
+    returnType: TypeDef?,
     currentType: TypeDef?,
     currentTypeGenerics: List<TypeDef>
 ): BestMethodData {
     // Find which methods are applicable.
-    val applicableResult = getApplicableMethods(methodsToCheck, methodName, arguments, expectedResult, scope, typeCache, currentType, currentTypeGenerics)
+    val applicableResult = getApplicableMethods(methodsToCheck, methodName, arguments, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
     // Try to choose the best from among them.
-    return tryChooseBestMethod(applicableResult, callLoc, methodName, arguments, expectedResult, scope, typeCache, currentType, currentTypeGenerics)
+    return tryChooseBestMethod(applicableResult, callLoc, methodName, arguments, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
 }
 
 // Return type encapsulating the best method
@@ -89,6 +91,8 @@ private fun getApplicableMethods(
 
     // The TypeDefCache holding data for all types in this AST.
     typeCache: TypeDefCache,
+    // The desired return type at the site of the method call.
+    returnType: TypeDef?,
     // The current type which our method call is inside.
     currentType: TypeDef?,
     // The type generics we're currently instantiating with.
@@ -108,7 +112,7 @@ private fun getApplicableMethods(
     // Filter out methods that don't match, and return the ones that do.
     val applicableMethods = methodsToCheck.filter { method ->
         // Wrong argument count:
-        if (method.argTypes.size != arguments.size) { return@filter false }
+        if (method.paramTypes.size != arguments.size) { return@filter false }
         // Wrong name:
         if (method.name != methodName) { return@filter false }
 
@@ -120,11 +124,11 @@ private fun getApplicableMethods(
         arguments.allIndexed { index, arg ->
             // Get information
             val cacheForThisArg = argCheckingCache[index]
-            val expectedArgType = method.argTypes[index]
+            val expectedArgType = method.paramTypes[index]
             // Get the result of the check, either from the cache or by computing it
             val checkResult = cacheForThisArg.get(expectedArgType) {
                 try {
-                    val checked = checkExpr(arg, expectedArgType, scope, typeCache, currentType, currentTypeGenerics).expr
+                    val checked = checkExpr(arg, expectedArgType, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
                     Optional.of(checked)
                 } catch (ex: CompilationException) {
                     // If it failed, then add this method to the tried methods set
@@ -141,7 +145,7 @@ private fun getApplicableMethods(
     return ApplicableMethodsResult(
         applicableMethods,
         applicableMethods.map {
-            it.argTypes.mapIndexed { index, typeDef ->
+            it.paramTypes.mapIndexed { index, typeDef ->
                 argCheckingCache[index].getOrThrow(typeDef).get()
         }},
         triedMethods
@@ -166,6 +170,7 @@ private fun tryChooseBestMethod(
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
     typeCache: TypeDefCache,
+    returnType: TypeDef?,
     currentType: TypeDef?,
     currentTypeGenerics: List<TypeDef>
 ): BestMethodData {
@@ -181,7 +186,7 @@ private fun tryChooseBestMethod(
     // Otherwise, there are no applicable methods, so error with that.
     // Attempt to infer the types of the arguments, to include in the error message.
     val inferredArguments = arguments.map { try {
-        inferExpr(it, scope, typeCache, currentType, currentTypeGenerics).expr.type
+        inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics).expr.type
     } catch (e: CompilationException) {
         null
     }}
@@ -223,7 +228,7 @@ private fun compareMethods(a: MethodDef, b: MethodDef): Int {
                 1
         }
     // Compare each arg, also negation of the return types
-    val comparedArgs = a.argTypes.asSequence().zip(b.argTypes.asSequence()).map {
+    val comparedArgs = a.paramTypes.asSequence().zip(b.paramTypes.asSequence()).map {
         compareTypes(it.first, it.second)
     } + -compareTypes(a.returnType, b.returnType)
     val hasM1 = -1 in comparedArgs
@@ -233,4 +238,28 @@ private fun compareMethods(a: MethodDef, b: MethodDef): Int {
     if (hasM1) return -1
     if (has1) return 1
     return 0
+}
+
+
+class NoApplicableMethodException(methodName: String, argTypes: List<TypeDef?>, returnType: TypeDef?, tried: List<MethodDef>, loc: Loc): CompilationException(
+    "Unable to find valid overload for method call\n  ${
+        overloadString(methodName, argTypes, returnType)
+    }${
+        if (tried.isNotEmpty()) "\nTried:\n${
+            tried.joinToString(separator = "") { "- " + overloadString(it.name, it.paramTypes, it.returnType) + "\n" }
+        }"
+        else "\n"
+    }", loc
+)
+class TooManyMethodsException(potential: List<MethodDef>, loc: Loc): CompilationException(
+    "Too many valid overloads for method call; cannot choose between:\n ${
+        potential.joinToString(separator = "") { "- " + overloadString(it.name, it.paramTypes, it.returnType) + "\n" }
+    }",
+    loc
+)
+
+private fun overloadString(name: String, argTypes: List<TypeDef?>, returnType: TypeDef?): String {
+    return "$name(${
+        argTypes.joinToString(separator = ", ") { it?.name ?: "<unknown type>" }
+    }) -> ${returnType?.name ?: "<Anything>"}"
 }

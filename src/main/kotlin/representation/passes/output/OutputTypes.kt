@@ -5,6 +5,7 @@ import org.objectweb.asm.Opcodes
 import representation.asts.ir.GeneratedField
 import representation.asts.ir.GeneratedMethod
 import representation.asts.ir.GeneratedType
+import representation.asts.typed.TypeDef
 
 fun outputType(type: GeneratedType): ByteArray = when (type) {
     is GeneratedType.GeneratedClass -> {
@@ -20,19 +21,35 @@ fun outputType(type: GeneratedType): ByteArray = when (type) {
         writer.toByteArray()
     }
     is GeneratedType.GeneratedValueType -> {
-        TODO()
+        // Create a class writer
+        val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+        writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, type.runtimeName, null, "java/lang/Object", null)
+        // Create the fields and methods, end and return
+        type.returningFields.forEach { outputField(it, writer) }
+        type.fields.forEach { outputField(it, writer) }
+        type.methods.forEach { outputMethod(it, writer) }
+        writer.visitEnd()
+        writer.toByteArray()
     }
 }
 
-private fun outputField(field: GeneratedField, classWriter: ClassWriter, prefix: String = "") {
-
+private fun outputField(field: GeneratedField, classWriter: ClassWriter) {
+    val access = Opcodes.ACC_PUBLIC + (if (field.runtimeStatic) Opcodes.ACC_STATIC else 0)
+    val desc = field.fieldDef.type.descriptor
+    if (desc.size != 1) throw IllegalStateException("Attempt to output plural field? Bug in compiler, please report")
+    classWriter.visitField(access, field.runtimeName, desc[0], null, null)
 }
 
 private fun outputMethod(method: GeneratedMethod, classWriter: ClassWriter) {
+    // If the method is static, or part of a StructDef, then tag it with static
+    var access = Opcodes.ACC_PUBLIC
+    if (method.methodDef.static || method.methodDef.owningType.unwrap() is TypeDef.StructDef)
+        access += Opcodes.ACC_STATIC
+    // Create the writer
     val writer = classWriter.visitMethod(
-        Opcodes.ACC_PUBLIC + if (method.methodDef.static) Opcodes.ACC_STATIC else 0,
-        method.methodDef.runtimeName,
-        getMethodDescriptor(method.methodDef), null, null)
+        access, method.methodDef.runtimeName, getMethodDescriptor(method.methodDef),
+        null, null
+    )
     writer.visitCode()
     outputInstruction(method.body, writer)
     writer.visitInsn(Opcodes.RETURN) // TODO: Other types

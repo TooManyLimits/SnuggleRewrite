@@ -7,6 +7,7 @@ import representation.asts.resolved.ResolvedAST
 import representation.asts.resolved.ResolvedFile
 import representation.asts.resolved.ResolvedTypeDef
 import util.*
+import util.caching.IdentityCache
 import java.util.LinkedList
 import java.util.Queue
 

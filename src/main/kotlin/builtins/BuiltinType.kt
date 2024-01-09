@@ -53,6 +53,13 @@ interface BuiltinType {
     // special care needs to be given for plural types.
     fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
 
+    // Whether the type can be considered a reference type.
+    // I don't have a perfect definition of this, unfortunately, but one
+    // way of looking at it would be to say "field accesses on this type
+    // should work the same way as they would for a normal class". There
+    // may be some variance in how this is interpreted.
+    fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
+
     // Get the fields of this type, given the generics.
     fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now
 

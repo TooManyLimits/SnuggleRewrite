@@ -4,13 +4,14 @@ import representation.asts.resolved.ResolvedAST
 import representation.asts.resolved.ResolvedType
 import representation.asts.resolved.ResolvedTypeDef
 import builtins.BuiltinType
+import representation.asts.typed.FieldDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
 import representation.asts.typed.TypedFile
 import util.ConsList.Companion.nil
 import util.ConsMap
-import util.EqualityCache
-import util.IdentityCache
+import util.caching.EqualityCache
+import util.caching.IdentityCache
 
 /**
  * Convert a ResolvedAST into a TypedAST.
@@ -26,7 +27,7 @@ fun typeAST(ast: ResolvedAST): TypedAST {
 
     return TypedAST(ast.allFiles.mapValues {
         // Top-level code does not have any currentTypeGenerics.
-        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache, null, listOf()).expr)
+        TypedFile(it.value.name, inferExpr(it.value.code, ConsMap(nil()), typeCache, null, null, listOf()).expr)
     })
 }
 
@@ -59,21 +60,8 @@ fun getTypeDef(type: ResolvedType, typeCache: TypeDefCache, currentTypeGenerics:
 private fun indirect(base: ResolvedTypeDef, generics: List<TypeDef>, typeCache: TypeDefCache,
                             instantiator: (TypeDef.Indirection) -> TypeDef
 ): TypeDef {
-    // Create the basic indirection. Depends on knowledge of the base type.
-    fun createIndirection(base: ResolvedTypeDef): TypeDef.Indirection = when (base) {
-        is ResolvedTypeDef.Indirection -> createIndirection(base.promise.expect())
-        is ResolvedTypeDef.Builtin -> TypeDef.Indirection(
-            base.builtin.stackSlots(generics, typeCache),
-            base.builtin.isPlural(generics, typeCache),
-            base.builtin.getPrimarySupertype(generics, typeCache)
-        )
-        is ResolvedTypeDef.Class -> TypeDef.Indirection(
-            1, false,
-            getTypeDef(base.superType, typeCache, generics)
-        )
-    }
     // Create the indirection and add it to the cache
-    val indirection = createIndirection(base)
+    val indirection = TypeDef.Indirection()
     typeCache.putBasic(base, generics, indirection)
     // Instantiate, fill in the indirection with the result, and return.
     val instantiated = instantiator(indirection)
@@ -96,16 +84,27 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
         }
         // Other types need more work replacing generics.
         is ResolvedTypeDef.Class -> indirect(base, generics, typeCache) { indirection ->
-
+            val supertype = getTypeDef(base.superType, typeCache, generics)
             TypeDef.ClassDef(
-                base.loc, base.name, indirection.primarySupertype!!, generics,
-
+                base.loc, base.name, supertype, generics,
                 // Note: This is where the currentTypeGenerics start out! The generics
                 // passed into this method are used as currentTypeGenerics when instantiating/typing methods and fields.
-
                 // Map the fields
-                base.fields.map { TODO() },
+                base.fields.map { FieldDef.SnuggleFieldDef(it.loc, it.pub, it.static, it.name, null, getTypeDef(it.annotatedType, typeCache, generics)) },
                 // Map the methods, using the indirection as the "this"/owning type.
+                base.methods.map { typeMethod(indirection, base.methods, it, typeCache, generics) }
+            )
+        }
+        is ResolvedTypeDef.Struct -> indirect(base, generics, typeCache) { indirection ->
+            var currentPluralOffset = 0
+            TypeDef.StructDef(
+                base.loc, base.name, generics,
+                base.fields.map {
+                    val fieldType = getTypeDef(it.annotatedType, typeCache, generics)
+                    val res = FieldDef.SnuggleFieldDef(it.loc, it.pub, it.static, it.name, currentPluralOffset, fieldType)
+                    currentPluralOffset += fieldType.stackSlots
+                    res
+                },
                 base.methods.map { typeMethod(indirection, base.methods, it, typeCache, generics) }
             )
         }
@@ -130,7 +129,7 @@ data class TypeDefCache(
     val builtins: Map<BuiltinType, ResolvedTypeDef>
 )
 private fun TypeDefCache.getBasic(base: ResolvedTypeDef, generics: List<TypeDef>, func: (ResolvedTypeDef, List<TypeDef>) -> TypeDef) =
-    this.basicCache.get(base) {EqualityCache()}.get(generics) {func(base, it)}
+    this.basicCache.get(base) { EqualityCache() }.get(generics) {func(base, it)}
 private fun TypeDefCache.putBasic(base: ResolvedTypeDef, generics: List<TypeDef>, value: TypeDef) =
     this.getBasic(base, generics) { _, _ -> value}
 private fun TypeDefCache.getTuple(elements: List<TypeDef>, func: (List<TypeDef>) -> TypeDef.Tuple) =

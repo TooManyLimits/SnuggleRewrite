@@ -12,21 +12,22 @@ import util.ConsList
 fun main() {
 
     val code = """
-        let x: i32 = 1000
-        print(x)
-        print(let y: i32 = 10)
-        let z = new Object()
-        print(z)
-        class Silly {
-            fn new() super()
+        struct Vec2 {
+            x: i32 y: i32
+            fn add(o: Vec2): Vec2 
+                new { this.x + o.x, this.y + o.y }
         }
-        print(new Silly())
+        let x = new Vec2 { 10, 20 }
+        let y = new Vec2 { 30, 40 }
+        let z = x + y
+        print(z.x)
+        print(z.y)
     """.trimIndent()
     val lexer = Lexer("main", code)
 
     val file = parseFileLazy(lexer)
     val parsedAST = ParsedAST(mapOf("main" to file))
-    parsedAST.debugReadAllFiles() // Remove lazy wrapping
+//    parsedAST.debugReadAllFiles() // Remove lazy wrapping
 //    println(parsedAST)
     val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType, ObjectType, PrintType, IntLiteralType, *INT_TYPES))
 //    println(resolvedAST)

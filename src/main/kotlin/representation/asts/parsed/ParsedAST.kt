@@ -28,7 +28,7 @@ sealed interface ParsedElement {
         val name: String
 
         data class Class(override val loc: Loc, override val pub: Boolean, override val name: String, val numGenerics: Int, val superType: ParsedType, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
-//        data class Struct(override val loc: Loc, override val pub: Boolean, override val name: String, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
+        data class Struct(override val loc: Loc, override val pub: Boolean, override val name: String, val numGenerics: Int, val fields: List<ParsedFieldDef>, val methods: List<ParsedMethodDef>): ParsedTypeDef
 
     }
 //
@@ -45,12 +45,16 @@ sealed interface ParsedElement {
         data class Block(override val loc: Loc, val elements: List<ParsedElement>): ParsedExpr
         data class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
 
+        data class Return(override val loc: Loc, val rhs: ParsedExpr): ParsedExpr
+
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Super(override val loc: Loc): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
-        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr
 
-        data class ConstructorCall(override val loc: Loc, val type: ParsedType, val args: List<ParsedExpr>): ParsedExpr
+        data class FieldAccess(override val loc: Loc, val receiver: ParsedExpr, val fieldName: String): ParsedExpr
+        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr
+        data class ConstructorCall(override val loc: Loc, val type: ParsedType?, val args: List<ParsedExpr>): ParsedExpr
+        data class RawStructConstructor(override val loc: Loc, val type: ParsedType?, val fieldValues: List<ParsedExpr>): ParsedExpr
 
         //... etc
     }
@@ -58,18 +62,17 @@ sealed interface ParsedElement {
 }
 
 // Helper data structures
-data class ParsedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ParsedType, val initializer: ParsedElement.ParsedExpr?)
-data class ParsedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
+data class ParsedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ParsedType)
+data class ParsedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
 sealed interface ParsedPattern {
 
     val loc: Loc
 
-//    object Empty : ParsedPattern // _
-//    data class Literal(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
-//    data class And(override val loc: Loc, val pats: List<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
-    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?):
-    ParsedPattern
-//    data class Tuple(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
+//    object EmptyPattern : ParsedPattern // _
+//    data class LiteralPattern(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
+//    data class AndPattern(override val loc: Loc, val pats: List<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
+    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
+//    data class TuplePattern(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
 
 }
 

@@ -18,6 +18,7 @@ object PrintType: BuiltinType {
     override val descriptor: List<String> get() = listOf()
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 0
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val thisType = getBasicBuiltin(this, typeCache)
@@ -27,7 +28,7 @@ object PrintType: BuiltinType {
         val objectType = getBasicBuiltin(ObjectType, typeCache)
         return listOf(
             // print(bool)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(boolType)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "invoke", unitType, listOf(boolType)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]
@@ -37,7 +38,7 @@ object PrintType: BuiltinType {
                 // []
             },
             // print(i32)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(i32Type)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "invoke", unitType, listOf(i32Type)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]
@@ -47,7 +48,7 @@ object PrintType: BuiltinType {
                 // []
             },
             // print(Object)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(objectType)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "invoke", unitType, listOf(objectType)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]

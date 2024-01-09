@@ -57,7 +57,7 @@ private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String
                 val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) }
                 expr = ParsedExpr.MethodCall(name.loc, expr, name.string(), args)
             } else {
-                TODO() // Field
+                expr = ParsedExpr.FieldAccess(name.loc, expr, name.string())
             }
         }
         //invoke() overload (or new(), if receiver is super)
@@ -87,6 +87,8 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
 
         TokenType.LET -> parseDeclaration(lexer, typeGenerics)
 
+        TokenType.RETURN -> ParsedExpr.Return(lexer.last().loc, parseExpr(lexer, typeGenerics))
+
         else -> throw ParsingException(expected = "Expression", found = lexer.last().type.toString(), loc = lexer.last().loc)
     }
 }
@@ -98,10 +100,29 @@ private fun parseImport(lexer: Lexer): ParsedExpr {
 }
 
 private fun parseConstructor(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
-    val type = parseType(lexer, typeGenerics, "for constructor")
-    lexer.expect(TokenType.LEFT_PAREN)
-    val args = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) }
-    return ParsedExpr.ConstructorCall(type.loc, type, args)
+    val newTok = lexer.last()
+    return when {
+        // Check for new() or new {}, which will have their type inferred from context
+        // Implicit regular constructor
+        lexer.consume(TokenType.LEFT_PAREN) -> ParsedExpr.ConstructorCall(newTok.loc, null,
+            commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) })
+        // Implicit raw struct
+        lexer.consume(TokenType.LEFT_CURLY) -> ParsedExpr.RawStructConstructor(newTok.loc, null,
+            commaSeparated(lexer, TokenType.RIGHT_CURLY) { parseExpr(it, typeGenerics) })
+        // Otherwise, type is explicit
+        else -> {
+            val type = parseType(lexer, typeGenerics, "after \"new\"")
+            when {
+                // Explicit regular constructor
+                lexer.consume(TokenType.LEFT_PAREN) -> ParsedExpr.ConstructorCall(
+                    type.loc, type, commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(it, typeGenerics) })
+                // Explicit raw struct
+                lexer.consume(TokenType.LEFT_CURLY) -> ParsedExpr.RawStructConstructor(
+                    type.loc, type, commaSeparated(lexer, TokenType.RIGHT_CURLY) { parseExpr(it, typeGenerics) })
+                else -> throw ParsingException("Expected parentheses or curly brace for constructor args", type.loc)
+            }
+        }
+    }
 }
 
 private fun parseDeclaration(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
