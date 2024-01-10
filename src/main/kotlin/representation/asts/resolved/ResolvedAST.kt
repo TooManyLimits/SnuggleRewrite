@@ -64,7 +64,7 @@ sealed interface ResolvedTypeDef {
     }
 
     data class Builtin(val builtin: BuiltinType): ResolvedTypeDef {
-        override val name: String get() = builtin.name
+        override val name: String get() = builtin.baseName
         override val pub: Boolean get() = true
         override val numGenerics: Int get() = builtin.numGenerics
     }

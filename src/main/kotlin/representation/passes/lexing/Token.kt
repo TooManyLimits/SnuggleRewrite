@@ -67,8 +67,11 @@ fun tokenOf(loc: Loc, string: String): Token? {
         ";" -> TokenType.SEMICOLON
         "," -> TokenType.COMMA
         "." -> TokenType.DOT
+        "?" -> TokenType.QUESTION_MARK
         "(" -> TokenType.LEFT_PAREN
         ")" -> TokenType.RIGHT_PAREN
+        "[" -> TokenType.LEFT_SQUARE
+        "]" -> TokenType.RIGHT_SQUARE
         "{" -> TokenType.LEFT_CURLY
         "}" -> TokenType.RIGHT_CURLY
         "<" -> TokenType.LESS
@@ -149,8 +152,11 @@ enum class TokenType {
     SEMICOLON,
     COMMA,
     DOT,
+    QUESTION_MARK,
     LEFT_PAREN,
     RIGHT_PAREN,
+    LEFT_SQUARE,
+    RIGHT_SQUARE,
     LEFT_CURLY,
     RIGHT_CURLY,
     LESS,

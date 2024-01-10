@@ -11,10 +11,11 @@ import representation.passes.typing.getUnit
 // java/lang/Object underneath.
 object ObjectType: BuiltinType {
 
-    override val name: String get() = "Object"
+    override val baseName: String get() = "Object"
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
     override val nameable: Boolean get() = true
-    override val runtimeName: String get() = "java/lang/Object"
-    override val descriptor: List<String> = listOf("L$runtimeName;")
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String = "java/lang/Object"
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf("Ljava/lang/Object;")
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true

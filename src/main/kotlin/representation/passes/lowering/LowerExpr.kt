@@ -2,7 +2,6 @@ package representation.passes.lowering
 
 import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
-import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -10,7 +9,6 @@ import representation.asts.typed.TypedExpr
 import representation.passes.typing.isFallible
 import util.Cons
 import util.ConsList
-import util.Nil
 import util.caching.IdentityIncrementalCalculator
 
 /**
@@ -129,18 +127,19 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
                     yield(Instruction.MethodCall.Virtual(expr.methodDef))
                 else
                     yield(Instruction.MethodCall.Static(expr.methodDef))
+                // Get results
+                yieldAll(getMethodResults(expr.methodDef, desiredFields))
             }
             is MethodDef.ConstMethodDef,
             is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
         }
-        yieldAll(getMethodResults(expr.methodDef, desiredFields))
     }
     is TypedExpr.StaticMethodCall -> sequence {
         lowerTypeDef(expr.receiverType, typeCalc)
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
         when (expr.methodDef) {
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) // TODO: Cost
+            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
             is MethodDef.SnuggleMethodDef -> {
                 yield(Instruction.MethodCall.Static(expr.methodDef))
                 yieldAll(getMethodResults(expr.methodDef, desiredFields))
@@ -156,8 +155,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
         when (expr.methodDef) {
-            // Bytecode, emit directly
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) // TODO: Cost
+            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
             // Special call!
             is MethodDef.SnuggleMethodDef -> {
                 yield(Instruction.MethodCall.Special(expr.methodDef))
@@ -174,13 +172,12 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
         // Push args
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
-        when (expr.constructorMethodDef) {
-            // Bytecode, emit the bytecode directly
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.constructorMethodDef.bytecode)) // TODO: Cost
+        when (expr.methodDef) {
+            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
             // Invoke the constructor, ✨special✨
             is MethodDef.SnuggleMethodDef -> {
-                yield(Instruction.MethodCall.Special(expr.constructorMethodDef))
-                yieldAll(getMethodResults(expr.constructorMethodDef, desiredFields))
+                yield(Instruction.MethodCall.Special(expr.methodDef))
+                yieldAll(getMethodResults(expr.methodDef, desiredFields))
             }
             is MethodDef.ConstMethodDef,
             is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")

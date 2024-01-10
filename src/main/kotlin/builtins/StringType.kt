@@ -8,10 +8,11 @@ import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getBasicBuiltin
 
 object StringType: BuiltinType {
-    override val name: String get() = "String"
+    override val baseName: String get() = "String"
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
     override val nameable: Boolean get() = true
-    override val runtimeName: String get() = "java/lang/String"
-    override val descriptor: List<String> get() = listOf("L$runtimeName;")
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String = "java/lang/String"
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf("Ljava/lang/String;")
 
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false

@@ -19,10 +19,11 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
     // If the given BigInteger fits in this int type
     fun fits(value: BigInteger) = value >= minValue && value <= maxValue
 
-    override val name: String = (if (signed) "i" else "u") + bits
+    override val baseName: String = (if (signed) "i" else "u") + bits
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
     override val nameable: Boolean get() = true
-    override val runtimeName: String? get() = null
-    override val descriptor: List<String> = listOf(when (bits) {
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf(when (bits) {
         8 -> "B"
         16 -> "S"
         32 -> "I"

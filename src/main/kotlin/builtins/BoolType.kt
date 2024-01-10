@@ -10,10 +10,11 @@ import representation.passes.typing.getBasicBuiltin
 // Bool type.
 object BoolType: BuiltinType {
 
-    override val name: String get() = "bool"
+    override val baseName: String get() = "bool"
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
     override val nameable: Boolean get() = true
-    override val runtimeName: String? get() = null
-    override val descriptor: List<String> = listOf("Z")
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf("Z")
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false

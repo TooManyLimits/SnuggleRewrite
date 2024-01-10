@@ -9,10 +9,11 @@ import representation.passes.typing.getBasicBuiltin
 import java.math.BigInteger
 
 object IntLiteralType: BuiltinType {
-    override val name: String get() = "IntLiteral" // Name used for error messages
+    override val baseName: String get() = "IntLiteral"
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName // Name used for error messages
     override val nameable: Boolean get() = false // Not nameable, can't refer to type "IntLiteral" in code
-    override val runtimeName: String? get() = null
-    override val descriptor: List<String> get() = listOf()
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf()
 
     // If we ever use this value anyway, something has already gone terribly wrong
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = -1000

@@ -258,7 +258,7 @@ fun resolveExpr(
 // Returns the resolved type, as well as a set of types that were reached while resolving this type
 fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ResolvedTypeDef>): ResolvedType = when (type) {
     is ParsedType.Basic -> {
-        val resolvedBase = currentMappings.lookup(type.base) ?: throw UnknownTypeException(type.toString(), type.loc)
+        val resolvedBase = currentMappings.lookup(type.base) ?: throw UnknownTypeException(type.base, type.loc)
         val resolvedGenerics = type.generics.map { resolveType(it, currentMappings) }
         ResolvedType.Basic(type.loc, resolvedBase, resolvedGenerics)
     }

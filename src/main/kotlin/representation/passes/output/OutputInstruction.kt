@@ -1,6 +1,7 @@
 package representation.passes.output
 
 import builtins.*
+import builtins.helpers.popType
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -48,16 +49,7 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     // Helper function for push, it has lots of logic
     is Instruction.Push -> outputPush(inst, writer)
     // Pop the correct number of stack slots
-    is Instruction.Pop -> {
-        // Need to recurse for plural types
-        fun popRecursive(writer: MethodVisitor, type: TypeDef): Unit = when {
-            type.isPlural -> type.nonStaticFields.forEach { popRecursive(writer, it.type) }
-            type.stackSlots == 2 -> writer.visitInsn(Opcodes.POP2)
-            type.stackSlots == 1 -> writer.visitInsn(Opcodes.POP)
-            else -> throw IllegalStateException("Types should always be 1, 2, or plural slots")
-        }
-        popRecursive(writer, inst.typeToPop)
-    }
+    is Instruction.Pop -> popType(inst.typeToPop, writer)
     is Instruction.NewRefAndDup -> {
         writer.visitTypeInsn(Opcodes.NEW, inst.typeToCreate.runtimeName!!)
         writer.visitInsn(Opcodes.DUP)
@@ -113,10 +105,10 @@ private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: Metho
             else
                 writer.visitVarInsn(if (store) Opcodes.LSTORE else Opcodes.LLOAD, index)
             else -> {
-                if (type.isReferenceType)
+                if (type.isReferenceType || (type.builtin == OptionType && type.generics[0].isReferenceType))
                     writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
                 else
-                    throw IllegalStateException("Unknown builtin type by LoadLocal \"${type.builtin.name}\", bug in compiler, please report")
+                    throw IllegalStateException("Unknown type by LoadLocal \"${type.name}\", bug in compiler, please report")
             }
         }
         is TypeDef.ClassDef -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)

@@ -24,6 +24,9 @@ sealed class TypeDef {
     abstract val fields: List<FieldDef>
     abstract val methods: List<MethodDef>
 
+    // The generics from which this type def was made
+    abstract val generics: List<TypeDef>
+
     // Helpers caching common values.
     val nonStaticFields: List<FieldDef> by lazy { fields.filter { !it.static } }
     val staticFields: List<FieldDef> by lazy { fields.filter { it.static } }
@@ -85,11 +88,12 @@ sealed class TypeDef {
         override val supertypes: List<TypeDef> get() = promise.expect().supertypes
         override val fields: List<FieldDef> get() = promise.expect().fields
         override val methods: List<MethodDef> get() = promise.expect().methods
+        override val generics: List<TypeDef> get() = promise.expect().generics
         override val builtin: BuiltinType? get() = promise.expect().builtin
     }
 
     data class Tuple(val innerTypes: List<TypeDef>): TypeDef() {
-        override val name: String = toGeneric("", innerTypes)
+        override val name: String = toGeneric("", innerTypes).ifEmpty { "()" }
         override val runtimeName: String = "tuples/$name"
         override val descriptor: List<String> = innerTypes.flatMap { it.descriptor }
         override val stackSlots: Int = innerTypes.sumOf { it.stackSlots }
@@ -105,12 +109,13 @@ sealed class TypeDef {
             }
         }
         override val methods: List<MethodDef> get() = listOf()
+        override val generics: List<TypeDef> get() = listOf()
     }
 
-    class InstantiatedBuiltin(override val builtin: BuiltinType, val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef() {
-        override val name: String = toGeneric(builtin.name, generics)
-        override val runtimeName: String? = builtin.runtimeName?.let { toGeneric(it, generics) }
-        override val descriptor: List<String> = builtin.descriptor
+    class InstantiatedBuiltin(override val builtin: BuiltinType, override val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef() {
+        override val name: String = builtin.name(generics, typeCache)
+        override val runtimeName: String? = builtin.runtimeName(generics, typeCache)
+        override val descriptor: List<String> = builtin.descriptor(generics, typeCache)
         override val stackSlots: Int = builtin.stackSlots(generics, typeCache)
         override val isPlural: Boolean = builtin.isPlural(generics, typeCache)
         override val isReferenceType: Boolean = builtin.isReferenceType(generics, typeCache)
@@ -121,7 +126,7 @@ sealed class TypeDef {
     }
 
     class ClassDef(val loc: Loc, override val name: String, val supertype: TypeDef,
-                   val generics: List<TypeDef>,
+                   override val generics: List<TypeDef>,
                    override val fields: List<FieldDef>,
                    override val methods: List<MethodDef>
     ): TypeDef() {
@@ -135,7 +140,7 @@ sealed class TypeDef {
     }
 
     class StructDef(val loc: Loc, override val name: String,
-                   val generics: List<TypeDef>,
+                   override val generics: List<TypeDef>,
                    override val fields: List<FieldDef>,
                    override val methods: List<MethodDef>
     ): TypeDef() {

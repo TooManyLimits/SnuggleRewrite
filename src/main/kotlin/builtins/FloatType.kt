@@ -4,10 +4,11 @@ import representation.asts.typed.TypeDef
 import representation.passes.typing.TypeDefCache
 
 open class FloatType(val bits: Int): BuiltinType {
-    override val name: String = "f$bits"
+    override val baseName: String = "f$bits"
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
     override val nameable: Boolean get() = true
-    override val runtimeName: String? get() = null
-    override val descriptor: List<String> = listOf(when (bits) {
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf(when (bits) {
         32 -> "F"
         64 -> "D"
         else -> throw IllegalStateException()

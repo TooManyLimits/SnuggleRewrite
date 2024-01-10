@@ -12,10 +12,11 @@ import java.io.PrintWriter
 
 // Temporary builtin to allow printing
 object PrintType: BuiltinType {
-    override val name: String get() = "print"
+    override val baseName: String get() = "print"
+    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
     override val nameable: Boolean get() = true
-    override val runtimeName: String? get() = null
-    override val descriptor: List<String> get() = listOf()
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf()
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 0
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false

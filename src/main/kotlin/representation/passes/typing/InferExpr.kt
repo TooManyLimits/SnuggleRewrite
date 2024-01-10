@@ -243,7 +243,6 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
                     else -> throw IllegalStateException()
                 }, typeCache)
             }
-            is String -> getBasicBuiltin(StringType, typeCache)
             else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
         }
         just(TypedExpr.Literal(expr.loc, value, type))

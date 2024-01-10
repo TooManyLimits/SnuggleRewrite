@@ -13,9 +13,14 @@ import representation.passes.typing.TypeDefCache
  */
 interface BuiltinType {
 
+    // The base name of the type, without generic details.
+    // For example, take Option<T>. Its name() is "T?", but its
+    // baseName is "Option".
+    val baseName: String
+
     // The name of this type, as it appears in error messages,
     // and how it is written in Snuggle code.
-    val name: String
+    fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String
 
     // Whether the type is nameable. Can it be referred to by
     // name? This is almost always the case, except for elusive
@@ -32,12 +37,12 @@ interface BuiltinType {
     // Some types, like bool or f32, have no runtimeName, since
     // there is no class associated with them. This is why it's
     // optional.
-    val runtimeName: String?
+    fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String?
 
     // The java descriptor of this type. For instance, booleans
     // have "Z". Integers have "I". Longs are "J". Strings are
     // "Ljava/lang/String;".
-    val descriptor: List<String>
+    fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String>
 
     // The number of generics this type has. 0 by default.
     val numGenerics: Int get() = 0

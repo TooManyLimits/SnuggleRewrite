@@ -9,7 +9,6 @@ import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.passes.lexing.Loc
-import representation.passes.name_resolving.ExprResolutionResult
 import util.ConsMap
 import util.extend
 import util.lookup
@@ -100,10 +99,18 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics) } ?: expectedType
 
         // Different situations depending on the type.
-        val res = if (/*type.hasSpecialConstructor*/ false) {
-            // Special constructor. Some builtins
-            // have these.
-            TODO()
+        val res = if (type.unwrap() is TypeDef.InstantiatedBuiltin && !type.isReferenceType) {
+            // Special constructor. Non-reference type builtins have these.
+            val methods = type.staticMethods
+            val expectedResult = type.unwrap()
+            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+            if (best.method !is MethodDef.BytecodeMethodDef)
+                throw IllegalStateException("Assumed that builtin, non-reference type constructors are defined in bytecode - but type \"${type.name} breaks this? Bug in compiler, please report")
+            // Doesn't matter what type of method call we return here,
+            // since the method is bytecode anyway, so we'll pick a static call.
+            just(TypedExpr.StaticMethodCall(
+                expr.loc, type, "new", best.checkedArgs, best.method, best.method.returnType
+            ))
         } else if (type.unwrap() is TypeDef.StructDef) {
             // StructDef constructors work differently.
             // Instead of being nonstatic methods that initialize
@@ -205,5 +212,5 @@ class TypeCheckingException(expectedType: TypeDef, actualType: TypeDef, situatio
     : CompilationException("Expected $situation to have type ${expectedType.name}, but found ${actualType.name}", loc)
 
 class NumberRangeException(expectedType: IntType, value: BigInteger, loc: Loc)
-    : CompilationException("Expected ${expectedType.name}, but literal $value is out of range " +
+    : CompilationException("Expected ${expectedType.baseName}, but literal $value is out of range " +
         "(${expectedType.minValue} to ${expectedType.maxValue}).", loc)
