@@ -4,6 +4,7 @@ import builtins.IntLiteralType
 import builtins.IntType
 import errors.CompilationException
 import errors.ParsingException
+import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -130,31 +131,39 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, type))
         }
         if (!res.expr.type.isSubtype(expectedType))
-            throw TypeCheckingException(expectedType, res.expr.type, "Constructor", expr.loc)
+            throw IncorrectTypeException(expectedType, res.expr.type, "Constructor", expr.loc)
         res
     }
 
     is ResolvedExpr.RawStructConstructor -> {
+        // For reason behind explicitness check: See the definition of TypeCheckingException
+        val isExplicit = expr.type != null
         val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics) } ?: expectedType
         if (type.unwrap() !is TypeDef.StructDef)
-            throw CompilationException("Raw struct constructors can only create structs, but type \"${type.name}\" is not a struct", expr.loc)
+            if (isExplicit)
+                throw CompilationException("Raw struct constructors can only create structs, but type \"${type.name}\" is not a struct", expr.loc)
+            else
+                throw TypeCheckingException("Raw struct constructors can only create structs, but type \"${type.name}\" is not a struct", expr.loc)
         if (type.nonStaticFields.size != expr.fieldValues.size)
-            throw CompilationException("Struct \"${type.name}\" has ${type.nonStaticFields.size} non-static fields, but ${expr.fieldValues.size} fields were provided in the raw constructor!", expr.loc)
+            if (isExplicit)
+                throw CompilationException("Struct \"${type.name}\" has ${type.nonStaticFields.size} non-static fields, but ${expr.fieldValues.size} fields were provided in the raw constructor!", expr.loc)
+            else
+                throw TypeCheckingException("Struct \"${type.name}\" has ${type.nonStaticFields.size} non-static fields, but ${expr.fieldValues.size} fields were provided in the raw constructor!", expr.loc)
         val checkedFieldValues = type.nonStaticFields.zip(expr.fieldValues).map { (field, value) ->
             checkExpr(value, field.type, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
         }
         val res = just(TypedExpr.RawStructConstructor(expr.loc, checkedFieldValues, type))
         if (!res.expr.type.isSubtype(expectedType))
-            throw TypeCheckingException(expectedType, res.expr.type, "Constructor", expr.loc)
+            throw IncorrectTypeException(expectedType, res.expr.type, "Constructor", expr.loc) // Is TypeCheckingException
         res
     }
 
     is ResolvedExpr.Tuple -> {
         val expectedType = expectedType.unwrap()
         if (expectedType !is TypeDef.Tuple)
-            throw CompilationException("Expected type \"${expectedType.name}\", but found tuple", expr.loc)
+            throw TypeCheckingException("Expected type \"${expectedType.name}\", but found tuple", expr.loc)
         if (expectedType.innerTypes.size != expr.elements.size)
-            throw CompilationException("Expected tuple with ${expectedType.innerTypes.size} elements, but found one with ${expr.elements.size} instead", expr.loc)
+            throw TypeCheckingException("Expected tuple with ${expectedType.innerTypes.size} elements, but found one with ${expr.elements.size} instead", expr.loc)
         val typeCheckedElements = expectedType.innerTypes.zip(expr.elements).map { (expected, expr) ->
             checkExpr(expr, expected, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
         }
@@ -173,7 +182,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     else -> {
         val res = inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics)
         if (!res.expr.type.isSubtype(expectedType))
-            throw TypeCheckingException(expectedType, res.expr.type, when(expr) {
+            throw IncorrectTypeException(expectedType, res.expr.type, when(expr) {
                 is ResolvedExpr.Import -> "Import expression"
                 is ResolvedExpr.Literal -> "Literal"
                 is ResolvedExpr.Variable -> "Variable \"${expr.name}\""
@@ -208,9 +217,9 @@ fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult {
     else result
 }
 
-class TypeCheckingException(expectedType: TypeDef, actualType: TypeDef, situation: String, loc: Loc)
-    : CompilationException("Expected $situation to have type ${expectedType.name}, but found ${actualType.name}", loc)
+class IncorrectTypeException(expectedType: TypeDef, actualType: TypeDef, situation: String, loc: Loc)
+    : TypeCheckingException("Expected $situation to have type ${expectedType.name}, but found ${actualType.name}", loc)
 
 class NumberRangeException(expectedType: IntType, value: BigInteger, loc: Loc)
-    : CompilationException("Expected ${expectedType.baseName}, but literal $value is out of range " +
+    : TypeCheckingException("Expected ${expectedType.baseName}, but literal $value is out of range " +
         "(${expectedType.minValue} to ${expectedType.maxValue}).", loc)

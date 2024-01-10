@@ -1,6 +1,7 @@
 package representation.passes.typing
 
 import errors.CompilationException
+import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -130,7 +131,7 @@ private fun getApplicableMethods(
                 try {
                     val checked = checkExpr(arg, expectedArgType, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
                     Optional.of(checked)
-                } catch (ex: CompilationException) {
+                } catch (ex: TypeCheckingException) {
                     // If it failed, then add this method to the tried methods set
                     triedMethods.add(method)
                     Optional.empty()

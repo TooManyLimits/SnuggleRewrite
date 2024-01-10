@@ -3,6 +3,7 @@ package builtins
 import builtins.helpers.popType
 import builtins.helpers.pushDefaultValue
 import org.objectweb.asm.Label
+import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import representation.asts.typed.FieldDef
@@ -45,15 +46,7 @@ object OptionType: BuiltinType {
                     val afterError = Label()
                     it.visitInsn(Opcodes.DUP)
                     it.visitJumpInsn(Opcodes.IFNONNULL, afterError)
-                    run {
-                        // TODO: Better error
-                        val runtimeException = Type.getInternalName(RuntimeException::class.java)
-                        it.visitTypeInsn(Opcodes.NEW, runtimeException)
-                        it.visitInsn(Opcodes.DUP)
-                        it.visitLdcInsn("Attempt to use get() on empty option")
-                        it.visitMethodInsn(Opcodes.INVOKESPECIAL, runtimeException, "<init>", "(Ljava/lang/String;)V", false)
-                        it.visitInsn(Opcodes.ATHROW)
-                    }
+                    errorInGet(it)
                     it.visitLabel(afterError)
                 },
                 MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "new", thisType, listOf()) {
@@ -76,15 +69,7 @@ object OptionType: BuiltinType {
                 MethodDef.BytecodeMethodDef(pub = true, static = false, 0, thisType, "get", innerType, listOf()) {
                     val afterError = Label()
                     it.visitJumpInsn(Opcodes.IFNE, afterError)
-                    run {
-                        // TODO: Better error
-                        val runtimeException = Type.getInternalName(RuntimeException::class.java)
-                        it.visitTypeInsn(Opcodes.NEW, runtimeException)
-                        it.visitInsn(Opcodes.DUP)
-                        it.visitLdcInsn("Attempt to use get() on empty option")
-                        it.visitMethodInsn(Opcodes.INVOKESPECIAL, runtimeException, "<init>", "(Ljava/lang/String;)V", false)
-                        it.visitInsn(Opcodes.ATHROW)
-                    }
+                    errorInGet(it)
                     it.visitLabel(afterError)
                 },
                 MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "new", thisType, listOf()) {
@@ -123,4 +108,15 @@ object OptionType: BuiltinType {
         )
     }
 
+}
+
+// When you try to get() on an empty option
+private fun errorInGet(writer: MethodVisitor) {
+    // TODO: Better error
+    val runtimeException = Type.getInternalName(RuntimeException::class.java)
+    writer.visitTypeInsn(Opcodes.NEW, runtimeException)
+    writer.visitInsn(Opcodes.DUP)
+    writer.visitLdcInsn("Attempt to use get() on empty Option")
+    writer.visitMethodInsn(Opcodes.INVOKESPECIAL, runtimeException, "<init>", "(Ljava/lang/String;)V", false)
+    writer.visitInsn(Opcodes.ATHROW)
 }

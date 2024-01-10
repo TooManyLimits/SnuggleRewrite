@@ -12,20 +12,6 @@ import util.ConsList
 fun main() {
 
     val code = """
-//        let empty: String? = new()
-//        let full: String? = new("hii")
-//        print(full.get())
-////        print(empty.get())
-//
-//        let emptyInt: i32? = new()
-//        let fullInt: i32? = new(10)
-//        print(fullInt.get())
-//        print(emptyInt.get())
-        
-        let whuh: String??? = new(new(new()))
-        print(whuh.bool()) // bool() checks if present
-        print(whuh.get().bool())
-        print(whuh.get().get().bool())
         
     """.trimIndent()
     val lexer = Lexer("main", code)

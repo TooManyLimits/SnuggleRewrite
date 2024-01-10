@@ -118,35 +118,16 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
         yieldAll(lowerExpr(expr.receiver, ConsList.nil(), typeCalc))
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
-        when (expr.methodDef) {
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
-            is MethodDef.SnuggleMethodDef -> {
-                // Non-static methods on classes are virtual on the JVM
-                // Non-static methods on structs are static on the JVM
-                if (expr.methodDef.owningType.unwrap() is TypeDef.ClassDef)
-                    yield(Instruction.MethodCall.Virtual(expr.methodDef))
-                else
-                    yield(Instruction.MethodCall.Static(expr.methodDef))
-                // Get results
-                yieldAll(getMethodResults(expr.methodDef, desiredFields))
-            }
-            is MethodDef.ConstMethodDef,
-            is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
-        }
+        if (expr.methodDef.owningType.unwrap() is TypeDef.ClassDef)
+            yieldAll(createCall(expr.methodDef, desiredFields) { Instruction.MethodCall.Virtual(it) })
+        else
+            yieldAll(createCall(expr.methodDef, desiredFields) { Instruction.MethodCall.Static(it) })
     }
     is TypedExpr.StaticMethodCall -> sequence {
         lowerTypeDef(expr.receiverType, typeCalc)
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
-        when (expr.methodDef) {
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
-            is MethodDef.SnuggleMethodDef -> {
-                yield(Instruction.MethodCall.Static(expr.methodDef))
-                yieldAll(getMethodResults(expr.methodDef, desiredFields))
-            }
-            is MethodDef.ConstMethodDef,
-            is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
-        }
+        yieldAll(createCall(expr.methodDef, desiredFields) { Instruction.MethodCall.Static(it) })
     }
     is TypedExpr.SuperMethodCall -> sequence {
         // Load "this" on the stack
@@ -154,16 +135,8 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
         // Push args
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
-        when (expr.methodDef) {
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
-            // Special call!
-            is MethodDef.SnuggleMethodDef -> {
-                yield(Instruction.MethodCall.Special(expr.methodDef))
-                yieldAll(getMethodResults(expr.methodDef, desiredFields))
-            }
-            is MethodDef.ConstMethodDef,
-            is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
-        }
+        // Create call
+        yieldAll(createCall(expr.methodDef, desiredFields) { Instruction.MethodCall.Special(it) })
     }
     is TypedExpr.ClassConstructorCall -> sequence {
         lowerTypeDef(expr.type, typeCalc)
@@ -172,16 +145,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
         // Push args
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.nil(), typeCalc))
-        when (expr.methodDef) {
-            is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0, expr.methodDef.bytecode)) //TODO: Cost
-            // Invoke the constructor, ✨special✨
-            is MethodDef.SnuggleMethodDef -> {
-                yield(Instruction.MethodCall.Special(expr.methodDef))
-                yieldAll(getMethodResults(expr.methodDef, desiredFields))
-            }
-            is MethodDef.ConstMethodDef,
-            is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
-        }
+        yieldAll(createCall(expr.methodDef, desiredFields) { Instruction.MethodCall.Special(it) })
     }
     is TypedExpr.RawStructConstructor -> sequence {
         expr.type.nonStaticFields.zip(expr.fieldValues).forEach { (field, value) ->
@@ -228,6 +192,22 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
 
 private fun getPluralOffset(desiredFields: ConsList<FieldDef>): Int
 = desiredFields.fold(0) { accum, field -> accum + field.pluralOffset!!}
+
+private inline fun createCall(
+    methodDef: MethodDef, desiredFields: ConsList<FieldDef>,
+    crossinline snuggleCallType: (MethodDef.SnuggleMethodDef) -> Instruction.MethodCall
+): Sequence<Instruction> {
+    return when (methodDef) {
+        is MethodDef.BytecodeMethodDef -> sequenceOf(Instruction.Bytecodes(0, methodDef.bytecode)) //TODO: Cost
+        // Invoke according to the snuggle call type
+        is MethodDef.SnuggleMethodDef -> sequence {
+            yield(snuggleCallType(methodDef))
+            yieldAll(getMethodResults(methodDef, desiredFields))
+        }
+        is MethodDef.ConstMethodDef,
+        is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
+    }
+}
 
 /**
  * This handles fetching method results after a method call is made.
