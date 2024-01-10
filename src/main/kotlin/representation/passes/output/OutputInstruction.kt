@@ -112,8 +112,12 @@ private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: Metho
                 writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
             else
                 writer.visitVarInsn(if (store) Opcodes.LSTORE else Opcodes.LLOAD, index)
-            is ObjectType -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
-            else -> throw RuntimeException("Unknown builtin type by LoadLocal \"${type.builtin.name}\", bug in compiler, please report")
+            else -> {
+                if (type.isReferenceType)
+                    writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
+                else
+                    throw IllegalStateException("Unknown builtin type by LoadLocal \"${type.builtin.name}\", bug in compiler, please report")
+            }
         }
         is TypeDef.ClassDef -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
         // Indirection should have been unwrapped, others are plural. Should not happen
@@ -171,6 +175,7 @@ private fun outputPush(inst: Instruction.Push, writer: MethodVisitor) = when (in
             }
         }
     }
+    is String -> writer.visitLdcInsn(inst.valueToPush)
 
     else -> throw IllegalStateException("Unrecognized literal class: ${inst.valueToPush.javaClass.name}")
 }

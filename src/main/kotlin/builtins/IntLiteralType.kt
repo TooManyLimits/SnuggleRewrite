@@ -19,9 +19,9 @@ object IntLiteralType: BuiltinType {
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
-    // Supertypes are the various int types
+    // Supertypes are the various int types and float types
     override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =
-        INT_TYPES.map { getBasicBuiltin(it, typeCache) }
+        INT_TYPES.map { getBasicBuiltin(it, typeCache) } + FLOAT_TYPES.map { getBasicBuiltin(it, typeCache) }
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val intLiteralType = getBasicBuiltin(IntLiteralType, typeCache)
