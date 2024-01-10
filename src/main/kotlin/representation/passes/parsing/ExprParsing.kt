@@ -4,6 +4,7 @@ import representation.asts.parsed.ParsedElement.*
 import representation.passes.lexing.Lexer
 import representation.passes.lexing.TokenType
 import errors.ParsingException
+import representation.asts.parsed.ParsedElement
 
 /**
  * Expression parsing !
@@ -79,6 +80,9 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
 
         TokenType.IMPORT -> parseImport(lexer)
 
+        TokenType.LEFT_CURLY -> parseBlock(lexer, typeGenerics)
+        TokenType.LEFT_PAREN -> parseParenOrTuple(lexer, typeGenerics)
+
         TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value!!)
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
@@ -97,6 +101,36 @@ private fun parseImport(lexer: Lexer): ParsedExpr {
     val loc = lexer.last().loc
     val lit = lexer.expect(TokenType.STRING_LITERAL)
     return ParsedExpr.Import(loc, lit.string())
+}
+
+private fun parseBlock(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
+    val startLoc = lexer.last().loc
+    val elems = ArrayList<ParsedElement>()
+    while (!lexer.consume(TokenType.LEFT_CURLY))
+        elems.add(parseElement(lexer, typeGenerics))
+    return if (elems.isEmpty())
+        ParsedExpr.Tuple(startLoc.merge(lexer.last().loc), listOf())
+    else {
+        elems.trimToSize()
+        ParsedExpr.Block(startLoc.merge(lexer.last().loc), elems)
+    }
+}
+
+private fun parseParenOrTuple(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {
+    val parenLoc = lexer.last().loc
+    // If we immediately find closing paren, it's a tuple of 0 values (aka unit)
+    if (lexer.consume(TokenType.RIGHT_PAREN))
+        return ParsedExpr.Tuple(parenLoc.merge(lexer.last().loc), listOf())
+    // Otherwise, parse the first expr
+    val firstExpr = parseExpr(lexer, typeGenerics)
+    // If we find a comma, keep going. Otherwise, end here and emit parenthesized
+    return if (lexer.consume(TokenType.COMMA)) {
+        val rest = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseExpr(lexer, typeGenerics) }
+        ParsedExpr.Tuple(parenLoc.merge(lexer.last().loc), listOf(firstExpr) + rest)
+    } else {
+        lexer.expect(TokenType.RIGHT_PAREN, "to end parenthesized expression")
+        ParsedExpr.Parenthesized(parenLoc.merge(lexer.last().loc), firstExpr)
+    }
 }
 
 private fun parseConstructor(lexer: Lexer, typeGenerics: List<String>): ParsedExpr {

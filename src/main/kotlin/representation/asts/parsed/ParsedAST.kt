@@ -50,6 +50,8 @@ sealed interface ParsedElement {
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Super(override val loc: Loc): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
+        data class Parenthesized(override val loc: Loc, val inner: ParsedExpr): ParsedExpr
+        data class Tuple(override val loc: Loc, val elements: List<ParsedExpr>): ParsedExpr
 
         data class FieldAccess(override val loc: Loc, val receiver: ParsedExpr, val fieldName: String): ParsedExpr
         data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr

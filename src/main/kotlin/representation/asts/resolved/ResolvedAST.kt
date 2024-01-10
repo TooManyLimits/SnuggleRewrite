@@ -96,6 +96,7 @@ sealed interface ResolvedExpr {
 
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
+    data class Tuple(override val loc: Loc, val elements: List<ResolvedExpr>): ResolvedExpr
 
     data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr

@@ -213,6 +213,14 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.RawStructConstructor(expr.loc, checkedFieldValues, type))
     }
 
+    is ResolvedExpr.Tuple -> {
+        // Infer each element, emit result.
+        val inferredElems = expr.elements.map { inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics).expr }
+        val tupleType = getTuple(inferredElems.map { it.type }, typeCache)
+        // Tuples are really the same as any other struct, so emit a raw struct constructor
+        just(TypedExpr.RawStructConstructor(expr.loc, inferredElems, tupleType))
+    }
+
     is ResolvedExpr.Return -> {
         if (returnType == null)
             throw ParsingException("Can only use \"return\" inside of a method definition", expr.loc)

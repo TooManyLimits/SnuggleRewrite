@@ -142,6 +142,18 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         res
     }
 
+    is ResolvedExpr.Tuple -> {
+        val expectedType = expectedType.unwrap()
+        if (expectedType !is TypeDef.Tuple)
+            throw CompilationException("Expected type \"${expectedType.name}\", but found tuple", expr.loc)
+        if (expectedType.innerTypes.size != expr.elements.size)
+            throw CompilationException("Expected tuple with ${expectedType.innerTypes.size} elements, but found one with ${expr.elements.size} instead", expr.loc)
+        val typeCheckedElements = expectedType.innerTypes.zip(expr.elements).map { (expected, expr) ->
+            checkExpr(expr, expected, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+        }
+        just(TypedExpr.RawStructConstructor(expr.loc, typeCheckedElements, expectedType))
+    }
+
     // Return: just infer the expression. Don't bother checking the return type,
     // since technically this should output a bottom type (a subtype of everything).
     // (though we don't have a representation of such)

@@ -222,6 +222,13 @@ fun resolveExpr(
         )
     }
 
+    is ParsedElement.ParsedExpr.Tuple -> {
+        val resolvedElements = expr.elements.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
+        val unitedFiles = union(resolvedElements.map { it.files })
+        val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>().extendMany(resolvedElements.map { it.exposedTypes })
+        ExprResolutionResult(ResolvedExpr.Tuple(expr.loc, resolvedElements.map { it.expr }), unitedFiles, unitedExposedTypes)
+    }
+
     // Declarations:
     is ParsedElement.ParsedExpr.Declaration -> {
         val pattern = resolvePattern(expr.lhs, currentMappings)
@@ -240,6 +247,8 @@ fun resolveExpr(
     // For ones where there's no nested expressions or other things, it's just a 1-liner.
     is ParsedElement.ParsedExpr.Literal -> ExprResolutionResult(ResolvedExpr.Literal(expr.loc, expr.value))
     is ParsedElement.ParsedExpr.Variable -> ExprResolutionResult(ResolvedExpr.Variable(expr.loc, expr.name))
+    // Parenthesized - just resolve inner.
+    is ParsedElement.ParsedExpr.Parenthesized -> resolveExpr(expr.inner, startingMappings, currentMappings, ast, cache)
 
     // Should not encounter a Super unless as a receiver of a ParsedMethodCall.
     is ParsedElement.ParsedExpr.Super
