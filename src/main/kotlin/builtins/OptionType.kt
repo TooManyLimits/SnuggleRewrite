@@ -42,18 +42,18 @@ object OptionType: BuiltinType {
         return if (innerType.isReferenceType) {
             // Working with a nullable reference type!
             listOf(
-                MethodDef.BytecodeMethodDef(pub = true, static = false, 0, thisType, "get", innerType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf()) {
                     val afterError = Label()
                     it.visitInsn(Opcodes.DUP)
                     it.visitJumpInsn(Opcodes.IFNONNULL, afterError)
                     errorInGet(it)
                     it.visitLabel(afterError)
                 },
-                MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "new", thisType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf()) {
                     it.visitInsn(Opcodes.ACONST_NULL)
                 },
-                MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "new", thisType, listOf(innerType)) {},
-                MethodDef.BytecodeMethodDef(pub = true, static = false, 0, thisType, "bool", boolType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf(innerType)) {},
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "bool", boolType, listOf()) {
                     val ifPresent = Label()
                     val done = Label()
                     it.visitJumpInsn(Opcodes.IFNONNULL, ifPresent)
@@ -66,20 +66,20 @@ object OptionType: BuiltinType {
         } else {
             // Working with a value type + a bool!
             listOf(
-                MethodDef.BytecodeMethodDef(pub = true, static = false, 0, thisType, "get", innerType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf()) {
                     val afterError = Label()
                     it.visitJumpInsn(Opcodes.IFNE, afterError)
                     errorInGet(it)
                     it.visitLabel(afterError)
                 },
-                MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "new", thisType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf()) {
                     pushDefaultValue(innerType, it)
                     it.visitInsn(Opcodes.ICONST_0)
                 },
-                MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "new", thisType, listOf(innerType)) {
+                MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf(innerType)) {
                     it.visitInsn(Opcodes.ICONST_1)
                 },
-                MethodDef.BytecodeMethodDef(pub = true, static = false, 0, thisType, "bool", boolType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "bool", boolType, listOf()) {
                     //Stack is [value, bool]
                     val ifPresent = Label()
                     val done = Label()

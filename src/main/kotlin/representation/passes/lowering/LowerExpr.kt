@@ -206,6 +206,7 @@ private inline fun createCall(
         }
         is MethodDef.ConstMethodDef,
         is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method def - bug in compiler, please report")
+        is MethodDef.GenericMethodDef<*> -> throw IllegalStateException("Cannot lower generic method call - bug in compiler, please report")
     }
 }
 

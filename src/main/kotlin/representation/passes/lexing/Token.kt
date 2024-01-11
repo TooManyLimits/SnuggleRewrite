@@ -64,6 +64,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "return" -> TokenType.RETURN
 
         ":" -> TokenType.COLON
+        "::" -> TokenType.DOUBLE_COLON
         ";" -> TokenType.SEMICOLON
         "," -> TokenType.COMMA
         "." -> TokenType.DOT
@@ -149,6 +150,7 @@ enum class TokenType {
     RETURN,
 
     COLON,
+    DOUBLE_COLON,
     SEMICOLON,
     COMMA,
     DOT,

@@ -19,7 +19,11 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                     it.runtimeName,
                     it.supertype.runtimeName!!,
                     it.fields.map { GeneratedField(it, it.static, it.name).also { lowerTypeDef(it.fieldDef.type, typeCalc) } },
+                    // Lower the SnuggleMethodDefs as well as any GenericSnuggleMethodDefs!
                     it.methods.filterIsInstance<MethodDef.SnuggleMethodDef>().map { lowerMethod(it, typeCalc) }
+                    + it.methods.filterIsInstance<MethodDef.GenericMethodDef.GenericSnuggleMethodDef>().flatMap {
+                        it.specializations.freeze().values.map { lowerMethod(it, typeCalc) }
+                    }
                 )
             }
             is TypeDef.Tuple, is TypeDef.StructDef -> {
@@ -30,6 +34,9 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                         it.recursiveNonStaticFields.drop(1).map { (pathToField, field) -> GeneratedField(field, true, "RETURN! $$pathToField") },
                         it.staticFields.map { GeneratedField(it, true, it.name).also { lowerTypeDef(it.fieldDef.type, typeCalc) } },
                         it.methods.filterIsInstance<MethodDef.SnuggleMethodDef>().map { lowerMethod(it, typeCalc) }
+                        + it.methods.filterIsInstance<MethodDef.GenericMethodDef.GenericSnuggleMethodDef>().flatMap {
+                            it.specializations.freeze().values.map { lowerMethod(it, typeCalc) }
+                        }
                     )
                 }
             }

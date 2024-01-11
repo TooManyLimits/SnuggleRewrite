@@ -5,6 +5,8 @@ import org.objectweb.asm.MethodVisitor
 import representation.passes.lexing.Loc
 import representation.passes.typing.TypeDefCache
 import util.Promise
+import util.caching.EqualityCache
+import util.caching.EqualityMemoized
 import util.toGeneric
 
 // A type definition, instantiated. No more generics left to fill.
@@ -158,7 +160,6 @@ sealed class TypeDef {
 sealed interface MethodDef {
     val pub: Boolean //
     val static: Boolean
-    val numGenerics: Int
     val owningType: TypeDef
     val name: String
     val runtimeName: String get() = name // For most, the runtime name is the same as the name.
@@ -167,19 +168,16 @@ sealed interface MethodDef {
 
     // Override vals on the first line, important things on later lines
 
-    data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val numGenerics: Int, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
+    data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
                                  val bytecode: (MethodVisitor) -> Unit): MethodDef
-    data class ConstMethodDef(override val pub: Boolean, override val numGenerics: Int, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
+    data class ConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
                               val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef {
         override val static: Boolean get() = false
     }
-    data class StaticConstMethodDef(override val pub: Boolean, override val numGenerics: Int, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
+    data class StaticConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
                                     val replacer: (TypedExpr.StaticMethodCall) -> TypedExpr): MethodDef {
         override val static: Boolean get() = true
     }
-
-    // TODO
-    // data class SnuggleGenericMethodDef(): MethodDef
 
     // runtimeName field: often, SnuggleMethodDef will need to have a different name
     // at runtime than in the internal representation. These are the case for:
@@ -187,15 +185,42 @@ sealed interface MethodDef {
     // - overloaded methods, whose names are changed to have a disambiguation number appended
     //
     // Note that body and runtime name are lazily calculated to allow for self-referencing concerns.
-    data class SnuggleMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String,
+    data class SnuggleMethodDef(val loc: Loc, override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String,
                                 override val returnType: TypeDef,
                                 override val paramTypes: List<TypeDef>,
                                 val runtimeNameGetter: Lazy<String>,
-                                val loc: Loc, val lazyBody: Lazy<TypedExpr>)
+                                val lazyBody: Lazy<TypedExpr>)
         : MethodDef {
-            override val numGenerics: Int get() = 0
             override val runtimeName by runtimeNameGetter
         }
+
+    abstract class GenericMethodDef<T: MethodDef>(val numGenerics: Int): MethodDef {
+        // The specializations created from this generic method def
+        val specializations: EqualityCache<List<TypeDef>, T> = EqualityCache()
+        fun getSpecialization(generics: List<TypeDef>) = specializations.get(generics) { specialize(it) }
+        // Abstract: Specialize this GenericMethodDef into a (non-generic!) MethodDef by replacing the generics.
+        protected abstract fun specialize(generics: List<TypeDef>): T
+        // Unspecialized generic method defs cannot know certain properties
+        override val paramTypes: List<TypeDef> get() = throw IllegalStateException("Should not be asking generic method def for its param types - it doesn't know them")
+        override val returnType: TypeDef get() = throw IllegalStateException("Should not be asking generic method def for its return type - it doesn't know it")
+        override val runtimeName: String get() = throw IllegalStateException("Should not be asking generic method def for its runtime name - it doesn't know it")
+
+        // A generic method defined in Snuggle code
+        class GenericSnuggleMethodDef(val loc: Loc, override val pub: Boolean, override val static: Boolean, numGenerics: Int,
+                                      override val owningType: TypeDef, override val name: String,
+                                      val returnTypeGetter: EqualityMemoized<List<TypeDef>, TypeDef>,
+                                      val paramTypeGetter: EqualityMemoized<List<TypeDef>, List<TypeDef>>,
+                                      val runtimeNameGetter: EqualityMemoized<List<TypeDef>, Lazy<String>>,
+                                      val lazyBodyGetter: EqualityMemoized<List<TypeDef>, Lazy<TypedExpr>>
+        )
+        : GenericMethodDef<SnuggleMethodDef>(numGenerics) {
+            override fun specialize(generics: List<TypeDef>): SnuggleMethodDef = SnuggleMethodDef(
+                loc, pub, static, owningType, name, returnTypeGetter(generics),
+                paramTypeGetter(generics), runtimeNameGetter(generics), lazyBodyGetter(generics)
+            )
+        }
+
+    }
 }
 
 sealed interface FieldDef {

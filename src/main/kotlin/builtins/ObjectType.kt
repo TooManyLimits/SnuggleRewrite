@@ -24,7 +24,7 @@ object ObjectType: BuiltinType {
         val objType = getBasicBuiltin(ObjectType, typeCache)
         val unitType = getUnit(typeCache)
         return listOf(
-            MethodDef.BytecodeMethodDef(true, false, 0, objType, "new", unitType, listOf()) {
+            MethodDef.BytecodeMethodDef(true, false, objType, "new", unitType, listOf()) {
                 it.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
             }
         )

@@ -13,18 +13,18 @@ class ConstWrapperTemp(private val static: Boolean, private val owningType: Type
                        private val returnType: TypeDef, private val argTypes: List<TypeDef>,
                        private val replacerGetter: ((TypedExpr.MethodCall) -> TypedExpr) -> (TypedExpr.MethodCall) -> TypedExpr) {
     infix fun orBytecode(bytecode: (MethodVisitor) -> Unit): MethodDef.ConstMethodDef {
-        return MethodDef.ConstMethodDef(true, 0, owningType, name, returnType, argTypes, replacerGetter {
+        return MethodDef.ConstMethodDef(true, owningType, name, returnType, argTypes, replacerGetter {
             TypedExpr.MethodCall(
                 it.loc, it.receiver, it.methodName, it.args,
-                MethodDef.BytecodeMethodDef(true, static, 0, owningType, "native\$$name", returnType, argTypes, bytecode),
+                MethodDef.BytecodeMethodDef(true, static, owningType, "native\$$name", returnType, argTypes, bytecode),
                 it.type)
         })
     }
     infix fun orExpr(exprGetter: (TypedExpr.MethodCall) -> TypedExpr): MethodDef.ConstMethodDef {
-        return MethodDef.ConstMethodDef(true, 0, owningType, name, returnType, argTypes, replacerGetter(exprGetter))
+        return MethodDef.ConstMethodDef(true, owningType, name, returnType, argTypes, replacerGetter(exprGetter))
     }
     fun orThrow(): MethodDef.ConstMethodDef {
-        return MethodDef.ConstMethodDef(true, 0, owningType, name, returnType, argTypes, replacerGetter {
+        return MethodDef.ConstMethodDef(true, owningType, name, returnType, argTypes, replacerGetter {
             throw IllegalStateException("Calling const without fallback, on non-literals? Bug in compiler, please report")
         })
     }

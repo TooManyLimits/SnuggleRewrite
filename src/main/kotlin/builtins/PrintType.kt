@@ -29,7 +29,7 @@ object PrintType: BuiltinType {
         val objectType = getBasicBuiltin(ObjectType, typeCache)
         return listOf(
             // print(bool)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "invoke", unitType, listOf(boolType)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(boolType)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]
@@ -39,7 +39,7 @@ object PrintType: BuiltinType {
                 // []
             },
             // print(i32)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "invoke", unitType, listOf(i32Type)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(i32Type)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]
@@ -49,7 +49,7 @@ object PrintType: BuiltinType {
                 // []
             },
             // print(Object)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, 0, thisType, "invoke", unitType, listOf(objectType)) {
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(objectType)) {
                 // [arg]
                 it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
                 // [arg, System.out]

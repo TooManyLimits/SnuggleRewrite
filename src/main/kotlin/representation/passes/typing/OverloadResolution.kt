@@ -25,18 +25,20 @@ fun getBestMethod(
     // Data for understanding the call site
     callLoc: Loc,
     methodName: String,
+    genericArguments: List<TypeDef>,
     arguments: List<ResolvedExpr>,
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
     typeCache: TypeDefCache,
     returnType: TypeDef?,
     currentType: TypeDef?,
-    currentTypeGenerics: List<TypeDef>
+    currentTypeGenerics: List<TypeDef>,
+    currentMethodGenerics: List<TypeDef>
 ): BestMethodData {
     // Find which methods are applicable.
-    val applicableResult = getApplicableMethods(methodsToCheck, methodName, arguments, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+    val applicableResult = getApplicableMethods(methodsToCheck, methodName, genericArguments, arguments, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
     // Try to choose the best from among them.
-    return tryChooseBestMethod(applicableResult, callLoc, methodName, arguments, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+    return tryChooseBestMethod(applicableResult, callLoc, methodName, arguments, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
 }
 
 // Return type encapsulating the best method
@@ -82,6 +84,8 @@ private fun getApplicableMethods(
     methodsToCheck: Collection<MethodDef>,
     // The name of the method.
     methodName: String,
+    // The (explicit) generic arguments to the call
+    genericArguments: List<TypeDef>,
     // The arguments to the method call.
     arguments: List<ResolvedExpr>,
     // The expected output of the method call.
@@ -97,7 +101,9 @@ private fun getApplicableMethods(
     // The current type which our method call is inside.
     currentType: TypeDef?,
     // The type generics we're currently instantiating with.
-    currentTypeGenerics: List<TypeDef>
+    currentTypeGenerics: List<TypeDef>,
+    // The method generics we're currently instantiating with.
+    currentMethodGenerics: List<TypeDef>
 ): ApplicableMethodsResult {
 
     // Create a cache for storing type-checked arguments,
@@ -111,35 +117,56 @@ private fun getApplicableMethods(
     val triedMethods: ArrayList<MethodDef> = ArrayList()
 
     // Filter out methods that don't match, and return the ones that do.
-    val applicableMethods = methodsToCheck.filter { method ->
-        // Wrong argument count:
-        if (method.paramTypes.size != arguments.size) { return@filter false }
+    val applicableMethods = methodsToCheck.mapNotNull { method ->
         // Wrong name:
-        if (method.name != methodName) { return@filter false }
+        if (method.name != methodName) { return@mapNotNull null }
+
+        var method = method // Enable reassignment
+
+        // Method is generic
+        if (method is MethodDef.GenericMethodDef<*>) {
+            // Call site supplies explicit args
+            if (genericArguments.isNotEmpty()) {
+                // Call site specified explicit args.
+                // Wrong number of generics:
+                if (method.numGenerics != genericArguments.size) { return@mapNotNull null }
+                // Correct # of generics, and explicit. Specialize the method.
+                method = method.getSpecialization(genericArguments)
+            } else {
+                // Call site did not specify explicit args, so we'll try to infer
+                TODO() // Type inference for generic args
+            }
+        }
+
+        // Wrong argument count:
+        if (method.paramTypes.size != arguments.size) { return@mapNotNull null }
 
         // If we have an expected result,
         // Wrong return type:
-        if (expectedResult != null && !method.returnType.isSubtype(expectedResult)) { return@filter false }
+        if (expectedResult != null && !method.returnType.isSubtype(expectedResult)) { return@mapNotNull null }
 
         // Final filter: check that all arguments match the expected type.
-        arguments.allIndexed { index, arg ->
+        if (!arguments.allIndexed { index, arg ->
             // Get information
             val cacheForThisArg = argCheckingCache[index]
             val expectedArgType = method.paramTypes[index]
             // Get the result of the check, either from the cache or by computing it
             val checkResult = cacheForThisArg.get(expectedArgType) {
                 try {
-                    val checked = checkExpr(arg, expectedArgType, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+                    val checked = checkExpr(arg, expectedArgType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
                     Optional.of(checked)
                 } catch (ex: TypeCheckingException) {
-                    // If it failed, then add this method to the tried methods set
+                    // If it failed, then add this method to the tried methods set and quit
                     triedMethods.add(method)
                     Optional.empty()
                 }
             }
-            // If the result is present, then the argument was successful.
+            // If the result is present, then the argument was successful
             checkResult.isPresent
-        }
+        }) { return@mapNotNull null }
+
+        // If we passed everything, output the successful method
+        return@mapNotNull method
     }
 
     // Return everything
@@ -173,7 +200,8 @@ private fun tryChooseBestMethod(
     typeCache: TypeDefCache,
     returnType: TypeDef?,
     currentType: TypeDef?,
-    currentTypeGenerics: List<TypeDef>
+    currentTypeGenerics: List<TypeDef>,
+    currentMethodGenerics: List<TypeDef>
 ): BestMethodData {
     // If there's only 1 method, just return it.
     if (applicableResult.applicableMethods.size == 1)
@@ -187,7 +215,7 @@ private fun tryChooseBestMethod(
     // Otherwise, there are no applicable methods, so error with that.
     // Attempt to infer the types of the arguments, to include in the error message.
     val inferredArguments = arguments.map { try {
-        inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics).expr.type
+        inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr.type
     } catch (e: CompilationException) {
         null
     }}

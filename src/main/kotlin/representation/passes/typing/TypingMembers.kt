@@ -5,11 +5,11 @@ import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.asts.typed.TypedPattern
-import util.ConsList
 import util.ConsMap
-import util.caching.EqualityCache
 import util.caching.EqualityMemoized
 import util.extend
+import util.mangleSlashes
+import util.toGeneric
 
 /**
  * Converting members of types, like methods/fields, from
@@ -44,8 +44,10 @@ import util.extend
  * - typeCache: The cache of TypeDefs that have been created while typing this AST.
  * - currentTypeGenerics: The generics of the owningType that we're currently instantiating with.
  */
-fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, methodDef: ResolvedMethodDef, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): MethodDef.SnuggleMethodDef {
-    if (methodDef.numGenerics != 0) TODO()
+fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, methodDef: ResolvedMethodDef, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): MethodDef {
+
+    // First, create a generic method def. Then, if the original method had no generics,
+    // simply specialize the generic method with 0 generics. This keeps the system general.
 
     var disambiguationIndex = 0
     for (method in allMethodDefs) {
@@ -53,40 +55,52 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
         if (method.name == methodDef.name) disambiguationIndex++
     }
 
+    // Create the various components of the method def, specialized over the method generics.
     // Get the param patterns and their types
-    val paramPatterns = methodDef.params.map { inferPattern(it, typeCache, currentTypeGenerics) }
-    val paramTypes = paramPatterns.map { it.type }
+    val paramPatternsByGeneric = EqualityMemoized<List<TypeDef>, List<TypedPattern>> {
+            methodGenerics -> methodDef.params.map { inferPattern(it, typeCache, currentTypeGenerics, methodGenerics) }
+    }
+    val paramTypesByGeneric = EqualityMemoized<List<TypeDef>, List<TypeDef>> { paramPatternsByGeneric(it).map { it.type } }
     // Get the return type
-    val returnType = getTypeDef(methodDef.returnType, typeCache, currentTypeGenerics)
+    val returnTypeByGeneric = EqualityMemoized<List<TypeDef>, TypeDef> { getTypeDef(methodDef.returnType, typeCache, currentTypeGenerics, it) }
     // Create the lazy getter for the body
-    val bodyGetter = lazy {
+    val bodyGetterByGeneric = EqualityMemoized<List<TypeDef>, Lazy<TypedExpr>> { methodGenerics -> lazy {
         // Get the bindings for the body, from the params
         var bodyBindings: ConsMap<String, VariableBinding> = ConsMap.of()
         // If non-static, add a "this" parameter as the first one in the bindings
         if (!methodDef.static)
             bodyBindings = bodyBindings.extend("this", VariableBinding(owningType, false, 0))
         // Populate the bindings
-        for (typedParam in paramPatterns)
+        for (typedParam in paramPatternsByGeneric(methodGenerics))
             bodyBindings = bodyBindings.extend(bindings(typedParam, bodyBindings).first)
         // Type-check the method body to be the return type
-        val checkedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache, returnType, owningType, currentTypeGenerics).expr
+        val checkedBody = checkExpr(methodDef.body, returnTypeByGeneric(methodGenerics), bodyBindings, typeCache, returnTypeByGeneric(methodGenerics), owningType, currentTypeGenerics, methodGenerics).expr
         // And get a Return() wrapper over it, since we want to return the body
         // Now lowerExpr() will handle all the stuff with returning plural types, etc.
         TypedExpr.Return(checkedBody.loc, checkedBody, checkedBody.type)
-    }
+    }}
     // Get the lazy runtime name:
-    val runtimeNameGetter = lazy { when {
-        // If this is a class and the name is "new", make runtime name be "<init>" instead
+    val runtimeNameGetterByGeneric = EqualityMemoized<List<TypeDef>, Lazy<String>> { methodGenerics -> lazy { when {
+        // If this is a class and the name is "new", make runtime name be "<init>" instead.
+        // TODO: Still need to disambiguate jvm constructor methods
         (owningType.unwrap() is TypeDef.ClassDef) && methodDef.name == "new" -> "<init>"
         // If the disambiguation index is > 0, use it
-        disambiguationIndex > 0 -> methodDef.name + "$" + disambiguationIndex
+        disambiguationIndex > 0 ->
+            mangleSlashes(toGeneric( methodDef.name + "$" + disambiguationIndex, methodGenerics))
         // Default, just the name
-        else -> methodDef.name
-    }}
+        else -> mangleSlashes(toGeneric(methodDef.name, methodGenerics))
+    }}}
 
-    // Return the method def
-    return MethodDef.SnuggleMethodDef(
-        methodDef.pub, methodDef.static, owningType, methodDef.name,
-        returnType, paramTypes, runtimeNameGetter, methodDef.loc, bodyGetter
+    // Create the generic method def
+    val genericSnuggleMethodDef = MethodDef.GenericMethodDef.GenericSnuggleMethodDef(
+        methodDef.loc, methodDef.pub, methodDef.static, methodDef.numGenerics, owningType, methodDef.name,
+        returnTypeByGeneric, paramTypesByGeneric, runtimeNameGetterByGeneric, bodyGetterByGeneric
     )
+
+    // If the method def has no generics, immediately specialize it and return that.
+    // Otherwise, return the generic one
+    return if (methodDef.numGenerics == 0)
+        genericSnuggleMethodDef.getSpecialization(listOf())
+    else
+        genericSnuggleMethodDef
 }

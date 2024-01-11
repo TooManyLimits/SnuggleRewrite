@@ -23,7 +23,7 @@ import kotlin.math.max
  * This one adds one additional parameter, expectedType. It makes sure
  * that the expr's type is a subtype of expectedType, or else it will error.
  */
-fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>): TypingResult = when(expr) {
+fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult = when(expr) {
 
     // Very similar to inferring a block; we just need to
     // checkExpr() on the last expression, not infer it.
@@ -32,7 +32,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // DIFFERENCE: Map _all but the last expression_ to their inferred forms.
         val typedExprs = expr.exprs.subList(0, max(0, expr.exprs.size - 1)).mapTo(ArrayList(expr.exprs.size+1)) {
             // Infer the inner expression
-            val inferred = inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics)
+            val inferred = inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
             // Check its new vars. If neither side is empty, add the vars in.
             if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                 // Extend the scope with the new vars
@@ -46,7 +46,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         }
         // DIFFERENCE: On the last expr, check it instead.
         val lastExpr = if (expr.exprs.isNotEmpty())
-            checkExpr(expr.exprs.last(), expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+            checkExpr(expr.exprs.last(), expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         else throw IllegalStateException("Unit not yet implemented")
         typedExprs.add(lastExpr)
         // Return as usual.
@@ -60,11 +60,12 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     is ResolvedExpr.MethodCall -> {
         // Largely the same as the infer() version, just passes the "expectedType" parameter
         // Infer the type of the receiver
-        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         // Gather the set of non-static methods on the receiver
         val methods = typedReceiver.type.nonStaticMethods
         // Choose the best method from among them
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics)
+        val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val call = TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
 
         // Repeatedly replace const method calls until done
@@ -78,9 +79,10 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     }
 
     is ResolvedExpr.StaticMethodCall -> {
-        val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics)
+        val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics, currentMethodGenerics)
         val methods = receiverType.staticMethods
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics)
+        val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // TODO: Const static method calls
         pullUpLiteral(just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType)), expectedType)
     }
@@ -89,7 +91,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val superType = (currentType ?: throw ParsingException("Cannot use keyword \"super\" outside of a type definition", expr.loc))
             .primarySupertype ?: throw ParsingException("Cannot use keyword \"super\" here. Type \"${currentType.name} does not have a supertype.", expr.loc)
         val methods = superType.nonStaticMethods
-        val best = getBestMethod(methods, expr.loc, expr.methodName, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics)
+        val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
+        val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
         just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, best.method.returnType))
     }
@@ -97,14 +100,14 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     // Constructor and raw constructor, again almost exactly the same as infer().
     is ResolvedExpr.ConstructorCall -> {
 
-        val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics) } ?: expectedType
+        val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) } ?: expectedType
 
         // Different situations depending on the type.
         val res = if (type.unwrap() is TypeDef.InstantiatedBuiltin && !type.isReferenceType) {
             // Special constructor. Non-reference type builtins have these.
             val methods = type.staticMethods
             val expectedResult = type.unwrap()
-            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+            val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
             if (best.method !is MethodDef.BytecodeMethodDef)
                 throw IllegalStateException("Assumed that builtin, non-reference type constructors are defined in bytecode - but type \"${type.name} breaks this? Bug in compiler, please report")
             // Doesn't matter what type of method call we return here,
@@ -118,7 +121,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             // an object, they're static methods that return the struct.
             val methods = type.staticMethods
             val expectedResult = type.unwrap()
-            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+            val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
             just(TypedExpr.StaticMethodCall(
                 expr.loc, type, "new", best.checkedArgs, best.method, best.method.returnType
             ))
@@ -127,7 +130,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             // Look for a non-static method "new" that returns unit
             val methods = type.nonStaticMethods
             val expectedResult = getUnit(typeCache)
-            val best = getBestMethod(methods, expr.loc, "new", expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics)
+            val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
             just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, type))
         }
         if (!res.expr.type.isSubtype(expectedType))
@@ -138,7 +141,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     is ResolvedExpr.RawStructConstructor -> {
         // For reason behind explicitness check: See the definition of TypeCheckingException
         val isExplicit = expr.type != null
-        val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics) } ?: expectedType
+        val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) } ?: expectedType
         if (type.unwrap() !is TypeDef.StructDef)
             if (isExplicit)
                 throw CompilationException("Raw struct constructors can only create structs, but type \"${type.name}\" is not a struct", expr.loc)
@@ -150,7 +153,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             else
                 throw TypeCheckingException("Struct \"${type.name}\" has ${type.nonStaticFields.size} non-static fields, but ${expr.fieldValues.size} fields were provided in the raw constructor!", expr.loc)
         val checkedFieldValues = type.nonStaticFields.zip(expr.fieldValues).map { (field, value) ->
-            checkExpr(value, field.type, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+            checkExpr(value, field.type, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         }
         val res = just(TypedExpr.RawStructConstructor(expr.loc, checkedFieldValues, type))
         if (!res.expr.type.isSubtype(expectedType))
@@ -165,7 +168,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         if (expectedType.innerTypes.size != expr.elements.size)
             throw TypeCheckingException("Expected tuple with ${expectedType.innerTypes.size} elements, but found one with ${expr.elements.size} instead", expr.loc)
         val typeCheckedElements = expectedType.innerTypes.zip(expr.elements).map { (expected, expr) ->
-            checkExpr(expr, expected, scope, typeCache, returnType, currentType, currentTypeGenerics).expr
+            checkExpr(expr, expected, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         }
         just(TypedExpr.RawStructConstructor(expr.loc, typeCheckedElements, expectedType))
     }
@@ -173,14 +176,14 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     // Return: just infer the expression. Don't bother checking the return type,
     // since technically this should output a bottom type (a subtype of everything).
     // (though we don't have a representation of such)
-    is ResolvedExpr.Return -> inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics)
+    is ResolvedExpr.Return -> inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
 
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
     // e.g. Import, Literal, Variable, Declaration.
     // Usually, inferring and checking work similarly.
     else -> {
-        val res = inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics)
+        val res = inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         if (!res.expr.type.isSubtype(expectedType))
             throw IncorrectTypeException(expectedType, res.expr.type, when(expr) {
                 is ResolvedExpr.Import -> "Import expression"

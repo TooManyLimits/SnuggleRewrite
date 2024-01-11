@@ -1,5 +1,6 @@
 package representation.asts.parsed
 
+import representation.asts.typed.TypeDef
 import representation.passes.lexing.Loc
 
 /**
@@ -54,7 +55,7 @@ sealed interface ParsedElement {
         data class Tuple(override val loc: Loc, val elements: List<ParsedExpr>): ParsedExpr
 
         data class FieldAccess(override val loc: Loc, val receiver: ParsedExpr, val fieldName: String): ParsedExpr
-        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val args: List<ParsedExpr>): ParsedExpr
+        data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val genericArgs: List<ParsedType>, val args: List<ParsedExpr>): ParsedExpr
         data class ConstructorCall(override val loc: Loc, val type: ParsedType?, val args: List<ParsedExpr>): ParsedExpr
         data class RawStructConstructor(override val loc: Loc, val type: ParsedType?, val fieldValues: List<ParsedExpr>): ParsedExpr
 
@@ -94,8 +95,10 @@ sealed interface ParsedType {
     }
 //    data class Func(override val loc: Loc, val paramTypes: List<ParsedType>, val returnType: ParsedType): ParsedType
     data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType {
-        override fun toString(): String = "Generic $name"
+        override fun toString(): String = "TypeGeneric($name)"
     }
-//    data class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType
+    data class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType {
+        override fun toString(): String = "MethodGeneric($name)"
+    }
 
 }

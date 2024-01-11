@@ -10,7 +10,7 @@ import representation.asts.parsed.ParsedPattern
  * Element parsing !
  */
 
-fun parseElement(lexer: Lexer, typeGenerics: List<String>): ParsedElement {
+fun parseElement(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedElement {
     return when {
         lexer.consume(TokenType.PUB) -> when {
             lexer.consume(TokenType.CLASS) -> parseClass(lexer, true)
@@ -19,14 +19,14 @@ fun parseElement(lexer: Lexer, typeGenerics: List<String>): ParsedElement {
         }
         lexer.consume(TokenType.CLASS) -> parseClass(lexer, false)
         lexer.consume(TokenType.STRUCT) -> parseStruct(lexer, false)
-        else -> parseExpr(lexer, typeGenerics)
+        else -> parseExpr(lexer, typeGenerics, methodGenerics)
     }
 }
 
 // Helper functions:
 
 // Params are a list of patterns separated by commas, inside parentheses
-fun parseParams(lexer: Lexer, typeGenerics: List<String>): List<ParsedPattern> {
+fun parseParams(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): List<ParsedPattern> {
 
     // Helper local function to check if a pattern is explicitly typed,
     // which it must be for function parameters.
@@ -37,7 +37,7 @@ fun parseParams(lexer: Lexer, typeGenerics: List<String>): List<ParsedPattern> {
 
     lexer.expect(TokenType.LEFT_PAREN, "to begin params list")
     return commaSeparated(lexer, TokenType.RIGHT_PAREN) {
-        val pat = parsePattern(it, typeGenerics)
+        val pat = parsePattern(it, typeGenerics, methodGenerics)
         if (!isExplicitlyTyped(pat))
             throw ParsingException("Function parameters must be explicitly typed", pat.loc)
         pat

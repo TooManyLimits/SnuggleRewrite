@@ -9,3 +9,5 @@ fun toGeneric(base: String, generics: List<TypeDef>, leftBracket: String = "(", 
         base
     }
 }
+
+fun mangleSlashes(str: String): String = str.replace('/', '\\')

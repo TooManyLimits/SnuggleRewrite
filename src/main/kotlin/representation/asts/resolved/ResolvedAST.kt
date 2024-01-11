@@ -100,9 +100,9 @@ sealed interface ResolvedExpr {
 
     data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
-    data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
-    data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
-    data class SuperMethodCall(override val loc: Loc, val methodName: String, val args: List<ResolvedExpr>): ResolvedExpr
+    data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>): ResolvedExpr
+    data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>): ResolvedExpr
+    data class SuperMethodCall(override val loc: Loc, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>): ResolvedExpr
     data class ConstructorCall(override val loc: Loc, val type: ResolvedType?, val args: List<ResolvedExpr>): ResolvedExpr
     data class RawStructConstructor(override val loc: Loc, val type: ResolvedType?, val fieldValues: List<ResolvedExpr>): ResolvedExpr
 
@@ -122,4 +122,5 @@ sealed interface ResolvedType {
     data class Basic(override val loc: Loc, val base: ResolvedTypeDef, val generics: List<ResolvedType>): ResolvedType
     data class Tuple(override val loc: Loc, val elements: List<ResolvedType>): ResolvedType
     data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
+    data class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
 }

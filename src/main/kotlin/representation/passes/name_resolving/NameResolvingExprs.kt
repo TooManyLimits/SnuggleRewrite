@@ -168,6 +168,7 @@ fun resolveExpr(
                             expr.loc,
                             ResolvedType.Basic(expr.receiver.loc, type, listOf()),
                             expr.methodName,
+                            expr.genericArgs.map { resolveType(it, currentMappings) },
                             resolvedArgs.map { it.expr }
                         ), unitedFiles, unitedExposedTypes
                     )
@@ -178,7 +179,7 @@ fun resolveExpr(
             is ParsedElement.ParsedExpr.Super -> {
                 // This is a super method call.
                 return@run ExprResolutionResult(
-                    ResolvedExpr.SuperMethodCall(expr.loc, expr.methodName, resolvedArgs.map { it.expr }),
+                    ResolvedExpr.SuperMethodCall(expr.loc, expr.methodName, expr.genericArgs.map { resolveType(it, currentMappings) }, resolvedArgs.map { it.expr }),
                     unitedFiles, unitedExposedTypes
                 )
             }
@@ -188,7 +189,7 @@ fun resolveExpr(
         // Resolve the receiver and return.
         val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
         ExprResolutionResult(
-            ResolvedExpr.MethodCall(expr.loc, resolvedReceiver.expr, expr.methodName, resolvedArgs.map { it.expr }),
+            ResolvedExpr.MethodCall(expr.loc, resolvedReceiver.expr, expr.methodName, expr.genericArgs.map { resolveType(it, currentMappings) },resolvedArgs.map { it.expr }),
             union(resolvedReceiver.files, unitedFiles), // Add its files
             resolvedReceiver.exposedTypes.extend(unitedExposedTypes) // Add its exposed types
         )
@@ -264,6 +265,7 @@ fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ResolvedTypeD
     }
     is ParsedType.Tuple -> ResolvedType.Tuple(type.loc, type.elementTypes.map { resolveType(it, currentMappings) })
     is ParsedType.TypeGeneric -> ResolvedType.TypeGeneric(type.loc, type.name, type.index)
+    is ParsedType.MethodGeneric -> ResolvedType.MethodGeneric(type.loc, type.name, type.index)
 }
 
 class ResolutionException(filePath: String, loc: Loc)
