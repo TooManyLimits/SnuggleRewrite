@@ -57,6 +57,8 @@ sealed interface Instruction {
     data class Push(val valueToPush: Any, val type: TypeDef): Instruction
     // Pop the given type from the top of the stack
     data class Pop(val typeToPop: TypeDef): Instruction
+    // Swap the two given basic values
+    data class SwapBasic(val top: TypeDef, val second: TypeDef): Instruction
     // Create a new, uninitialized instance of the given type on the stack
     data class NewRefAndDup(val typeToCreate: TypeDef): Instruction
     // Dup a reference type on top of the stack
@@ -69,8 +71,9 @@ sealed interface Instruction {
     data class StoreLocal(val index: Int, val type: TypeDef): Instruction
     // Load a value of the given type from a local variable at the given index
     data class LoadLocal(val index: Int, val type: TypeDef): Instruction
-    // Get a field from a reference type. Reference type is on the stack
+    // Get/put a field from a reference type. Reference type is on the stack
     data class GetReferenceTypeField(val owningType: TypeDef, val fieldType: TypeDef, val runtimeFieldName: String): Instruction
+    data class PutReferenceTypeField(val owningType: TypeDef, val fieldType: TypeDef, val runtimeFieldName: String): Instruction
     // Get/Put a static field.
     data class GetStaticField(val owningType: TypeDef, val fieldType: TypeDef, val runtimeFieldName: String): Instruction
     data class PutStaticField(val owningType: TypeDef, val fieldType: TypeDef, val runtimeFieldName: String): Instruction

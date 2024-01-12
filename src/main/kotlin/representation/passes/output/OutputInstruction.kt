@@ -2,6 +2,7 @@ package representation.passes.output
 
 import builtins.*
 import builtins.helpers.popType
+import builtins.helpers.swapBasic
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -50,6 +51,9 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.Push -> outputPush(inst, writer)
     // Pop the correct number of stack slots
     is Instruction.Pop -> popType(inst.typeToPop, writer)
+    // Swap the basic types
+    is Instruction.SwapBasic -> swapBasic(inst.top, inst.second, writer)
+    // Create a new reference and dup it
     is Instruction.NewRefAndDup -> {
         writer.visitTypeInsn(Opcodes.NEW, inst.typeToCreate.runtimeName!!)
         writer.visitInsn(Opcodes.DUP)
@@ -57,7 +61,12 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.DupRef -> writer.visitInsn(Opcodes.DUP)
     is Instruction.LoadRefType -> writer.visitVarInsn(Opcodes.ALOAD, inst.index)
 
-    // Store/load local variables. Have a helper function for it, because of repetition
+    // Store/load local variables. Have a helper function for it, because of repetition.
+    // These are also a bit unique in the fact that their implementation of plural type
+    // recursion is during the outputting phase, and not during the lowering phase like
+    // with many of the other instructions. There is no good reason for this, other than
+    // this is how it was first implemented, and we're too lazy to rewrite the
+    // implementation for the local variable lowering/outputting.
     is Instruction.StoreLocal -> handleLocal(inst.index, inst.type, store = true, writer)
     is Instruction.LoadLocal -> handleLocal(inst.index, inst.type, store = false, writer)
 
@@ -65,6 +74,10 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.GetReferenceTypeField -> {
         if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetReferenceTypeField with plural type? Bug in compiler, please report")
         writer.visitFieldInsn(Opcodes.GETFIELD, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
+    }
+    is Instruction.PutReferenceTypeField -> {
+        if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetReferenceTypeField with plural type? Bug in compiler, please report")
+        writer.visitFieldInsn(Opcodes.PUTFIELD, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
     }
     is Instruction.GetStaticField -> {
         if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetStaticField with plural type? Bug in compiler, please report")

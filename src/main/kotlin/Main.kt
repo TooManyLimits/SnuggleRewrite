@@ -12,11 +12,21 @@ import util.ConsList
 fun main() {
 
     val code = """
-        class Cutie {
-            static fn colon3<T>(elem: T) print(elem)
+        let mut x: i32 = 10
+        x = 5
+        print(x)
+        
+        class Thingy {
+            mut field: i32
+            tup: (i32, i32)
+            fn new() super()
         }
-        Cutie.colon3::<String>(":3")
-        Cutie.colon3::<i32>(10000)
+        let thing = new Thingy()
+        print(thing.field)
+        thing.field = 20
+        print(thing.field)
+        thing.tup.v0 = 24
+        print(thing.tup.v0)
     """.trimIndent()
     val lexer = Lexer("main", code)
 

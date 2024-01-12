@@ -4,6 +4,7 @@ import representation.asts.ir.GeneratedField
 import representation.asts.ir.GeneratedMethod
 import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
+import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import util.ConsList
@@ -18,7 +19,7 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                 GeneratedType.GeneratedClass(
                     it.runtimeName,
                     it.supertype.runtimeName!!,
-                    it.fields.map { GeneratedField(it, it.static, it.name).also { lowerTypeDef(it.fieldDef.type, typeCalc) } },
+                    it.fields.flatMap { lowerField(it, it.static, it.name, typeCalc) }, //Flatmap generate the fields
                     // Lower the SnuggleMethodDefs as well as any GenericSnuggleMethodDefs!
                     it.methods.filterIsInstance<MethodDef.SnuggleMethodDef>().map { lowerMethod(it, typeCalc) }
                     + it.methods.filterIsInstance<MethodDef.GenericMethodDef.GenericSnuggleMethodDef>().flatMap {
@@ -31,8 +32,11 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                 else {
                     GeneratedType.GeneratedValueType(
                         it.runtimeName!!,
-                        it.recursiveNonStaticFields.drop(1).map { (pathToField, field) -> GeneratedField(field, true, "RETURN! $$pathToField") },
-                        it.staticFields.map { GeneratedField(it, true, it.name).also { lowerTypeDef(it.fieldDef.type, typeCalc) } },
+                        it.recursiveNonStaticFields.drop(1).map { (pathToField, field) ->
+                            lowerTypeDef(field.type, typeCalc)
+                            GeneratedField(field, true, "RETURN! $$pathToField")
+                        },
+                        it.staticFields.flatMap { lowerField(it, it.static, it.name, typeCalc) },
                         it.methods.filterIsInstance<MethodDef.SnuggleMethodDef>().map { lowerMethod(it, typeCalc) }
                         + it.methods.filterIsInstance<MethodDef.GenericMethodDef.GenericSnuggleMethodDef>().flatMap {
                             it.specializations.freeze().values.map { lowerMethod(it, typeCalc) }
@@ -54,4 +58,19 @@ private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: Identit
     val loweredBody = lowerExpr(methodDef.lazyBody.value, ConsList.nil(), typeCalc)
     val codeBlock = Instruction.CodeBlock(ConsList.fromIterable(loweredBody.asIterable()))
     return GeneratedMethod(methodDef, codeBlock)
+}
+
+private fun lowerField(fieldDef: FieldDef, runtimeStatic: Boolean, runtimeNamePrefix: String, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedField> {
+    // Lower type def for the field
+    lowerTypeDef(fieldDef.type, typeCalc)
+    return if (fieldDef.type.isPlural) {
+        // If plural, lower the recursive fields
+        fieldDef.type.recursiveNonStaticFields.map { (pathToField, field) ->
+            lowerTypeDef(field.type, typeCalc)
+            GeneratedField(field, runtimeStatic, runtimeNamePrefix + "$" + pathToField)
+        }
+    } else {
+        // Otherwise, just the one field
+        listOf(GeneratedField(fieldDef, runtimeStatic, runtimeNamePrefix))
+    }
 }

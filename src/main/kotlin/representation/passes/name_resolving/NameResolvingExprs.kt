@@ -240,6 +240,15 @@ fun resolveExpr(
             initializer.exposedTypes
         )
     }
+    is ParsedElement.ParsedExpr.Assignment -> {
+        val resolvedLhs = resolveExpr(expr.lhs, startingMappings, currentMappings, ast, cache)
+        val resolvedRhs = resolveExpr(expr.rhs, startingMappings, currentMappings, ast, cache)
+        ExprResolutionResult(
+            ResolvedExpr.Assignment(expr.loc, resolvedLhs.expr, resolvedRhs.expr),
+            union(resolvedLhs.files, resolvedRhs.files),
+            resolvedLhs.exposedTypes.extend(resolvedRhs.exposedTypes)
+        )
+    }
 
     is ParsedElement.ParsedExpr.Return -> resolveExpr(expr.rhs, startingMappings, currentMappings, ast, cache).let {
         ExprResolutionResult(ResolvedExpr.Return(it.expr.loc, it.expr), it.files, it.exposedTypes)

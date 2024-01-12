@@ -46,7 +46,22 @@ private fun parseUnary(lexer: Lexer, typeGenerics: List<String>, methodGenerics:
         val loc = tok.loc.merge(operand.loc)
         return ParsedExpr.MethodCall(loc, operand, methodName, listOf(), listOf())
     }
-    return parseFieldAccessOrMethodCall(lexer, typeGenerics, methodGenerics)
+    return parseAssignment(lexer, typeGenerics, methodGenerics)
+}
+
+private fun parseAssignment(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    var lhs = parseFieldAccessOrMethodCall(lexer, typeGenerics, methodGenerics)
+    if (lexer.consume(TokenType.EQUALS)) {
+        val eqLoc = lexer.last().loc
+        val rhs = parseExpr(lexer, typeGenerics, methodGenerics)
+        lhs = if (lhs is ParsedExpr.Variable || lhs is ParsedExpr.FieldAccess)
+            ParsedExpr.Assignment(eqLoc, lhs, rhs)
+        else if (lhs is ParsedExpr.MethodCall && lhs.methodName == "get")
+            TODO()
+        else
+            throw ParsingException("Cannot have an assignment here - can only assign to variables, fields, or [] results", eqLoc)
+    }
+    return lhs
 }
 
 private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {

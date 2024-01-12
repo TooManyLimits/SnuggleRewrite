@@ -38,7 +38,7 @@ private fun parseGenerics(lexer: Lexer): List<String> {
     return listOf()
 }
 
-enum class TypeType {
+private enum class TypeType {
     CLASS, STRUCT, ENUM
 }
 
@@ -76,10 +76,11 @@ private fun parseMembers(lexer: Lexer, typeGenerics: List<String>, typeType: Typ
             }
         } else {
             // Otherwise, we must have field(s).
+            val isMut = lexer.consume(TokenType.MUT)
             val fieldName = lexer.expect(TokenType.IDENTIFIER, "to begin field name, or a function definition")
             lexer.expect(TokenType.COLON, "for mandatory field type annotation")
             val typeAnnotation = parseType(lexer, typeGenerics, listOf())
-            fields += ParsedFieldDef(fieldName.loc, isPub, isStatic, fieldName.string(), typeAnnotation)
+            fields += ParsedFieldDef(fieldName.loc, isPub, isStatic, isMut, fieldName.string(), typeAnnotation)
         }
     }
     return fields to methods

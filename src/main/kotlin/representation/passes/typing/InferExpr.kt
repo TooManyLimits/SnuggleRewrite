@@ -3,6 +3,7 @@ package representation.passes.typing
 import builtins.*
 import errors.CompilationException
 import errors.ParsingException
+import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -62,7 +63,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     // Variable looks up its name in scope, errors if none is there
     is ResolvedExpr.Variable -> {
         val binding = scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)
-        just(TypedExpr.Variable(expr.loc, expr.name, binding.index, binding.type))
+        just(TypedExpr.Variable(expr.loc, binding.mutable, expr.name, binding.index, binding.type))
     }
 
     // Blocks maintain their own scope, infer each element. Type of block is type of last expr inside
@@ -73,8 +74,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             var scope = scope // Shadow scope
             val inferredExprs = expr.exprs.map {
                 // Infer the inner expression
-                val inferred =
-                    inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+                val inferred = inferExpr(it, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
                 // Check its new vars. If neither side is empty, add the vars in.
                 if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                     // Extend the scope with the new vars
@@ -125,10 +125,21 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             TypingResult.WithVars(typed, patternBindings.first, patternBindings.first)
     }
 
+    is ResolvedExpr.Assignment -> {
+        val typedLhs = inferExpr(expr.lhs, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        checkMutable(typedLhs, expr.loc) // Checks if mutable, errors if not
+        val lhsType = typedLhs.type
+        val typedRhs = checkExpr(expr.rhs, lhsType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        // Type of assignment is Unit
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        just(TypedExpr.Assignment(expr.loc, typedLhs, typedRhs, maxVariable, getUnit(typeCache)))
+    }
+
     is ResolvedExpr.FieldAccess -> {
         val receiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         val bestField = findField(receiver.type, false, expr.fieldName, expr.loc)
-        just(TypedExpr.FieldAccess(expr.loc, receiver, expr.fieldName, bestField, bestField.type))
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        just(TypedExpr.FieldAccess(expr.loc, receiver, expr.fieldName, bestField, maxVariable, bestField.type))
     }
 
     is ResolvedExpr.StaticFieldAccess -> {
@@ -264,3 +275,17 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
 
 class NoSuchVariableException(varName: String, loc: Loc)
     : CompilationException("No variable with name \"$varName\" is in the current scope", loc)
+
+// Check whether an assignment to this lvalue is okay or not
+private fun checkMutable(lvalue: TypedExpr, assignLoc: Loc): Unit = when (lvalue) {
+    is TypedExpr.Variable -> if (!lvalue.mutable)
+        throw CompilationException("Cannot assign to immutable variable \"${lvalue.name}\"", assignLoc) else {}
+    is TypedExpr.StaticFieldAccess -> if (!lvalue.fieldDef.mutable)
+        throw CompilationException("Cannot assign to immutable static field \"${lvalue.fieldName}\"", assignLoc) else {}
+    is TypedExpr.FieldAccess -> when {
+        lvalue.receiver.type.isReferenceType -> if (!lvalue.fieldDef.mutable)
+            throw CompilationException("Cannot assign to immutable field \"${lvalue.fieldName}\"", assignLoc) else {}
+        else -> checkMutable(lvalue.receiver, assignLoc)
+    }
+    else -> throw CompilationException("Illegal assignment - can only assign to variables, fields, or [] results.", assignLoc)
+}

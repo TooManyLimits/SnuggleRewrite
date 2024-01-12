@@ -54,7 +54,7 @@ private fun resolveFieldDef(fieldDef: ParsedFieldDef,
                             cache: IdentityCache<ParsedFile, PublicMembers>
 ): Pair<ResolvedFieldDef, Set<ParsedFile>> {
     val resolvedType = resolveType(fieldDef.annotatedType, currentMappings)
-    return ResolvedFieldDef(fieldDef.loc, fieldDef.pub, fieldDef.static, fieldDef.name, resolvedType) to setOf()
+    return ResolvedFieldDef(fieldDef.loc, fieldDef.pub, fieldDef.static, fieldDef.mutable, fieldDef.name, resolvedType) to setOf()
 }
 
 private fun resolveMethodDef(

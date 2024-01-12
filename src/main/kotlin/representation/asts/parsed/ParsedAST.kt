@@ -45,13 +45,14 @@ sealed interface ParsedElement {
 
         data class Block(override val loc: Loc, val elements: List<ParsedElement>): ParsedExpr
         data class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
+        // Lhs is one of: FieldAccess or Variable
+        data class Assignment(override val loc: Loc, val lhs: ParsedExpr, val rhs: ParsedExpr): ParsedExpr
 
         data class Return(override val loc: Loc, val rhs: ParsedExpr): ParsedExpr
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Super(override val loc: Loc): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
-        data class Parenthesized(override val loc: Loc, val inner: ParsedExpr): ParsedExpr
         data class Tuple(override val loc: Loc, val elements: List<ParsedExpr>): ParsedExpr
 
         data class FieldAccess(override val loc: Loc, val receiver: ParsedExpr, val fieldName: String): ParsedExpr
@@ -59,13 +60,14 @@ sealed interface ParsedElement {
         data class ConstructorCall(override val loc: Loc, val type: ParsedType?, val args: List<ParsedExpr>): ParsedExpr
         data class RawStructConstructor(override val loc: Loc, val type: ParsedType?, val fieldValues: List<ParsedExpr>): ParsedExpr
 
+        data class Parenthesized(override val loc: Loc, val inner: ParsedExpr): ParsedExpr
         //... etc
     }
 
 }
 
 // Helper data structures
-data class ParsedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ParsedType)
+data class ParsedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ParsedType)
 data class ParsedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
 sealed interface ParsedPattern {
 

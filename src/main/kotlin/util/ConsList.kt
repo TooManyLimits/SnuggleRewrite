@@ -26,24 +26,6 @@ sealed interface ConsList<out T> : Iterable<T> {
         }
     }
 
-    fun <R> fold(initial: R, func: (accum: R, elem: T) -> R): R {
-        var cur = this
-        var res = initial
-        while (cur is Cons) {
-            res = func(res, cur.elem)
-            cur = cur.rest
-        }
-        return res
-    }
-
-    fun forEach(consumer: (T) -> Unit) {
-        var cur = this
-        while (cur is Cons) {
-            consumer(cur.elem)
-            cur = cur.rest
-        }
-    }
-
     fun lastOrNull(): T? {
         var cur = this
         while (cur is Cons) {
@@ -130,8 +112,11 @@ data class Cons<T>(val elem: T, val rest: ConsList<T>): ConsList<T> {
     override fun toString(): String {
         return "$elem::$rest"
     }
-    override fun iterator() = iterator {
-        yield(elem)
-        yieldAll(rest)
-    }
+    override fun iterator(): Iterator<T> = ConsListIterator(this)
+}
+
+private class ConsListIterator<T>(private var list: ConsList<T>): Iterator<T> {
+    override fun hasNext(): Boolean = this.list != Nil.INSTANCE
+    override fun next(): T = (this.list as Cons).elem.also { this.list = (this.list as Cons).rest }
+
 }

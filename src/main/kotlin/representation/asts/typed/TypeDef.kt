@@ -106,7 +106,7 @@ sealed class TypeDef {
         override val fields: List<FieldDef> = run {
             var currentIndex = 0
             innerTypes.mapIndexed { index, type ->
-                FieldDef.BuiltinField(pub = true, static = false, "v$index", currentIndex, type)
+                FieldDef.BuiltinField(pub = true, static = false, mutable = false, "v$index", currentIndex, type)
                     .also { currentIndex += type.stackSlots }
             }
         }
@@ -226,16 +226,17 @@ sealed interface MethodDef {
 sealed interface FieldDef {
     val pub: Boolean
     val static: Boolean
+    val mutable: Boolean
     val pluralOffset: Int? // If the owning type is plural, and this is non-static, this should be the field's offset.
     val name: String
     val type: TypeDef
 
     data class BuiltinField(
-        override val pub: Boolean, override val static: Boolean,
+        override val pub: Boolean, override val static: Boolean, override val mutable: Boolean,
         override val name: String, override val pluralOffset: Int?, override val type: TypeDef
     ): FieldDef
     data class SnuggleFieldDef(
-        val loc: Loc, override val pub: Boolean, override val static: Boolean,
+        val loc: Loc, override val pub: Boolean, override val static: Boolean, override val mutable: Boolean,
         override val name: String, override val pluralOffset: Int?, override val type: TypeDef
     ): FieldDef
 }

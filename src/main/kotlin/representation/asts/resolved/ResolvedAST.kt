@@ -81,7 +81,7 @@ sealed interface ResolvedTypeDef {
 
 }
 
-data class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val name: String, val annotatedType: ResolvedType)
+data class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ResolvedType)
 data class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
 
 sealed interface ResolvedExpr {
@@ -91,6 +91,8 @@ sealed interface ResolvedExpr {
 
     data class Block(override val loc: Loc, val exprs: List<ResolvedExpr>): ResolvedExpr
     data class Declaration(override val loc: Loc, val pattern: ResolvedPattern, val initializer: ResolvedExpr): ResolvedExpr
+    // Lhs is one of: FieldAccess, StaticFieldAccess, Variable
+    data class Assignment(override val loc: Loc, val lhs: ResolvedExpr, val rhs: ResolvedExpr): ResolvedExpr
 
     data class Return(override val loc: Loc, val rhs: ResolvedExpr): ResolvedExpr
 

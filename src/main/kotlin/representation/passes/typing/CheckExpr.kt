@@ -189,9 +189,9 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
                 is ResolvedExpr.Import -> "Import expression"
                 is ResolvedExpr.Literal -> "Literal"
                 is ResolvedExpr.Variable -> "Variable \"${expr.name}\""
+                is ResolvedExpr.Assignment -> "Assignment"
                 is ResolvedExpr.FieldAccess -> "Field access \"${expr.fieldName}"
                 is ResolvedExpr.StaticFieldAccess -> "Static field access \"${expr.fieldName}"
-                is ResolvedExpr.ConstructorCall -> "Constructor call"
                 is ResolvedExpr.Declaration -> "Let expression"
                 else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
             }, expr.loc)

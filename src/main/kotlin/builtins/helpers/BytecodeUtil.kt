@@ -20,6 +20,18 @@ fun popType(type: TypeDef, writer: MethodVisitor): Unit = when {
 }
 
 /**
+ * Swap two "basic" types on top of the stack. Neither type may be plural.
+ */
+fun swapBasic(top: TypeDef, second: TypeDef, writer: MethodVisitor): Unit = when {
+    top.isPlural || second.isPlural -> throw IllegalStateException("Calling swapBasic with plural types - bug in compiler, please report")
+    top.stackSlots == 1 && second.stackSlots == 1 -> writer.visitInsn(Opcodes.SWAP)
+    top.stackSlots == 2 && second.stackSlots == 1 -> { writer.visitInsn(Opcodes.DUP2_X1); writer.visitInsn(Opcodes.POP2) }
+    top.stackSlots == 1 && second.stackSlots == 2 -> { writer.visitInsn(Opcodes.DUP_X2); writer.visitInsn(Opcodes.POP) }
+    top.stackSlots == 2 && second.stackSlots == 2 -> { writer.visitInsn(Opcodes.DUP2_X2); writer.visitInsn(Opcodes.POP2) }
+    else -> throw IllegalStateException("Types should be plural, or have 1 or 2 stack slots - bug in compiler, please report")
+}
+
+/**
  * Push a default, uninitialized value of the given type onto the top
  * of the stack.
  */

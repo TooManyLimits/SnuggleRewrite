@@ -60,6 +60,9 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
         }
     }
 
+    // Extracted to special method, since it's complex
+    is TypedExpr.Assignment -> handleAssignment(expr.lhs, expr.rhs, ConsList.nil(), expr.maxVariable, typeCalc)
+
     // Load the local variable
     is TypedExpr.Variable -> sequenceOf(Instruction.LoadLocal(
         expr.variableIndex + getPluralOffset(desiredFields),
@@ -83,7 +86,11 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
             if (lastField.type.isPlural) {
                 // If the last field in the chain is plural, store the reference type
                 // as a top local variable, then repeatedly grab it and GetReferenceTypeField.
-                TODO()
+                yield(Instruction.StoreLocal(expr.maxVariable, expr.receiver.type))
+                for ((pathToField, field) in lastField.type.recursiveNonStaticFields) {
+                    yield(Instruction.LoadLocal(expr.maxVariable, expr.receiver.type))
+                    yield(Instruction.GetReferenceTypeField(expr.receiver.type, field.type, namePrefix + "$" + pathToField))
+                }
             } else {
                 // If not, then simply grab the field with the name prefix.
                 yield(Instruction.GetReferenceTypeField(expr.receiver.type, lastField.type, namePrefix))
@@ -190,8 +197,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
     }
 }
 
-private fun getPluralOffset(desiredFields: ConsList<FieldDef>): Int
-= desiredFields.fold(0) { accum, field -> accum + field.pluralOffset!!}
+private fun getPluralOffset(fieldsToFollow: ConsList<FieldDef>): Int = fieldsToFollow.sumOf { it.pluralOffset!! }
 
 private inline fun createCall(
     methodDef: MethodDef, desiredFields: ConsList<FieldDef>,
@@ -232,6 +238,54 @@ private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<Fi
                 yield(Instruction.GetStaticField(methodToCall.returnType, field.type, namePrefix + "$" + pathToField))
             }
         }
-
     } else sequenceOf()
+}
+
+/**
+ * Handle assignment to an lvalue, recursively (plural field accesses, etc)
+ *
+ * fieldsToFollow starts as nil.
+ * assignmentType is the type being assigned to the lvalue.
+ */
+fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
+    lhs is TypedExpr.Variable -> sequence {
+        yieldAll(lowerExpr(rhs, ConsList.nil(), typeCalc))
+        yield(Instruction.StoreLocal(lhs.variableIndex + getPluralOffset(fieldsToFollow), rhs.type))
+    }
+
+    lhs is TypedExpr.StaticFieldAccess -> sequence {
+        val nameSuffix = fieldsToFollow.fold(lhs.fieldName) { suffix, field -> suffix + "$" + field.name }
+        if (rhs.type.isPlural) {
+            for ((pathToField, field) in rhs.type.recursiveNonStaticFields.asReversed())
+                yield(Instruction.PutStaticField(lhs.receiverType, field.type, pathToField + "$" + nameSuffix))
+        } else {
+            yield(Instruction.PutStaticField(lhs.receiverType, rhs.type, lhs.fieldName))
+        }
+    }
+
+    lhs is TypedExpr.FieldAccess && lhs.receiver.type.isReferenceType -> sequence {
+        yieldAll(lowerExpr(lhs.receiver, ConsList.nil(), typeCalc))
+        val nameSuffix = fieldsToFollow.fold(lhs.fieldName) { suffix, field -> suffix + "$" + field.name }
+        if (rhs.type.isPlural) {
+            // Store the reference type as a local, to grab later
+            yield(Instruction.StoreLocal(maxVariable, lhs.receiver.type))
+            // Emit the RHS onto the stack
+            yieldAll(lowerExpr(rhs, ConsList.nil(), typeCalc))
+            // For each field, store it
+            for ((pathToField, field) in rhs.type.recursiveNonStaticFields.asReversed()) {
+                yield(Instruction.LoadLocal(maxVariable, lhs.receiver.type))
+                yield(Instruction.SwapBasic(lhs.receiver.type, field.type))
+                yield(Instruction.PutReferenceTypeField(lhs.receiver.type, field.type, pathToField + "$" + nameSuffix))
+            }
+        } else {
+            // Just set the field directly
+            yieldAll(lowerExpr(rhs, ConsList.nil(), typeCalc))
+            yield(Instruction.PutReferenceTypeField(lhs.receiver.type, rhs.type, nameSuffix))
+        }
+    }
+
+    // Recursive case: The LHS is a field access, but its receiver is not a reference type.
+    lhs is TypedExpr.FieldAccess -> handleAssignment(lhs.receiver, rhs, Cons(lhs.fieldDef, fieldsToFollow), maxVariable, typeCalc)
+
+    else -> throw IllegalStateException("Illegal assignment case - bug in compiler, please report")
 }

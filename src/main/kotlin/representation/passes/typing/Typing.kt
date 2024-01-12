@@ -91,7 +91,7 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
                 // Note: This is where the currentTypeGenerics start out! The generics
                 // passed into this method are used as currentTypeGenerics when instantiating/typing methods and fields.
                 // Map the fields
-                base.fields.map { FieldDef.SnuggleFieldDef(it.loc, it.pub, it.static, it.name, null, getTypeDef(it.annotatedType, typeCache, generics, listOf())) },
+                base.fields.map { FieldDef.SnuggleFieldDef(it.loc, it.pub, it.static, it.mutable, it.name, null, getTypeDef(it.annotatedType, typeCache, generics, listOf())) },
                 // Map the methods, using the indirection as the "this"/owning type.
                 base.methods.map { typeMethod(indirection, base.methods, it, typeCache, generics) }
             )
@@ -102,7 +102,7 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
                 base.loc, base.name, generics,
                 base.fields.map {
                     val fieldType = getTypeDef(it.annotatedType, typeCache, generics, listOf())
-                    val res = FieldDef.SnuggleFieldDef(it.loc, it.pub, it.static, it.name, currentPluralOffset, fieldType)
+                    val res = FieldDef.SnuggleFieldDef(it.loc, it.pub, it.static, false, it.name, currentPluralOffset, fieldType)
                     currentPluralOffset += fieldType.stackSlots
                     res
                 },

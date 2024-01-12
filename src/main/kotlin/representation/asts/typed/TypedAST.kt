@@ -33,6 +33,11 @@ data class TypedFile(val name: String, val code: TypedExpr)
 
 // TypeDef and related things were moved to another file, TypeDef.kt!
 
+// A couple of these Exprs have a special param "maxVariable". This refers
+// to the highest index of any variable in scope at the time. This is used
+// later while lowering, for storing temporaries as local variables
+// (usually in relation to plural types)
+
 sealed interface TypedExpr {
     val loc: Loc
     val type: TypeDef
@@ -41,13 +46,14 @@ sealed interface TypedExpr {
 
     data class Block(override val loc: Loc, val exprs: List<TypedExpr>, override val type: TypeDef): TypedExpr
     data class Declaration(override val loc: Loc, val pattern: TypedPattern, val variableIndex: Int, val initializer: TypedExpr, override val type: TypeDef): TypedExpr
+    data class Assignment(override val loc: Loc, val lhs: TypedExpr, val rhs: TypedExpr, val maxVariable: Int, override val type: TypeDef): TypedExpr
 
     data class Return(override val loc: Loc, val rhs: TypedExpr, override val type: TypeDef): TypedExpr
 
-    data class Variable(override val loc: Loc, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
+    data class Variable(override val loc: Loc, val mutable: Boolean, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr
 
-    data class FieldAccess(override val loc: Loc, val receiver: TypedExpr, val fieldName: String, val fieldDef: FieldDef, override val type: TypeDef): TypedExpr
+    data class FieldAccess(override val loc: Loc, val receiver: TypedExpr, val fieldName: String, val fieldDef: FieldDef, val maxVariable: Int, override val type: TypeDef): TypedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: TypeDef, val fieldName: String, val fieldDef: FieldDef, override val type: TypeDef): TypedExpr
     data class MethodCall(override val loc: Loc, val receiver: TypedExpr, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
     data class StaticMethodCall(override val loc: Loc, val receiverType: TypeDef, val methodName: String, val args: List<TypedExpr>, val methodDef: MethodDef, override val type: TypeDef): TypedExpr
