@@ -64,7 +64,7 @@ sealed class TypeDef {
     fun isSubtype(other: TypeDef): Boolean {
         val thisUnwrapped = this.unwrap()
         val otherUnwrapped = other.unwrap()
-        if (thisUnwrapped == otherUnwrapped) return true
+        if (thisUnwrapped.equals(otherUnwrapped)) return true
         for (supertype in supertypes)
             if (supertype.isSubtype(otherUnwrapped))
                 return true
@@ -117,6 +117,7 @@ sealed class TypeDef {
     class InstantiatedBuiltin(override val builtin: BuiltinType, override val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef() {
         override val name: String = builtin.name(generics, typeCache)
         override val runtimeName: String? = builtin.runtimeName(generics, typeCache)
+        val shouldGenerateClassAtRuntime = builtin.shouldGenerateClassAtRuntime(generics, typeCache)
         override val descriptor: List<String> = builtin.descriptor(generics, typeCache)
         override val stackSlots: Int = builtin.stackSlots(generics, typeCache)
         override val isPlural: Boolean = builtin.isPlural(generics, typeCache)

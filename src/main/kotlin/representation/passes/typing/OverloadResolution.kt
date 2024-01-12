@@ -270,7 +270,7 @@ private fun compareMethods(a: MethodDef, b: MethodDef): Int {
 }
 
 
-class NoApplicableMethodException(methodName: String, argTypes: List<TypeDef?>, returnType: TypeDef?, tried: List<MethodDef>, loc: Loc): CompilationException(
+class NoApplicableMethodException(methodName: String, argTypes: List<TypeDef?>, returnType: TypeDef?, tried: List<MethodDef>, loc: Loc): TypeCheckingException(
     "Unable to find valid overload for method call\n  ${
         overloadString(methodName, argTypes, returnType)
     }${
@@ -280,7 +280,7 @@ class NoApplicableMethodException(methodName: String, argTypes: List<TypeDef?>, 
         else "\n"
     }", loc
 )
-class TooManyMethodsException(potential: List<MethodDef>, loc: Loc): CompilationException(
+class TooManyMethodsException(potential: List<MethodDef>, loc: Loc): TypeCheckingException(
     "Too many valid overloads for method call; cannot choose between:\n ${
         potential.joinToString(separator = "") { "- " + overloadString(it.name, it.paramTypes, it.returnType) + "\n" }
     }",

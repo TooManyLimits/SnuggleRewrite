@@ -17,12 +17,13 @@ fun <T> MutableList<T>.insertionSort(comparator: (T, T) -> Int) {
         for (i in 0 until output.size) {
             val comparison = comparator(output[i], elem)
             if (comparison > 0) {
-                output += elem
+                output.add(i, elem)
                 continue@outer
             }
         }
         output += elem
     }
     this.clear()
+//    println(output)
     this.addAll(output)
 }

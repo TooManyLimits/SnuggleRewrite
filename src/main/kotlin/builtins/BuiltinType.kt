@@ -39,6 +39,11 @@ interface BuiltinType {
     // optional.
     fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String?
 
+    // Whether this type should generate a corresponding class at runtime. The class
+    // will have name given by runtimeName. Used by a few types, like Option<T> where
+    // T is not a reference type, but for most cases it's just false.
+    fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+
     // The java descriptor of this type. For instance, booleans
     // have "Z". Integers have "I". Longs are "J". Strings are
     // "Ljava/lang/String;".

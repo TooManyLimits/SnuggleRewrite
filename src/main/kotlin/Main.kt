@@ -12,21 +12,31 @@ import util.ConsList
 fun main() {
 
     val code = """
-        let mut x: i32 = 10
-        x = 5
-        print(x)
-        
-        class Thingy {
-            mut field: i32
-            tup: (i32, i32)
+        class List<T> {
             fn new() super()
+            fn double(): List<T> this
+            fn first(): T? new()
+            fn rest(): List<T>? new()
         }
-        let thing = new Thingy()
-        print(thing.field)
-        thing.field = 20
-        print(thing.field)
-        thing.tup.v0 = 24
-        print(thing.tup.v0)
+        class Nil<T>: List<T> {fn new() super()}
+        class Cons<T>: List<T> {
+            mut elem: T
+            mut rest: List<T>
+            fn new(elem: T, rest: List<T>) {
+                super()
+                this.elem = elem
+                this.rest = rest;
+            }
+            fn double(): List<T> new Cons<T>(this.elem * 2, this.rest.double())
+            fn first(): T? new(this.elem)
+            fn rest(): List<T>? new(this.rest)
+        }
+
+        let x: List<i32> = new Cons<i32>(5, new Cons<i32>(6, new Cons<i32>(7, new Nil<i32>())))
+        print(x.first().get())
+        let y = x.double()
+        print(y.first().get())
+                
     """.trimIndent()
     val lexer = Lexer("main", code)
 

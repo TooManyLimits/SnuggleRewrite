@@ -27,8 +27,9 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                     }
                 )
             }
-            is TypeDef.Tuple, is TypeDef.StructDef -> {
+            is TypeDef.Tuple, is TypeDef.StructDef, is TypeDef.InstantiatedBuiltin -> {
                 if (it.fields.isEmpty() && it.methods.isEmpty()) null
+                else if (it is TypeDef.InstantiatedBuiltin && !it.shouldGenerateClassAtRuntime) null
                 else {
                     GeneratedType.GeneratedValueType(
                         it.runtimeName!!,
@@ -44,7 +45,6 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                     )
                 }
             }
-            is TypeDef.InstantiatedBuiltin -> null //TODO, certain builtins should generate runtime classes
             // Indirections should not be here, we called .unwrap()
             is TypeDef.Indirection -> throw IllegalStateException("Unwrap should have removed indirections? Bug in compiler, please report")
         }

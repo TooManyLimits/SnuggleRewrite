@@ -19,9 +19,10 @@ fun output(ir: Program): CompiledProgram {
     // Create the importer
     val importer = outputImporter(ir)
     // Create the other types
-    val otherTypes = ir.generatedTypes.map { outputType(it) }
+//    println(ir.generatedTypes.map { it.runtimeName })
+    val otherTypes = ir.generatedTypes.map { outputType(it) } + importer
     // Return the compiled program
-    return CompiledProgram(runtimeClass, otherTypes + importer)
+    return CompiledProgram(runtimeClass, otherTypes)
 }
 
 /**

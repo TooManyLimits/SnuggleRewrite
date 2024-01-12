@@ -14,6 +14,7 @@ import util.ConsMap
 import util.extend
 import util.lookup
 import java.math.BigInteger
+import kotlin.math.exp
 import kotlin.math.max
 
 
@@ -99,40 +100,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
 
     // Constructor and raw constructor, again almost exactly the same as infer().
     is ResolvedExpr.ConstructorCall -> {
-
         val type = expr.type?.let { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) } ?: expectedType
-
-        // Different situations depending on the type.
-        val res = if (type.unwrap() is TypeDef.InstantiatedBuiltin && !type.isReferenceType) {
-            // Special constructor. Non-reference type builtins have these.
-            val methods = type.staticMethods
-            val expectedResult = type.unwrap()
-            val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-            if (best.method !is MethodDef.BytecodeMethodDef)
-                throw IllegalStateException("Assumed that builtin, non-reference type constructors are defined in bytecode - but type \"${type.name} breaks this? Bug in compiler, please report")
-            // Doesn't matter what type of method call we return here,
-            // since the method is bytecode anyway, so we'll pick a static call.
-            just(TypedExpr.StaticMethodCall(
-                expr.loc, type, "new", best.checkedArgs, best.method, best.method.returnType
-            ))
-        } else if (type.unwrap() is TypeDef.StructDef) {
-            // StructDef constructors work differently.
-            // Instead of being nonstatic methods that initialize
-            // an object, they're static methods that return the struct.
-            val methods = type.staticMethods
-            val expectedResult = type.unwrap()
-            val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-            just(TypedExpr.StaticMethodCall(
-                expr.loc, type, "new", best.checkedArgs, best.method, best.method.returnType
-            ))
-        } else {
-            // Regular ol' java style constructor
-            // Look for a non-static method "new" that returns unit
-            val methods = type.nonStaticMethods
-            val expectedResult = getUnit(typeCache)
-            val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-            just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, type))
-        }
+        val res = typeCheckConstructor(expr, type, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         if (!res.expr.type.isSubtype(expectedType))
             throw IncorrectTypeException(expectedType, res.expr.type, "Constructor", expr.loc)
         res
@@ -218,6 +187,40 @@ fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult {
             )
     }
     else result
+}
+
+fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult {
+    // Different situations depending on the type we're trying to construct
+    return if (knownType.unwrap() is TypeDef.InstantiatedBuiltin && !knownType.isReferenceType) {
+        // Special constructor. Non-reference type builtins have these.
+        val methods = knownType.staticMethods
+        val expectedResult = knownType.unwrap()
+        val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        if (best.method !is MethodDef.BytecodeMethodDef)
+            throw IllegalStateException("Assumed that builtin, non-reference type constructors are defined in bytecode - but type \"${knownType.name} breaks this? Bug in compiler, please report")
+        // Doesn't matter what type of method call we return here,
+        // since the method is bytecode anyway, so we'll pick a static call.
+        just(TypedExpr.StaticMethodCall(
+            expr.loc, knownType, "new", best.checkedArgs, best.method, best.method.returnType
+        ))
+    } else if (knownType.unwrap() is TypeDef.StructDef) {
+        // StructDef constructors work differently.
+        // Instead of being nonstatic methods that initialize
+        // an object, they're static methods that return the struct.
+        val methods = knownType.staticMethods
+        val expectedResult = knownType.unwrap()
+        val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        just(TypedExpr.StaticMethodCall(
+            expr.loc, knownType, "new", best.checkedArgs, best.method, best.method.returnType
+        ))
+    } else {
+        // Regular ol' java style constructor
+        // Look for a non-static method "new" that returns unit
+        val methods = knownType.nonStaticMethods
+        val expectedResult = getUnit(typeCache)
+        val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, knownType))
+    }
 }
 
 class IncorrectTypeException(expectedType: TypeDef, actualType: TypeDef, situation: String, loc: Loc)

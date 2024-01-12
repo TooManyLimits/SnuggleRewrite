@@ -25,9 +25,10 @@ object OptionType: BuiltinType {
     override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = generics[0].name + "?"
     override val nameable: Boolean get() = true
     override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String =
-        if (generics[0].isReferenceType) generics[0].runtimeName!! else "builtin_structs/" + generics[0].runtimeName + "?"
+        if (generics[0].isReferenceType) generics[0].runtimeName!! else "builtin_structs/" + generics[0].name + "?"
+    override fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isReferenceType
     override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> =
-        if (generics[0].isReferenceType) generics[0].descriptor else listOf("Z") + generics[0].descriptor
+        if (generics[0].isReferenceType) generics[0].descriptor else generics[0].descriptor + listOf("Z")
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int =
         if (generics[0].isReferenceType) 1 else generics[0].stackSlots + 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isReferenceType

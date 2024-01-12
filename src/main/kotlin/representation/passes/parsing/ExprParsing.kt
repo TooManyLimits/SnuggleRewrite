@@ -108,6 +108,7 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>, methodGenerics: 
         TokenType.LEFT_PAREN -> parseParenOrTuple(lexer, typeGenerics, methodGenerics)
 
         TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value!!)
+        TokenType.SEMICOLON -> ParsedExpr.Tuple(lexer.last().loc, listOf())
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
         TokenType.NEW -> parseConstructor(lexer, typeGenerics, methodGenerics)
@@ -130,7 +131,7 @@ private fun parseImport(lexer: Lexer): ParsedExpr {
 private fun parseBlock(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     val startLoc = lexer.last().loc
     val elems = ArrayList<ParsedElement>()
-    while (!lexer.consume(TokenType.LEFT_CURLY))
+    while (!lexer.consume(TokenType.RIGHT_CURLY))
         elems.add(parseElement(lexer, typeGenerics, methodGenerics))
     return if (elems.isEmpty())
         ParsedExpr.Tuple(startLoc.merge(lexer.last().loc), listOf())

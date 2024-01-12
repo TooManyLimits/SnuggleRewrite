@@ -195,30 +195,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     is ResolvedExpr.ConstructorCall -> {
         if (expr.type == null)
             throw CompilationException("Cannot infer type of constructor - try making it explicitly typed, or adding more type annotations", expr.loc)
-
         val type = getTypeDef(expr.type, typeCache, currentTypeGenerics, currentMethodGenerics)
-
-        // Different situations depending on the type.
-        if (/*type.hasSpecialConstructor*/ false) {
-            // Special constructor. Some builtins
-            // have these.
-            TODO()
-        } else if (type.unwrap() is TypeDef.StructDef) {
-            // StructDef constructors work differently.
-            // Instead of being nonstatic methods that initialize
-            // an object, they're static methods that return the struct.
-            val methods = type.staticMethods
-            val expectedResult = type.unwrap()
-            val best = getBestMethod(methods, expr.loc, "new", listOf(),  expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-            just(TypedExpr.StaticMethodCall(expr.loc, type, "new", best.checkedArgs, best.method, best.method.returnType))
-        } else {
-            // Regular ol' java style constructor
-            // Look for a non-static method "new" that returns unit
-            val methods = type.nonStaticMethods
-            val expectedResult = getUnit(typeCache)
-            val best = getBestMethod(methods, expr.loc, "new", listOf(),  expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-            just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, type))
-        }
+        typeCheckConstructor(expr, type, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
     }
 
     is ResolvedExpr.RawStructConstructor -> {
