@@ -36,9 +36,20 @@ fun main() {
         print(x.first().get())
         let y = x.double()
         print(y.first().get())
-        
-        let (x: i32, _) = (5, 6i32)
+
+        class Test { 
+            static fn sumTuple((a: i32, b: i32)): i32 {
+                a + b
+            }
+        }
+        let x = Test.sumTuple((10, 20))
         print(x)
+        
+        let (x: i32, y: i32) = (3, 4)
+        let z = (x, y)
+        print(x * y)
+        print(Test.sumTuple(z))
+        
     """.trimIndent()
     val lexer = Lexer("main", code)
 

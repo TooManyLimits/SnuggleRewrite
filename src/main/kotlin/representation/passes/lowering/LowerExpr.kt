@@ -64,10 +64,18 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
     is TypedExpr.Assignment -> handleAssignment(expr.lhs, expr.rhs, ConsList.nil(), expr.maxVariable, typeCalc)
 
     // Load the local variable
-    is TypedExpr.Variable -> sequenceOf(Instruction.LoadLocal(
-        expr.variableIndex + getPluralOffset(desiredFields),
-        desiredFields.lastOrNull()?.type ?: expr.type
-    ))
+    is TypedExpr.Variable -> {
+        val wantedType = desiredFields.lastOrNull()?.type ?: expr.type
+        var startIndex = expr.variableIndex + getPluralOffset(desiredFields)
+        if (wantedType.isPlural) sequence {
+            for ((_, field) in wantedType.recursiveNonStaticFields) {
+                yield(Instruction.LoadLocal(startIndex, field.type))
+                startIndex += field.type.stackSlots
+            }
+        } else {
+            sequenceOf(Instruction.LoadLocal(startIndex, wantedType))
+        }
+    }
 
     // Push the literal
     is TypedExpr.Literal -> sequenceOf(Instruction.Push(expr.value, expr.type))
@@ -251,7 +259,16 @@ private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<Fi
 fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
     lhs is TypedExpr.Variable -> sequence {
         yieldAll(lowerExpr(rhs, ConsList.nil(), typeCalc))
-        yield(Instruction.StoreLocal(lhs.variableIndex + getPluralOffset(fieldsToFollow), rhs.type))
+        val startIndex = lhs.variableIndex + getPluralOffset(fieldsToFollow)
+        if (rhs.type.isPlural) {
+            var curIndex = startIndex + rhs.type.stackSlots
+            for ((_, field) in rhs.type.recursiveNonStaticFields.asReversed()) {
+                curIndex -= field.type.stackSlots
+                yield(Instruction.StoreLocal(curIndex, field.type))
+            }
+        } else {
+            yield(Instruction.StoreLocal(startIndex, rhs.type))
+        }
     }
 
     lhs is TypedExpr.StaticFieldAccess -> sequence {
