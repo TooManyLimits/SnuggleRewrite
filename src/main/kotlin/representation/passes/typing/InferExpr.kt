@@ -101,28 +101,27 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // the pattern is explicitly typed or not.
         if (isExplicitlyTyped(expr.pattern)) {
             // If the pattern is explicitly typed, then infer its type:
-            typedPattern = inferPattern(expr.pattern, typeCache, currentTypeGenerics, currentMethodGenerics)
+            typedPattern = inferPattern(expr.pattern, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
             // Check the right side against that:
             typedInitializer = checkExpr(expr.initializer, typedPattern.type, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         } else {
             // The pattern is not explicitly typed, so instead infer the RHS:
             typedInitializer = inferExpr(expr.initializer, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
             // Check the pattern against the inferred type:
-            typedPattern = checkPattern(expr.pattern, typedInitializer.type, typeCache, currentTypeGenerics, currentMethodGenerics)
+            typedPattern = checkPattern(expr.pattern, typedInitializer.type, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
         }
         // Fetch the bindings if this "let" succeeds
-        val patternBindings = bindings(typedPattern, scope)
+        val patternBindings = bindings(typedPattern, getTopIndex(scope))
         // Create the new typed expr, type is always bool.
         // Use the index that's the second output of bindings().
-        val typed = TypedExpr.Declaration(expr.loc, typedPattern, patternBindings.second,
-            typedInitializer, getBasicBuiltin(BoolType, typeCache))
+        val typed = TypedExpr.Declaration(expr.loc, typedPattern, typedInitializer, getBasicBuiltin(BoolType, typeCache))
 
         // If it's fallible, only output the results if true.
         // Otherwise, always output the results.
         if (isFallible(typedPattern))
-            TypingResult.WithVars(typed, patternBindings.first, ConsMap.of())
+            TypingResult.WithVars(typed, patternBindings, ConsMap.of())
         else
-            TypingResult.WithVars(typed, patternBindings.first, patternBindings.first)
+            TypingResult.WithVars(typed, patternBindings, patternBindings)
     }
 
     is ResolvedExpr.Assignment -> {
@@ -220,6 +219,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Tuples are really the same as any other struct, so emit a raw struct constructor
         just(TypedExpr.RawStructConstructor(expr.loc, inferredElems, tupleType))
     }
+
+    is ResolvedExpr.Lambda -> throw TypeCheckingException("Cannot infer type of lambda. Try adding type annotations, or using in a context where a lambda is expected.", expr.loc)
 
     is ResolvedExpr.Return -> {
         if (returnType == null)

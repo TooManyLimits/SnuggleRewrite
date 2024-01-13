@@ -32,7 +32,9 @@ fun parseParams(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<S
     // which it must be for function parameters.
     fun isExplicitlyTyped(pattern: ParsedPattern): Boolean = when (pattern) {
         // Binding: explicitly typed if it has a type annotation
+        is ParsedPattern.EmptyPattern -> pattern.typeAnnotation != null
         is ParsedPattern.BindingPattern -> pattern.typeAnnotation != null
+        is ParsedPattern.TuplePattern -> pattern.elements.all(::isExplicitlyTyped)
     }
 
     lexer.expect(TokenType.LEFT_PAREN, "to begin params list")

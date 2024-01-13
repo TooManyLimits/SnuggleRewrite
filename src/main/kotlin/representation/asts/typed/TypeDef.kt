@@ -1,9 +1,11 @@
 package representation.asts.typed
 
 import builtins.BuiltinType
+import builtins.ObjectType
 import org.objectweb.asm.MethodVisitor
 import representation.passes.lexing.Loc
 import representation.passes.typing.TypeDefCache
+import representation.passes.typing.getBasicBuiltin
 import util.Promise
 import util.caching.EqualityCache
 import util.caching.EqualityMemoized
@@ -111,7 +113,23 @@ sealed class TypeDef {
             }
         }
         override val methods: List<MethodDef> get() = listOf()
-        override val generics: List<TypeDef> get() = listOf()
+        override val generics: List<TypeDef> get() = innerTypes
+    }
+
+    class Func(val paramTypes: List<TypeDef>, val returnType: TypeDef, typeCache: TypeDefCache): TypeDef() {
+        override val name: String = toGeneric("", paramTypes).ifEmpty { "()" } + "_to_" + returnType.name
+        override val runtimeName: String = "lambdas/$name/base"
+        override val descriptor: List<String> = listOf("L$runtimeName;")
+        override val stackSlots: Int get() = 1
+        override val isPlural: Boolean get() = false
+        override val isReferenceType: Boolean get() = true
+        override val primarySupertype: TypeDef = getBasicBuiltin(ObjectType, typeCache)
+        override val supertypes: List<TypeDef> get() = listOf(primarySupertype)
+        override val fields: List<FieldDef> get() = listOf()
+        override val methods: List<MethodDef> = listOf(
+            MethodDef.InterfaceMethodDef(pub = true, static = false, this, "invoke", returnType, paramTypes)
+        )
+        override val generics: List<TypeDef> = paramTypes + returnType
     }
 
     class InstantiatedBuiltin(override val builtin: BuiltinType, override val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef() {
@@ -179,19 +197,23 @@ sealed interface MethodDef {
                                     val replacer: (TypedExpr.StaticMethodCall) -> TypedExpr): MethodDef {
         override val static: Boolean get() = true
     }
+    // Method def without an implementation, used in things like TypeDef.Func
+    data class InterfaceMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>): MethodDef
 
     // runtimeName field: often, SnuggleMethodDef will need to have a different name
     // at runtime than in the internal representation. These are the case for:
     // - constructors, whose names are changed to "<init>" to match java's requirement
     // - overloaded methods, whose names are changed to have a disambiguation number appended
     //
-    // Note that body and runtime name are lazily calculated to allow for self-referencing concerns.
+    // Note that some of these fields are lazily calculated to allow for self-referencing concerns.
     data class SnuggleMethodDef(val loc: Loc, override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String,
-                                override val returnType: TypeDef,
-                                override val paramTypes: List<TypeDef>,
+                                val returnTypeGetter: Lazy<TypeDef>,
+                                val paramTypesGetter: Lazy<List<TypeDef>>,
                                 val runtimeNameGetter: Lazy<String>,
                                 val lazyBody: Lazy<TypedExpr>)
         : MethodDef {
+            override val returnType by returnTypeGetter
+            override val paramTypes by paramTypesGetter
             override val runtimeName by runtimeNameGetter
         }
 
@@ -209,8 +231,8 @@ sealed interface MethodDef {
         // A generic method defined in Snuggle code
         class GenericSnuggleMethodDef(val loc: Loc, override val pub: Boolean, override val static: Boolean, numGenerics: Int,
                                       override val owningType: TypeDef, override val name: String,
-                                      val returnTypeGetter: EqualityMemoized<List<TypeDef>, TypeDef>,
-                                      val paramTypeGetter: EqualityMemoized<List<TypeDef>, List<TypeDef>>,
+                                      val returnTypeGetter: EqualityMemoized<List<TypeDef>, Lazy<TypeDef>>,
+                                      val paramTypeGetter: EqualityMemoized<List<TypeDef>, Lazy<List<TypeDef>>>,
                                       val runtimeNameGetter: EqualityMemoized<List<TypeDef>, Lazy<String>>,
                                       val lazyBodyGetter: EqualityMemoized<List<TypeDef>, Lazy<TypedExpr>>
         )

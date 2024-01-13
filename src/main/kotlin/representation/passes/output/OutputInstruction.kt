@@ -1,6 +1,7 @@
 package representation.passes.output
 
 import builtins.*
+import builtins.helpers.basicLocal
 import builtins.helpers.popType
 import builtins.helpers.swapBasic
 import org.objectweb.asm.Label
@@ -42,7 +43,7 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         val owner = inst.methodToCall.owningType.runtimeName!!
         val name = inst.methodToCall.runtimeName
         val descriptor = getMethodDescriptor(inst.methodToCall)
-        writer.visitMethodInsn(inst.invokeBytecode, owner, name, descriptor, false)
+        writer.visitMethodInsn(inst.invokeBytecode, owner, name, descriptor, inst.isInterface)
     }
 
     // Helper function for return
@@ -61,14 +62,9 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.DupRef -> writer.visitInsn(Opcodes.DUP)
     is Instruction.LoadRefType -> writer.visitVarInsn(Opcodes.ALOAD, inst.index)
 
-    // Store/load local variables. Have a helper function for it, because of repetition.
-    // These are also a bit unique in the fact that their implementation of plural type
-    // recursion is during the outputting phase, and not during the lowering phase like
-    // with many of the other instructions. There is no good reason for this, other than
-    // this is how it was first implemented, and we're too lazy to rewrite the
-    // implementation for the local variable lowering/outputting.
-    is Instruction.StoreLocal -> handleLocal(inst.index, inst.type, store = true, writer)
-    is Instruction.LoadLocal -> handleLocal(inst.index, inst.type, store = false, writer)
+    // Store/load local variables. Can only deal with basic variables, not plural types.
+    is Instruction.StoreLocal -> basicLocal(inst.index, inst.type, store = true, writer)
+    is Instruction.LoadLocal -> basicLocal(inst.index, inst.type, store = false, writer)
 
     // Field instructions
     is Instruction.GetReferenceTypeField -> {
@@ -89,47 +85,6 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     }
 }
 
-private fun handleLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor) {
-    val type = type.unwrap() // Unwrap type
-    if (type.isPlural) {
-        // Plural case, we recurse
-        if (store) {
-            // Iterate backwards through the fields, decrementing index
-            var currentIndex = index + type.stackSlots
-            type.nonStaticFields.asReversed().forEach {
-                // Decrement before handling
-                currentIndex -= it.type.stackSlots
-                handleLocal(currentIndex, it.type, true, writer)
-            }
-        } else {
-            var currentIndex = index
-            type.nonStaticFields.forEach {
-                // Increment after handling
-                handleLocal(currentIndex, it.type, false, writer)
-                currentIndex += it.type.stackSlots
-            }
-        }
-    } else when (type) {
-        is TypeDef.InstantiatedBuiltin -> when (type.builtin) {
-            // Builtin types:
-            is BoolType -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
-            is IntType -> if (type.builtin.bits <= 32)
-                writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
-            else
-                writer.visitVarInsn(if (store) Opcodes.LSTORE else Opcodes.LLOAD, index)
-            else -> {
-                if (type.isReferenceType || (type.builtin == OptionType && type.generics[0].isReferenceType))
-                    writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
-                else
-                    throw IllegalStateException("Unknown type by LoadLocal \"${type.name}\", bug in compiler, please report")
-            }
-        }
-        is TypeDef.ClassDef -> writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
-        // Indirection should have been unwrapped, others are plural. Should not happen
-        is TypeDef.Indirection, is TypeDef.Tuple, is TypeDef.StructDef -> throw IllegalStateException("Unexpected TypeDef here, bug in compiler, please report")
-    }
-}
-
 private fun outputReturn(inst: Instruction.Return, writer: MethodVisitor) {
     if (inst.basicTypeToReturn == null)
         writer.visitInsn(Opcodes.RETURN)
@@ -139,7 +94,7 @@ private fun outputReturn(inst: Instruction.Return, writer: MethodVisitor) {
         if (builtin == BoolType) writer.visitInsn(Opcodes.IRETURN)
         else if (builtin is IntType) writer.visitInsn(if (builtin.bits <= 32) Opcodes.IRETURN else Opcodes.LRETURN)
         else if (builtin is FloatType) writer.visitInsn(if (builtin.bits <= 32) Opcodes.FRETURN else Opcodes.DRETURN)
-        else if (type.isReferenceType) writer.visitInsn(Opcodes.ARETURN)
+        else if (type.isReferenceType || (type.builtin == OptionType && type.generics[0].isReferenceType)) writer.visitInsn(Opcodes.ARETURN)
         else throw IllegalStateException("Unexpected type \"${type.name}\" made it to IR.Return - bug in compiler, please report")
     }
 }

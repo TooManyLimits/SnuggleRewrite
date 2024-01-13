@@ -36,7 +36,9 @@ fun main() {
         print(x.first().get())
         let y = x.double()
         print(y.first().get())
-                
+        
+        let (x: i32, _) = (5, 6i32)
+        print(x)
     """.trimIndent()
     val lexer = Lexer("main", code)
 

@@ -99,6 +99,7 @@ sealed interface ResolvedExpr {
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
     data class Tuple(override val loc: Loc, val elements: List<ResolvedExpr>): ResolvedExpr
+    data class Lambda(override val loc: Loc, val params: List<ResolvedPattern>, val body: ResolvedExpr): ResolvedExpr
 
     data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
@@ -114,7 +115,9 @@ sealed interface ResolvedExpr {
 sealed interface ResolvedPattern {
     val loc: Loc
 
+    data class EmptyPattern(override val loc: Loc, val typeAnnotation: ResolvedType?): ResolvedPattern
     data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ResolvedType?): ResolvedPattern
+    data class TuplePattern(override val loc: Loc, val elements: List<ResolvedPattern>): ResolvedPattern
 }
 
 sealed interface ResolvedType {
@@ -123,6 +126,7 @@ sealed interface ResolvedType {
     //Note: Now a DIRECT REFERENCE to a ResolvedTypeDef, rather than a mere String. This is the *primary reason for this AST pass*.
     data class Basic(override val loc: Loc, val base: ResolvedTypeDef, val generics: List<ResolvedType>): ResolvedType
     data class Tuple(override val loc: Loc, val elements: List<ResolvedType>): ResolvedType
+    data class Func(override val loc: Loc, val paramTypes: List<ResolvedType>, val returnType: ResolvedType): ResolvedType
     data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
     data class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
 }

@@ -45,16 +45,16 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<FieldDef>, typeCalc: Iden
     }
     // What to do for a declaration depends on the type of pattern
     is TypedExpr.Declaration -> sequence {
-        // Compute the types involved in the pattern
-        computeTypes(expr.pattern, typeCalc)
         // Yield the things
         if (isFallible(expr.pattern)) {
             TODO()
         } else {
-            // Compile the initializer
+            // Push the initializer
             yieldAll(lowerExpr(expr.initializer, ConsList.nil(), typeCalc))
-            // Store/bind local variable
-            yield(Instruction.StoreLocal(expr.variableIndex, expr.pattern.type))
+            // Apply the pattern
+            yieldAll(lowerPattern(expr.pattern, typeCalc))
+//            // Store/bind local variable
+//            yield(Instruction.StoreLocal(expr.variableIndex, expr.pattern.type))
             // Push true
             yield(Instruction.Push(true, expr.type))
         }
@@ -205,6 +205,7 @@ private inline fun createCall(
 ): Sequence<Instruction> {
     return when (methodDef) {
         is MethodDef.BytecodeMethodDef -> sequenceOf(Instruction.Bytecodes(0, methodDef.bytecode)) //TODO: Cost
+        is MethodDef.InterfaceMethodDef -> sequenceOf(Instruction.MethodCall.Interface(methodDef))
         // Invoke according to the snuggle call type
         is MethodDef.SnuggleMethodDef -> sequence {
             yield(snuggleCallType(methodDef))

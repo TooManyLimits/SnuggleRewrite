@@ -4,6 +4,7 @@ import representation.asts.ir.GeneratedField
 import representation.asts.ir.GeneratedMethod
 import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
+import representation.asts.parsed.ParsedType
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -45,6 +46,7 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                     )
                 }
             }
+            is TypeDef.Func -> TODO()
             // Indirections should not be here, we called .unwrap()
             is TypeDef.Indirection -> throw IllegalStateException("Unwrap should have removed indirections? Bug in compiler, please report")
         }

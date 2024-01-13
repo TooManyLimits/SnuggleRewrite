@@ -45,7 +45,7 @@ sealed interface TypedExpr {
     data class Import(override val loc: Loc, val file: String, override val type: TypeDef): TypedExpr
 
     data class Block(override val loc: Loc, val exprs: List<TypedExpr>, override val type: TypeDef): TypedExpr
-    data class Declaration(override val loc: Loc, val pattern: TypedPattern, val variableIndex: Int, val initializer: TypedExpr, override val type: TypeDef): TypedExpr
+    data class Declaration(override val loc: Loc, val pattern: TypedPattern, val initializer: TypedExpr, override val type: TypeDef): TypedExpr
     data class Assignment(override val loc: Loc, val lhs: TypedExpr, val rhs: TypedExpr, val maxVariable: Int, override val type: TypeDef): TypedExpr
 
     data class Return(override val loc: Loc, val rhs: TypedExpr, override val type: TypeDef): TypedExpr
@@ -67,5 +67,7 @@ sealed interface TypedPattern {
     val type: TypeDef
     // After typing is over, the binding pattern _always knows its type_,
     // rather than having an _optional_ type annotation.
-    data class BindingPattern(override val loc: Loc, override val type: TypeDef, val name: String, val isMut: Boolean): TypedPattern
+    data class EmptyPattern(override val loc: Loc, override val type: TypeDef): TypedPattern
+    data class BindingPattern(override val loc: Loc, override val type: TypeDef, val name: String, val isMut: Boolean, val variableIndex: Int): TypedPattern
+    data class TuplePattern(override val loc: Loc, override val type: TypeDef, val elements: List<TypedPattern>): TypedPattern
 }

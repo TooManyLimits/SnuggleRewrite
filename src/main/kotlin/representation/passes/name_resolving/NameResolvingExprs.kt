@@ -226,19 +226,21 @@ fun resolveExpr(
     is ParsedElement.ParsedExpr.Tuple -> {
         val resolvedElements = expr.elements.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }
         val unitedFiles = union(resolvedElements.map { it.files })
-        val unitedExposedTypes = ConsMap.of<String, ResolvedTypeDef>().extendMany(resolvedElements.map { it.exposedTypes })
+        val unitedExposedTypes = ConsMap.join(resolvedElements.map { it.exposedTypes })
         ExprResolutionResult(ResolvedExpr.Tuple(expr.loc, resolvedElements.map { it.expr }), unitedFiles, unitedExposedTypes)
+    }
+
+    is ParsedElement.ParsedExpr.Lambda -> {
+        val params = expr.params.map { resolvePattern(it, currentMappings) }
+        val body = resolveExpr(expr.body, startingMappings, currentMappings, ast, cache)
+        ExprResolutionResult(ResolvedExpr.Lambda(expr.loc, params, body.expr), body.files, body.exposedTypes)
     }
 
     // Declarations:
     is ParsedElement.ParsedExpr.Declaration -> {
         val pattern = resolvePattern(expr.lhs, currentMappings)
         val initializer = resolveExpr(expr.initializer, startingMappings, currentMappings, ast, cache)
-        ExprResolutionResult(
-            ResolvedExpr.Declaration(expr.loc, pattern, initializer.expr),
-            initializer.files,
-            initializer.exposedTypes
-        )
+        ExprResolutionResult(ResolvedExpr.Declaration(expr.loc, pattern, initializer.expr), initializer.files, initializer.exposedTypes)
     }
     is ParsedElement.ParsedExpr.Assignment -> {
         val resolvedLhs = resolveExpr(expr.lhs, startingMappings, currentMappings, ast, cache)
@@ -273,6 +275,7 @@ fun resolveType(type: ParsedType, currentMappings: ConsMap<String, ResolvedTypeD
         ResolvedType.Basic(type.loc, resolvedBase, resolvedGenerics)
     }
     is ParsedType.Tuple -> ResolvedType.Tuple(type.loc, type.elementTypes.map { resolveType(it, currentMappings) })
+    is ParsedType.Func -> ResolvedType.Func(type.loc, type.paramTypes.map { resolveType(it, currentMappings) }, resolveType(type.returnType, currentMappings))
     is ParsedType.TypeGeneric -> ResolvedType.TypeGeneric(type.loc, type.name, type.index)
     is ParsedType.MethodGeneric -> ResolvedType.MethodGeneric(type.loc, type.name, type.index)
 }

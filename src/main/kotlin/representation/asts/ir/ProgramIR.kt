@@ -39,14 +39,24 @@ sealed interface Instruction {
     sealed interface MethodCall: Instruction {
         val methodToCall: MethodDef
         val invokeBytecode: Int
+        val isInterface: Boolean
         data class Virtual(override val methodToCall: MethodDef): MethodCall {
             override val invokeBytecode: Int get() = Opcodes.INVOKEVIRTUAL
+            override val isInterface: Boolean get() = false
         }
         data class Static(override val methodToCall: MethodDef): MethodCall {
             override val invokeBytecode: Int get() = Opcodes.INVOKESTATIC
+            override val isInterface: Boolean get() = false
+
         }
         data class Special(override val methodToCall: MethodDef): MethodCall {
             override val invokeBytecode: Int get() = Opcodes.INVOKESPECIAL
+            override val isInterface: Boolean get() = false
+
+        }
+        data class Interface(override val methodToCall: MethodDef): MethodCall {
+            override val invokeBytecode: Int get() = Opcodes.INVOKEINTERFACE
+            override val isInterface: Boolean get() = true
         }
     }
 

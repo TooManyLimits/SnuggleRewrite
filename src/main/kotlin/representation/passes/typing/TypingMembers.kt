@@ -57,12 +57,16 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
 
     // Create the various components of the method def, specialized over the method generics.
     // Get the param patterns and their types
-    val paramPatternsByGeneric = EqualityMemoized<List<TypeDef>, List<TypedPattern>> {
-            methodGenerics -> methodDef.params.map { inferPattern(it, typeCache, currentTypeGenerics, methodGenerics) }
+    val paramPatternsByGeneric = EqualityMemoized<List<TypeDef>, List<TypedPattern>> { methodGenerics ->
+        var topIndex = 0
+        methodDef.params.map {
+            inferPattern(it, topIndex, typeCache, currentTypeGenerics, methodGenerics)
+                .also { topIndex += it.type.stackSlots }
+        }
     }
-    val paramTypesByGeneric = EqualityMemoized<List<TypeDef>, List<TypeDef>> { paramPatternsByGeneric(it).map { it.type } }
+    val paramTypesGetterByGeneric = EqualityMemoized<List<TypeDef>, Lazy<List<TypeDef>>> { lazy { paramPatternsByGeneric(it).map { it.type } }}
     // Get the return type
-    val returnTypeByGeneric = EqualityMemoized<List<TypeDef>, TypeDef> { getTypeDef(methodDef.returnType, typeCache, currentTypeGenerics, it) }
+    val returnTypeGetterByGeneric = EqualityMemoized<List<TypeDef>, Lazy<TypeDef>> { lazy { getTypeDef(methodDef.returnType, typeCache, currentTypeGenerics, it) }}
     // Create the lazy getter for the body
     val bodyGetterByGeneric = EqualityMemoized<List<TypeDef>, Lazy<TypedExpr>> { methodGenerics -> lazy {
         // Get the bindings for the body, from the params
@@ -72,9 +76,10 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
             bodyBindings = bodyBindings.extend("this", VariableBinding(owningType, false, 0))
         // Populate the bindings
         for (typedParam in paramPatternsByGeneric(methodGenerics))
-            bodyBindings = bodyBindings.extend(bindings(typedParam, bodyBindings).first)
+            bodyBindings = bodyBindings.extend(bindings(typedParam, getTopIndex(bodyBindings)))
         // Type-check the method body to be the return type
-        val checkedBody = checkExpr(methodDef.body, returnTypeByGeneric(methodGenerics), bodyBindings, typeCache, returnTypeByGeneric(methodGenerics), owningType, currentTypeGenerics, methodGenerics).expr
+        val returnType = returnTypeGetterByGeneric(methodGenerics).value
+        val checkedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache, returnType, owningType, currentTypeGenerics, methodGenerics).expr
         // And get a Return() wrapper over it, since we want to return the body
         // Now lowerExpr() will handle all the stuff with returning plural types, etc.
         TypedExpr.Return(checkedBody.loc, checkedBody, checkedBody.type)
@@ -94,7 +99,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
     // Create the generic method def
     val genericSnuggleMethodDef = MethodDef.GenericMethodDef.GenericSnuggleMethodDef(
         methodDef.loc, methodDef.pub, methodDef.static, methodDef.numGenerics, owningType, methodDef.name,
-        returnTypeByGeneric, paramTypesByGeneric, runtimeNameGetterByGeneric, bodyGetterByGeneric
+        returnTypeGetterByGeneric, paramTypesGetterByGeneric, runtimeNameGetterByGeneric, bodyGetterByGeneric
     )
 
     // If the method def has no generics, immediately specialize it and return that.

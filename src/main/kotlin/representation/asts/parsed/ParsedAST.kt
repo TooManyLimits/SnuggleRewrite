@@ -47,13 +47,13 @@ sealed interface ParsedElement {
         data class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
         // Lhs is one of: FieldAccess or Variable
         data class Assignment(override val loc: Loc, val lhs: ParsedExpr, val rhs: ParsedExpr): ParsedExpr
-
         data class Return(override val loc: Loc, val rhs: ParsedExpr): ParsedExpr
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Super(override val loc: Loc): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr
         data class Tuple(override val loc: Loc, val elements: List<ParsedExpr>): ParsedExpr
+        data class Lambda(override val loc: Loc, val params: List<ParsedPattern>, val body: ParsedExpr): ParsedExpr
 
         data class FieldAccess(override val loc: Loc, val receiver: ParsedExpr, val fieldName: String): ParsedExpr
         data class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val genericArgs: List<ParsedType>, val args: List<ParsedExpr>): ParsedExpr
@@ -73,11 +73,11 @@ sealed interface ParsedPattern {
 
     val loc: Loc
 
-//    object EmptyPattern : ParsedPattern // _
+    data class EmptyPattern(override val loc: Loc, val typeAnnotation: ParsedType?) : ParsedPattern // _
 //    data class LiteralPattern(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
 //    data class AndPattern(override val loc: Loc, val pats: List<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
     data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
-//    data class TuplePattern(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
+    data class TuplePattern(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
 
 }
 
@@ -95,7 +95,9 @@ sealed interface ParsedType {
     data class Tuple(override val loc: Loc, val elementTypes: List<ParsedType>): ParsedType {
         override fun toString(): String = "(${elementTypes.joinToString()})"
     }
-//    data class Func(override val loc: Loc, val paramTypes: List<ParsedType>, val returnType: ParsedType): ParsedType
+    data class Func(override val loc: Loc, val paramTypes: List<ParsedType>, val returnType: ParsedType): ParsedType {
+        override fun toString(): String = "(${paramTypes.joinToString()}) -> $returnType"
+    }
     data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ParsedType {
         override fun toString(): String = "TypeGeneric($name)"
     }

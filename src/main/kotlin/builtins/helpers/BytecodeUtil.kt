@@ -31,6 +31,22 @@ fun swapBasic(top: TypeDef, second: TypeDef, writer: MethodVisitor): Unit = when
     else -> throw IllegalStateException("Types should be plural, or have 1 or 2 stack slots - bug in compiler, please report")
 }
 
+fun basicLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor): Unit = when {
+    type.isPlural -> throw IllegalStateException("Calling basicLocal with plural type - bug in compiler, please report")
+    type.isReferenceType || (type.builtin == OptionType && type.generics[0].isReferenceType) ->
+        writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
+    type.builtin is IntType -> when {
+        (type.builtin as IntType).bits <= 32 -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
+        else -> writer.visitVarInsn(if (store) Opcodes.LSTORE else Opcodes.LLOAD, index)
+    }
+    type.builtin is FloatType -> when {
+        (type.builtin as FloatType).bits <= 32 -> writer.visitVarInsn(if (store) Opcodes.FSTORE else Opcodes.FLOAD, index)
+        else -> writer.visitVarInsn(if (store) Opcodes.DSTORE else Opcodes.DLOAD, index)
+    }
+    type.builtin == BoolType -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
+    else -> throw IllegalStateException("Unrecognized type \"${type.name}\" did not meet any condition for basicLocal? Bug in compiler, please report")
+}
+
 /**
  * Push a default, uninitialized value of the given type onto the top
  * of the stack.

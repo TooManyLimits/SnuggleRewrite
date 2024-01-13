@@ -142,6 +142,10 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         just(TypedExpr.RawStructConstructor(expr.loc, typeCheckedElements, expectedType))
     }
 
+    is ResolvedExpr.Lambda -> {
+        TODO()
+    }
+
     // Return: just infer the expression. Don't bother checking the return type,
     // since technically this should output a bottom type (a subtype of everything).
     // (though we don't have a representation of such)

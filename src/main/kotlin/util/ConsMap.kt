@@ -16,6 +16,7 @@ value class ConsMap<out K, out V>(val list: ConsList<Pair<K, V>>): Iterable<Pair
     companion object {
         fun <K, V> of(vararg pairs: Pair<K, V>): ConsMap<K, V> = ConsMap(ConsList.of(*pairs))
         fun <K, V> fromIterable(iterable: Iterable<Pair<K, V>>): ConsMap<K, V> = ConsMap(ConsList.fromIterable(iterable))
+        fun <K, V> join(maps: Iterable<ConsMap<K, V>>): ConsMap<K, V> = of<K, V>().extendMany(maps)
     }
 
     override fun iterator(): Iterator<Pair<K, V>> = list.iterator()
