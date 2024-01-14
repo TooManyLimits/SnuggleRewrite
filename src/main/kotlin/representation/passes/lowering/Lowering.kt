@@ -30,23 +30,11 @@ fun lower(ast: TypedAST): Program {
         val a = pair.first
         val b = pair2.first
         if (a.isSubtype(b))
-            if (b.isSubtype(a)) {
-                println("${a.name} and ${b.name} are the same?")
-                0
-            }
-            else {
-                println("${a.name} is a subtype of ${b.name}")
-                1
-            }
+            if (b.isSubtype(a)) 0
+            else 1
         else
-            if (b.isSubtype(a)) {
-                println("${b.name} is a subtype of ${a.name}")
-                -1
-            }
-            else {
-                println("${a.name} and ${b.name} are not related")
-                0
-            }
+            if (b.isSubtype(a)) - 1
+            else 0
     }
 //    println(typesList.map { it.second!!.runtimeName })
     // Return the program

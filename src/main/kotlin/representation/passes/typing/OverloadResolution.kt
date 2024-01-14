@@ -10,6 +10,7 @@ import representation.passes.lexing.Loc
 import util.ConsMap
 import util.caching.IdentityCache
 import util.allIndexed
+import util.caching.EqualityCache
 import util.insertionSort
 import java.util.*
 
@@ -112,7 +113,7 @@ private fun getApplicableMethods(
     // Map keys: "What we tried checking this argument as"
     // Optional none: "The check failed"
     // Optional filled: "The check succeeded, and resulted in this typed expr"
-    val argCheckingCache: List<IdentityCache<TypeDef, Optional<TypedExpr>>> = List(arguments.size) { IdentityCache() }
+    val argCheckingCache: List<EqualityCache<TypeDef, Optional<TypedExpr>>> = List(arguments.size) { EqualityCache() }
 
     val triedMethods: ArrayList<MethodDef> = ArrayList()
 

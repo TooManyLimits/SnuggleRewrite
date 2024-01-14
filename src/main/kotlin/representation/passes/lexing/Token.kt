@@ -69,6 +69,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "," -> TokenType.COMMA
         "." -> TokenType.DOT
         "?" -> TokenType.QUESTION_MARK
+        "->", "=>" -> TokenType.ARROW
         "_" -> TokenType.UNDERSCORE
         "(" -> TokenType.LEFT_PAREN
         ")" -> TokenType.RIGHT_PAREN
@@ -156,6 +157,7 @@ enum class TokenType {
     COMMA,
     DOT,
     QUESTION_MARK,
+    ARROW,
     UNDERSCORE,
     LEFT_PAREN,
     RIGHT_PAREN,

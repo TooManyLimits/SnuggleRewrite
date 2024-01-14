@@ -214,6 +214,7 @@ private inline fun createCall(
     return when (methodDef) {
         is MethodDef.BytecodeMethodDef -> sequenceOf(Instruction.Bytecodes(0, methodDef.bytecode)) //TODO: Cost
         is MethodDef.InterfaceMethodDef -> sequenceOf(Instruction.MethodCall.Interface(methodDef))
+        is MethodDef.CustomMethodDef -> methodDef.lowerer()
         // Invoke according to the snuggle call type
         is MethodDef.SnuggleMethodDef -> sequence {
             yield(snuggleCallType(methodDef))

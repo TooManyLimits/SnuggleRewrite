@@ -45,7 +45,15 @@ private fun addModifiers(parsedType: ParsedType, lexer: Lexer, typeGenerics: Lis
             ParsedType.Basic(parsedType.loc.merge(lexer.last().loc), "Array", listOf(parsedType))
         }
     }
-    // TODO: Check for arrow, function type
 
-    return parsedType
+    return if (lexer.consume(TokenType.ARROW)) {
+        val arrowLoc = lexer.last().loc
+        if (parsedType is ParsedType.Tuple) {
+            ParsedType.Func(arrowLoc, parsedType.elementTypes, parseType(lexer, typeGenerics, methodGenerics))
+        } else {
+            ParsedType.Func(arrowLoc, listOf(parsedType), parseType(lexer, typeGenerics, methodGenerics))
+        }
+    } else {
+        parsedType
+    }
 }

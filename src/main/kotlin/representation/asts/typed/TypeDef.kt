@@ -2,14 +2,20 @@ package representation.asts.typed
 
 import builtins.BuiltinType
 import builtins.ObjectType
+import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+import representation.asts.ir.Instruction
 import representation.passes.lexing.Loc
-import representation.passes.typing.TypeDefCache
-import representation.passes.typing.getBasicBuiltin
+import representation.passes.output.getMethodDescriptor
+import representation.passes.output.outputInstruction
+import representation.passes.typing.*
+import util.ConsMap
 import util.Promise
 import util.caching.EqualityCache
 import util.caching.EqualityMemoized
 import util.toGeneric
+import java.util.concurrent.atomic.AtomicInteger
 
 // A type definition, instantiated. No more generics left to fill.
 sealed class TypeDef {
@@ -77,11 +83,17 @@ sealed class TypeDef {
     fun unwrap(): TypeDef =
         if (this is Indirection) promise.expect().unwrap() else this
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other is TypeDef) return this.unwrap() === other.unwrap()
+        return false
+    }
+
     // An indirection which points to another TypeDef. Needed because of
     // self-references inside of types, i.e. if class A uses the type
     // A inside its definition (which is likely), the things in A need to
     // refer to A, while A is still being constructed.
-    data class Indirection(val promise: Promise<TypeDef> = Promise()): TypeDef() {
+    class Indirection(val promise: Promise<TypeDef> = Promise()): TypeDef() {
         override val name: String get() = promise.expect().name
         override val runtimeName: String? get() = promise.expect().runtimeName
         override val descriptor: List<String> get() = promise.expect().descriptor
@@ -96,7 +108,7 @@ sealed class TypeDef {
         override val builtin: BuiltinType? get() = promise.expect().builtin
     }
 
-    data class Tuple(val innerTypes: List<TypeDef>): TypeDef() {
+    class Tuple(val innerTypes: List<TypeDef>): TypeDef() {
         override val name: String = toGeneric("", innerTypes).ifEmpty { "()" }
         override val runtimeName: String = "tuples/$name"
         override val descriptor: List<String> = innerTypes.flatMap { it.descriptor }
@@ -117,6 +129,7 @@ sealed class TypeDef {
     }
 
     class Func(val paramTypes: List<TypeDef>, val returnType: TypeDef, typeCache: TypeDefCache): TypeDef() {
+        val nextImplementationIndex: AtomicInteger = AtomicInteger()
         override val name: String = toGeneric("", paramTypes).ifEmpty { "()" } + "_to_" + returnType.name
         override val runtimeName: String = "lambdas/$name/base"
         override val descriptor: List<String> = listOf("L$runtimeName;")
@@ -130,6 +143,81 @@ sealed class TypeDef {
             MethodDef.InterfaceMethodDef(pub = true, static = false, this, "invoke", returnType, paramTypes)
         )
         override val generics: List<TypeDef> = paramTypes + returnType
+    }
+
+    // An implementation of a TypeDef.Func.
+    // Creation of this type def is split into two phases. In the first phase,
+    // it's provided with the scope of the lambda's creation, and it makes
+    // a field for each local variable in scope. Then, later, once the
+    // "implementation" method def has been type-checked, unused fields
+    // are removed, leaving only the ones which are closed over. This
+    // also allows the constructor method to be generated.
+    class FuncImplementation(functionToImplement: Func, scope: ConsMap<String, VariableBinding>, implementation: MethodDef.SnuggleMethodDef): TypeDef() {
+        override val name: String = "impl_" + functionToImplement.nextImplementationIndex.getAndIncrement()
+        override val runtimeName: String = "lambdas/" + functionToImplement.name + "/" + name
+        override val descriptor: List<String> = listOf("L$runtimeName;")
+        override val stackSlots: Int = 1
+        override val isPlural: Boolean = false
+        override val isReferenceType: Boolean = true
+        override val primarySupertype: TypeDef = functionToImplement
+        override val supertypes: List<TypeDef> = listOf(primarySupertype)
+        override val generics: List<TypeDef> = functionToImplement.generics
+        // Important: the fields and methods are MUTABLE list, so some can be removed/added later, in the
+        // second phase of creation.
+        override val fields: List<FieldDef> = scope.flattened().mapTo(mutableListOf()) { (name, binding) ->
+            FieldDef.BuiltinField(pub = true, static = false, mutable = false, name, null, binding.type) }
+        override val methods: List<MethodDef> = mutableListOf(implementation)
+        // Finishes the creation of the type, and returns the generated constructor
+        fun finishCreation(typeCache: TypeDefCache): MethodDef {
+            // Finish the creation of this type def. This involves removing any unnecessary fields as well as
+            // adding the constructor method.
+            // Fetch the lazy body:
+            val body = (methods[0] as MethodDef.SnuggleMethodDef).lazyBody.value
+            // Find the fields used on the "this" in the lazy body
+            val thisFieldUsages = findThisFieldAccesses(body)
+            // Remove all fields from this type that aren't used in the body
+            (this.fields as MutableList<FieldDef>).retainAll(thisFieldUsages)
+            // Create the constructor, as a custom method def
+            val unitType = getUnit(typeCache)
+            val constructorPromise: Promise<MethodDef> = Promise() // Self-reference constructor
+            val generatedConstructor = MethodDef.CustomMethodDef(pub = false, static = false, owningType = this,
+                "new", "<init>", unitType, this.fields.map { it.type },
+            {
+                // Lowerer. Just call the constructor with an invokespecial
+                sequenceOf(Instruction.MethodCall.Special(constructorPromise.expect()))
+            }) {
+                // Outputter. Raw output to the class writer
+                val desc = getMethodDescriptor(constructorPromise.expect())
+                val writer = it.visitMethod(Opcodes.ACC_PUBLIC, "<init>", desc, null, null)
+                writer.visitCode()
+                writer.visitVarInsn(Opcodes.ALOAD, 0) // Load this
+                writer.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false) // Call super()
+                var curIndex = 1
+                for (field in this.fields) {
+                    if (field.type.isPlural) {
+                        for ((pathToField, field2) in field.type.recursiveNonStaticFields) {
+                            // Load this, load param we're storing, store in ref type, inc index
+                            outputInstruction(Instruction.LoadLocal(0, this), writer)
+                            outputInstruction(Instruction.LoadLocal(curIndex, field2.type), writer)
+                            outputInstruction(Instruction.PutReferenceTypeField(this, field2.type, pathToField), writer)
+                            curIndex += field2.type.stackSlots
+                        }
+                    } else {
+                        // Load this, load the param we're storing, store in ref type, inc index
+                        outputInstruction(Instruction.LoadLocal(0, this), writer)
+                        outputInstruction(Instruction.LoadLocal(curIndex, field.type), writer)
+                        outputInstruction(Instruction.PutReferenceTypeField(this, field.type, field.name), writer)
+                        curIndex += field.type.stackSlots
+                    }
+                }
+                writer.visitInsn(Opcodes.RETURN)
+                writer.visitMaxs(0, 0)
+                writer.visitEnd()
+            }
+            constructorPromise.fulfill(generatedConstructor)
+            (this.methods as MutableList<MethodDef>).add(generatedConstructor)
+            return generatedConstructor
+        }
     }
 
     class InstantiatedBuiltin(override val builtin: BuiltinType, override val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef() {
@@ -199,7 +287,10 @@ sealed interface MethodDef {
     }
     // Method def without an implementation, used in things like TypeDef.Func
     data class InterfaceMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>): MethodDef
-
+    // A MethodDef which has custom behavior for lowering itself and outputting itself to the ClassWriter
+    data class CustomMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val runtimeName: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
+                               val lowerer: () -> Sequence<Instruction>,
+                               val outputter: (ClassWriter) -> Unit): MethodDef
     // runtimeName field: often, SnuggleMethodDef will need to have a different name
     // at runtime than in the internal representation. These are the case for:
     // - constructors, whose names are changed to "<init>" to match java's requirement

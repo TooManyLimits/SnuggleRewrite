@@ -11,6 +11,8 @@ import representation.asts.parsed.ParsedElement
  */
 
 fun parseExpr(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    if (lexer.consume(TokenType.SEMICOLON))
+        return ParsedExpr.Tuple(lexer.last().loc, listOf())
     return parseBinary(lexer, typeGenerics, methodGenerics, 0)
 }
 
@@ -106,9 +108,9 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>, methodGenerics: 
 
         TokenType.LEFT_CURLY -> parseBlock(lexer, typeGenerics, methodGenerics)
         TokenType.LEFT_PAREN -> parseParenOrTuple(lexer, typeGenerics, methodGenerics)
+        TokenType.FN -> parseLambda(lexer, typeGenerics, methodGenerics)
 
         TokenType.LITERAL, TokenType.STRING_LITERAL -> ParsedExpr.Literal(lexer.last().loc, lexer.last().value!!)
-        TokenType.SEMICOLON -> ParsedExpr.Tuple(lexer.last().loc, listOf())
         TokenType.IDENTIFIER -> ParsedExpr.Variable(lexer.last().loc, lexer.last().string())
 
         TokenType.NEW -> parseConstructor(lexer, typeGenerics, methodGenerics)
@@ -156,6 +158,14 @@ private fun parseParenOrTuple(lexer: Lexer, typeGenerics: List<String>, methodGe
         lexer.expect(TokenType.RIGHT_PAREN, "to end parenthesized expression")
         ParsedExpr.Parenthesized(parenLoc.merge(lexer.last().loc), firstExpr)
     }
+}
+
+private fun parseLambda(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    val fnTok = lexer.last()
+    lexer.expect(TokenType.LEFT_PAREN, "for lambda params")
+    val params = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parsePattern(it, typeGenerics, methodGenerics) }
+    val body = parseExpr(lexer, typeGenerics, methodGenerics)
+    return ParsedExpr.Lambda(fnTok.loc, params, body)
 }
 
 private fun parseConstructor(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {

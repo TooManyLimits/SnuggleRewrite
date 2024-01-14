@@ -50,8 +50,8 @@ sealed interface TypedExpr {
 
     data class Return(override val loc: Loc, val rhs: TypedExpr, override val type: TypeDef): TypedExpr
 
-    data class Variable(override val loc: Loc, val mutable: Boolean, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr
+    data class Variable(override val loc: Loc, val mutable: Boolean, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
 
     data class FieldAccess(override val loc: Loc, val receiver: TypedExpr, val fieldName: String, val fieldDef: FieldDef, val maxVariable: Int, override val type: TypeDef): TypedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: TypeDef, val fieldName: String, val fieldDef: FieldDef, override val type: TypeDef): TypedExpr

@@ -22,10 +22,18 @@ sealed interface GeneratedType {
     data class GeneratedValueType(override val runtimeName: String,
                                   val returningFields: List<GeneratedField>,
                                   val fields: List<GeneratedField>, val methods: List<GeneratedMethod>): GeneratedType
+    data class GeneratedFuncType(override val runtimeName: String, val methods: List<GeneratedMethod>): GeneratedType
+    data class GeneratedFuncImpl(override val runtimeName: String, val supertypeName: String,
+                                 val fields: List<GeneratedField>, val methods: List<GeneratedMethod>): GeneratedType
 }
 
 data class GeneratedField(val fieldDef: FieldDef, val runtimeStatic: Boolean, val runtimeName: String)
-data class GeneratedMethod(val methodDef: MethodDef.SnuggleMethodDef, val body: Instruction.CodeBlock)
+
+sealed interface GeneratedMethod {
+    data class GeneratedSnuggleMethod(val methodDef: MethodDef.SnuggleMethodDef, val body: Instruction.CodeBlock): GeneratedMethod
+    data class GeneratedCustomMethod(val methodDef: MethodDef.CustomMethodDef): GeneratedMethod
+    data class GeneratedInterfaceMethod(val methodDef: MethodDef.InterfaceMethodDef): GeneratedMethod
+}
 
 sealed interface Instruction {
     // A collection of other instructions

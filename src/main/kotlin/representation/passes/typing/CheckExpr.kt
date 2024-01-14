@@ -6,15 +6,13 @@ import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
+import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.passes.lexing.Loc
-import util.ConsMap
-import util.extend
-import util.lookup
+import util.*
 import java.math.BigInteger
-import kotlin.math.exp
 import kotlin.math.max
 
 
@@ -142,8 +140,14 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         just(TypedExpr.RawStructConstructor(expr.loc, typeCheckedElements, expectedType))
     }
 
+    // Most of it is in helper function, because this is a complicated operation
     is ResolvedExpr.Lambda -> {
-        TODO()
+        val expectedType = expectedType.unwrap()
+        if (expectedType !is TypeDef.Func)
+            throw TypeCheckingException("Expected type \"${expectedType.name}\", but found lambda", expr.loc)
+        if (expectedType.paramTypes.size != expr.params.size)
+            throw TypeCheckingException("Expected lambda with ${expectedType.paramTypes.size} params, but found lambda with ${expr.params.size} params", expr.loc)
+        just(typeCheckLambdaExpression(expr, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics))
     }
 
     // Return: just infer the expression. Don't bother checking the return type,
@@ -226,6 +230,62 @@ fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef,
         just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, knownType))
     }
 }
+
+private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType: TypeDef.Func, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedExpr {
+    // Create a new artificial SnuggleMethodDef, binding the expected type's params as its variables,
+    // and type check its body to be the return type
+    val indirect = TypeDef.Indirection()
+    val implementationMethod = MethodDef.SnuggleMethodDef(lambda.loc, pub = true, static = false, indirect, "invoke",
+        returnTypeGetter = lazy { expectedType.returnType },
+        paramTypesGetter = lazy { expectedType.paramTypes },
+        runtimeNameGetter = lazy { "invoke" },
+        lazyBody = lazy {
+            var topIndex = 0
+            val paramPatterns = lambda.params.zip(expectedType.paramTypes).map { (pat, requiredType) ->
+                checkPattern(pat, requiredType, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
+                    .also { topIndex += it.type.stackSlots }
+            }
+
+            // Create body bindings, including "this"
+            var bodyBindings = ConsMap.of("this" to VariableBinding(indirect, false, 0))
+            // Declare the params
+            for (param in paramPatterns)
+                bodyBindings = bodyBindings.extend(bindings(param, getTopIndex(bodyBindings)))
+            // TODO: Add closure-ing
+            // Check the body as the return type, with the given things
+            val checkedBody = checkExpr(lambda.body, expectedType.returnType, bodyBindings, typeCache, expectedType.returnType, indirect, currentTypeGenerics, currentMethodGenerics).expr
+            // Output a Return with the checked body
+            TypedExpr.Return(checkedBody.loc, checkedBody, checkedBody.type)
+        }
+    )
+    // Create the implementation type (and finish its creation)
+    val implType = TypeDef.FuncImplementation(expectedType, scope, implementationMethod)
+    indirect.promise.fulfill(implType)
+    val generatedConstructor = implType.finishCreation(typeCache)
+    // Now construct the lambda!
+    val args = implType.fields.map {
+        val resolvedVariable = ResolvedExpr.Variable(lambda.loc, it.name)
+        checkExpr(resolvedVariable, it.type, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+    }
+    return TypedExpr.ClassConstructorCall(lambda.loc, generatedConstructor, args, implType) // Output a constructor call
+}
+
+// Find the set of all fields on "this" that were accessed
+fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
+    is TypedExpr.Block -> union(expr.exprs.asSequence().map(::findThisFieldAccesses).asIterable())
+    is TypedExpr.Declaration -> findThisFieldAccesses(expr.initializer)
+    is TypedExpr.Assignment -> union(findThisFieldAccesses(expr.lhs), findThisFieldAccesses(expr.rhs))
+    is TypedExpr.Return -> findThisFieldAccesses(expr.rhs)
+    is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
+        setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
+    is TypedExpr.MethodCall -> union(listOf(findThisFieldAccesses(expr.receiver)), expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
+    is TypedExpr.StaticMethodCall -> union(expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
+    is TypedExpr.SuperMethodCall -> union(expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
+    is TypedExpr.ClassConstructorCall -> union(expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
+    is TypedExpr.RawStructConstructor -> union(expr.fieldValues.asSequence().map(::findThisFieldAccesses).asIterable())
+    else -> setOf()
+}
+
 
 class IncorrectTypeException(expectedType: TypeDef, actualType: TypeDef, situation: String, loc: Loc)
     : TypeCheckingException("Expected $situation to have type ${expectedType.name}, but found ${actualType.name}", loc)

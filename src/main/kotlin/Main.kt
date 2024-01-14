@@ -12,43 +12,22 @@ import util.ConsList
 fun main() {
 
     val code = """
-        class List<T> {
-            fn new() super()
-            fn double(): List<T> this
-            fn first(): T? new()
-            fn rest(): List<T>? new()
+        class Box<T> {
+            pub mut v: T
+            fn new(elem: T) { super() this.v = elem; }
         }
-        class Nil<T>: List<T> {fn new() super()}
-        class Cons<T>: List<T> {
-            mut elem: T
-            mut rest: List<T>
-            fn new(elem: T, rest: List<T>) {
-                super()
-                this.elem = elem
-                this.rest = rest;
-            }
-            fn double(): List<T> new Cons<T>(this.elem * 2, this.rest.double())
-            fn first(): T? new(this.elem)
-            fn rest(): List<T>? new(this.rest)
-        }
-
-        let x: List<i32> = new Cons<i32>(5, new Cons<i32>(6, new Cons<i32>(7, new Nil<i32>())))
-        print(x.first().get())
-        let y = x.double()
-        print(y.first().get())
-
-        class Test { 
-            static fn sumTuple((a: i32, b: i32)): i32 {
-                a + b
+        class A {
+            static fn summer<T>(initial: T): (T -> (), () -> T) {
+                let accumulator: Box<T> = new(initial);
+                (fn(v) this.accumulator.v = this.accumulator.v + v, fn() this.accumulator.v)
             }
         }
-        let x = Test.sumTuple((10, 20))
-        print(x)
         
-        let (x: i32, y: i32) = (3, 4)
-        let z = (x, y)
-        print(x * y)
-        print(Test.sumTuple(z))
+        let (conc, val) = A.summer::<String>("")
+        conc("a")
+        conc("bb")
+        conc("ccc")
+        print(val())
         
     """.trimIndent()
     val lexer = Lexer("main", code)

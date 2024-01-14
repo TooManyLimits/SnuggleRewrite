@@ -20,6 +20,12 @@ value class ConsMap<out K, out V>(val list: ConsList<Pair<K, V>>): Iterable<Pair
     }
 
     override fun iterator(): Iterator<Pair<K, V>> = list.iterator()
+    fun flattened(): Map<out K, V> {
+        val map = mutableMapOf<K, V>()
+        for ((k, v) in this)
+            map.putIfAbsent(k, v)
+        return map
+    }
 }
 
 // Extend this map with a new pair.
