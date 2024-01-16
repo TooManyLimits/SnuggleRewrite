@@ -17,6 +17,7 @@ object StringType: BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
     override fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef = getBasicBuiltin(ObjectType, typeCache)
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {

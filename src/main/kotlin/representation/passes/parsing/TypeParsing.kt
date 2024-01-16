@@ -41,7 +41,6 @@ private fun addModifiers(parsedType: ParsedType, lexer: Lexer, typeGenerics: Lis
             ParsedType.Basic(parsedType.loc.merge(lexer.last().loc), "Option", listOf(parsedType))
         } else {
             lexer.expect(TokenType.RIGHT_SQUARE, "for array type")
-            TODO() // Array not implemented
             ParsedType.Basic(parsedType.loc.merge(lexer.last().loc), "Array", listOf(parsedType))
         }
     }

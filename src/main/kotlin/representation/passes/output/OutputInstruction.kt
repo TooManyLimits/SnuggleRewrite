@@ -8,8 +8,6 @@ import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.Instruction
-import representation.asts.typed.MethodDef
-import representation.asts.typed.TypeDef
 import java.math.BigInteger
 
 fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (inst) {
@@ -25,18 +23,18 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.Bytecodes -> inst.bytecodes(writer)
     // Check the boolean field, run the import if needed
     is Instruction.RunImport -> {
-        val afterImport = Label()
+        val alreadyImported = Label()
         // Load field on the stack
         writer.visitFieldInsn(Opcodes.GETSTATIC, getImporterClassName(), getImporterFieldName(inst.fileName), "Z")
-        // If it's false, jump to the end
-        writer.visitJumpInsn(Opcodes.IFNE, afterImport)
+        // If it's false, jump to the end and push false
+        writer.visitJumpInsn(Opcodes.IFNE, alreadyImported)
         // Set the field to true
         writer.visitInsn(Opcodes.ICONST_1)
         writer.visitFieldInsn(Opcodes.PUTSTATIC, getImporterClassName(), getImporterFieldName(inst.fileName), "Z")
         // Call the method
         writer.visitMethodInsn(Opcodes.INVOKESTATIC, getImporterClassName(), getImporterMethodName(inst.fileName), "()V", false)
-        // End of the import
-        writer.visitLabel(afterImport)
+        // Emit ending label
+        writer.visitLabel(alreadyImported)
     }
     // Make the call with the proper bytecode
     is Instruction.MethodCall -> {

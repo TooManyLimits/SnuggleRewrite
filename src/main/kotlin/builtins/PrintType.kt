@@ -20,12 +20,14 @@ object PrintType: BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 0
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val thisType = getBasicBuiltin(this, typeCache)
         val boolType = getBasicBuiltin(BoolType, typeCache)
         val unitType = getUnit(typeCache)
         val i32Type = getBasicBuiltin(I32Type, typeCache)
+        val u32Type = getBasicBuiltin(U32Type, typeCache)
         val objectType = getBasicBuiltin(ObjectType, typeCache)
         return listOf(
             // print(bool)
@@ -46,6 +48,19 @@ object PrintType: BuiltinType {
                 it.visitInsn(Opcodes.SWAP)
                 // [System.out, arg]
                 it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(PrintStream::class.java), "println", "(I)V", false)
+                // []
+            },
+            // print(u32)
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "invoke", unitType, listOf(u32Type)) {
+                // [arg as int]
+                it.visitInsn(Opcodes.I2L) // [arg sign-extended]
+                it.visitLdcInsn(0xFFFFFFFFL) // [arg sign-extended, 0xFFFFFFFF]
+                it.visitInsn(Opcodes.LAND) // [arg as long, unsigned]
+                it.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(System::class.java), "out", Type.getDescriptor(PrintStream::class.java))
+                // [arg, System.out]
+                it.visitInsn(Opcodes.DUP_X2) // [System.out, arg, System.out]
+                it.visitInsn(Opcodes.POP) // [System.out, arg]
+                it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(PrintStream::class.java), "println", "(J)V", false)
                 // []
             },
             // print(Object)

@@ -17,6 +17,7 @@ class ConstWrapperTemp(private val static: Boolean, private val owningType: Type
             TypedExpr.MethodCall(
                 it.loc, it.receiver, it.methodName, it.args,
                 MethodDef.BytecodeMethodDef(true, static, owningType, "native\$$name", returnType, argTypes, bytecode),
+                -10000, // Should never matter here!
                 it.type)
         })
     }

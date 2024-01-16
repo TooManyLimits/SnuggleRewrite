@@ -85,8 +85,6 @@ sealed interface ParsedType {
 
     val loc: Loc
 
-
-
     data class Basic(override val loc: Loc, val base: String, val generics: List<ParsedType>): ParsedType {
         override fun toString(): String {
             return base + if (generics.isNotEmpty()) "<" + generics.joinToString() + ">" else ""

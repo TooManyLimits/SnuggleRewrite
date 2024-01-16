@@ -65,7 +65,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-        val call = TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        val call = TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
 
         // Repeatedly replace const method calls until done
         var resultExpr: TypedExpr = call
@@ -83,7 +84,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // TODO: Const static method calls
-        pullUpLiteral(just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType)), expectedType)
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        pullUpLiteral(just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)), expectedType)
     }
 
     is ResolvedExpr.SuperMethodCall -> {
@@ -93,7 +95,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
-        just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, best.method.returnType))
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, maxVariable, best.method.returnType))
     }
 
     // Constructor and raw constructor, again almost exactly the same as infer().
@@ -199,27 +202,15 @@ fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult {
 
 fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult {
     // Different situations depending on the type we're trying to construct
-    return if (knownType.unwrap() is TypeDef.InstantiatedBuiltin && !knownType.isReferenceType) {
-        // Special constructor. Non-reference type builtins have these.
-        val methods = knownType.staticMethods
-        val expectedResult = knownType.unwrap()
-        val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-        if (best.method !is MethodDef.BytecodeMethodDef)
-            throw IllegalStateException("Assumed that builtin, non-reference type constructors are defined in bytecode - but type \"${knownType.name} breaks this? Bug in compiler, please report")
-        // Doesn't matter what type of method call we return here,
-        // since the method is bytecode anyway, so we'll pick a static call.
-        just(TypedExpr.StaticMethodCall(
-            expr.loc, knownType, "new", best.checkedArgs, best.method, best.method.returnType
-        ))
-    } else if (knownType.unwrap() is TypeDef.StructDef) {
-        // StructDef constructors work differently.
+    return if (knownType.hasStaticConstructor) {
+        // Some constructors work differently from java -
         // Instead of being nonstatic methods that initialize
-        // an object, they're static methods that return the struct.
+        // an object, they're static methods that return the type.
         val methods = knownType.staticMethods
-        val expectedResult = knownType.unwrap()
-        val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, knownType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
         just(TypedExpr.StaticMethodCall(
-            expr.loc, knownType, "new", best.checkedArgs, best.method, best.method.returnType
+            expr.loc, knownType, "new", best.checkedArgs, best.method, maxVariable, knownType
         ))
     } else {
         // Regular ol' java style constructor
@@ -227,7 +218,8 @@ fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef,
         val methods = knownType.nonStaticMethods
         val expectedResult = getUnit(typeCache)
         val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, expectedResult, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-        just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, knownType))
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        just(TypedExpr.ClassConstructorCall(expr.loc, best.method, best.checkedArgs, maxVariable, knownType))
     }
 }
 
@@ -267,7 +259,8 @@ private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType:
         val resolvedVariable = ResolvedExpr.Variable(lambda.loc, it.name)
         checkExpr(resolvedVariable, it.type, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
     }
-    return TypedExpr.ClassConstructorCall(lambda.loc, generatedConstructor, args, implType) // Output a constructor call
+    val maxVariable = scope.sumOf { it.second.type.stackSlots }
+    return TypedExpr.ClassConstructorCall(lambda.loc, generatedConstructor, args, maxVariable, implType) // Output a constructor call
 }
 
 // Find the set of all fields on "this" that were accessed

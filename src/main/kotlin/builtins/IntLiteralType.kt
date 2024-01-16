@@ -19,6 +19,7 @@ object IntLiteralType: BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = -1000
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
 
     // Supertypes are the various int types and float types
     override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =
@@ -63,6 +64,6 @@ private fun literalConcreteToConcrete(intType: TypeDef, methodName: String, call
     val newReceiver = TypedExpr.Literal(call.receiver.loc, receiverValue, intType)
     return TypedExpr.MethodCall(
         call.loc, newReceiver, methodName, call.args,
-        intType.methods.find { method -> method.name == methodName }!!, intType
+        intType.methods.find { method -> method.name == methodName }!!, -10000, intType
     )
 }

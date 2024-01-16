@@ -19,6 +19,7 @@ object ObjectType: BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val objType = getBasicBuiltin(ObjectType, typeCache)

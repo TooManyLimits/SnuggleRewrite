@@ -57,8 +57,8 @@ fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
  */
 fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult = when (expr) {
 
-    // Import has type bool
-    is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getBasicBuiltin(BoolType, typeCache)))
+    // Import has type unit
+    is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getUnit(typeCache)))
 
     // Variable looks up its name in scope, errors if none is there
     is ResolvedExpr.Variable -> {
@@ -156,8 +156,9 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Create a method call
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
         val call = TypedExpr.MethodCall(
-            expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, best.method.returnType)
+            expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
 
         // Repeatedly replace const method calls until done
         var resultExpr: TypedExpr = call
@@ -177,7 +178,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // TODO: Const static method calls
-        just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, best.method.returnType))
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        just(TypedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType))
     }
 
     is ResolvedExpr.SuperMethodCall -> {
@@ -188,7 +190,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
-        just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, best.method.returnType))
+        val maxVariable = scope.sumOf { it.second.type.stackSlots }
+        just(TypedExpr.SuperMethodCall(expr.loc, thisIndex, best.method, best.checkedArgs, maxVariable, best.method.returnType))
     }
 
     is ResolvedExpr.ConstructorCall -> {

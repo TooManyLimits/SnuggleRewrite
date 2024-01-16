@@ -20,7 +20,7 @@ fun lower(ast: TypedAST): Program {
     // Compile the top-level code into instructions
     val topLevelCode = ast.allFiles.mapValues {
         // Lower the expr and wrap it in a code block
-        val loweredCode = lowerExpr(it.value.code, ConsList.nil(), typeCalc)
+        val loweredCode = lowerExpr(it.value.code, ConsList.of(ConsList.nil()), typeCalc)
         Instruction.CodeBlock(ConsList.fromIterable(loweredCode.asIterable()))
     }
     // Get the types list, and sort it so subtypes come after their supertypes

@@ -30,8 +30,10 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                 )
             }
             is TypeDef.Tuple, is TypeDef.StructDef, is TypeDef.InstantiatedBuiltin -> {
-                if (it.fields.isEmpty() && it.methods.isEmpty()) null
+                if (it.fields.isEmpty() && generatedMethods.isEmpty()) null
                 else if (it is TypeDef.InstantiatedBuiltin && !it.shouldGenerateClassAtRuntime) null
+                else if (!it.isPlural) throw IllegalStateException("Only expected plural types to make it this far in lowering for builtins, but \"${it.name}\" did too? Bug in compiler, please report")
+                else if (it.recursiveNonStaticFields.size <= 1 && it.staticFields.isEmpty() && generatedMethods.isEmpty()) null
                 else {
                     GeneratedType.GeneratedValueType(
                         it.runtimeName!!,
@@ -60,7 +62,7 @@ private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: Identit
     methodDef.paramTypes.forEach { lowerTypeDef(it, typeCalc) }
     lowerTypeDef(methodDef.returnType, typeCalc)
 
-    val loweredBody = lowerExpr(methodDef.lazyBody.value, ConsList.nil(), typeCalc)
+    val loweredBody = lowerExpr(methodDef.lazyBody.value, ConsList.of(ConsList.nil()), typeCalc)
     val codeBlock = Instruction.CodeBlock(ConsList.fromIterable(loweredBody.asIterable()))
     return GeneratedMethod.GeneratedSnuggleMethod(methodDef, codeBlock)
 }

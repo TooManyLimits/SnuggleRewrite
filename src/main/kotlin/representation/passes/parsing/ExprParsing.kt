@@ -59,7 +59,7 @@ private fun parseAssignment(lexer: Lexer, typeGenerics: List<String>, methodGene
         lhs = if (lhs is ParsedExpr.Variable || lhs is ParsedExpr.FieldAccess)
             ParsedExpr.Assignment(eqLoc, lhs, rhs)
         else if (lhs is ParsedExpr.MethodCall && lhs.methodName == "get")
-            TODO()
+            ParsedExpr.MethodCall(eqLoc, lhs.receiver, "set", lhs.genericArgs, lhs.args + rhs)
         else
             throw ParsingException("Cannot have an assignment here - can only assign to variables, fields, or [] results", eqLoc)
     }
@@ -68,7 +68,7 @@ private fun parseAssignment(lexer: Lexer, typeGenerics: List<String>, methodGene
 
 private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     var expr = parseUnit(lexer, typeGenerics, methodGenerics)
-    while (lexer.consume(TokenType.DOT, TokenType.LEFT_PAREN)) when (lexer.last().type) {
+    while (lexer.consume(TokenType.DOT, TokenType.LEFT_PAREN, TokenType.LEFT_SQUARE)) when (lexer.last().type) {
         TokenType.DOT -> {
             val name = lexer.expect(TokenType.IDENTIFIER, "after DOT")
             val genericArgs = if (lexer.consume(TokenType.DOUBLE_COLON)) {
@@ -94,6 +94,12 @@ private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String
             // Special case: super() becomes super.new(), NOT super.invoke().
             val methodName = if (expr is ParsedExpr.Super) "new" else "invoke"
             expr = ParsedExpr.MethodCall(loc, expr, methodName, listOf(), args)
+        }
+        //get() overload
+        TokenType.LEFT_SQUARE -> {
+            val loc = lexer.last().loc
+            val args = commaSeparated(lexer, TokenType.RIGHT_SQUARE) { parseExpr(it, typeGenerics, methodGenerics) }
+            expr = ParsedExpr.MethodCall(loc, expr, "get", listOf(), args)
         }
         else -> throw IllegalStateException()
     }

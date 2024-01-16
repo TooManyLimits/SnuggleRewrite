@@ -70,6 +70,11 @@ interface BuiltinType {
     // may be some variance in how this is interpreted.
     fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
 
+    // Whether the type uses a static constructor style. If true, constructors
+    // should be of the form "static fn new() -> Type", returning an instance,
+    // if false they should be "fn new() -> Unit", initializing an existing instance.
+    fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
+
     // Get the fields of this type, given the generics.
     fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now
 

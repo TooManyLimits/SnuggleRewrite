@@ -13,6 +13,10 @@ import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getBasicBuiltin
 import representation.passes.typing.getGenericBuiltin
 import representation.passes.typing.getUnit
+import util.Cons
+import util.ConsList
+import util.append
+import util.appendElem
 
 /**
  * Optional types!
@@ -25,7 +29,7 @@ object OptionType: BuiltinType {
     override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = generics[0].name + "?"
     override val nameable: Boolean get() = true
     override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String =
-        if (generics[0].isReferenceType) generics[0].runtimeName!! else "builtin_structs/" + generics[0].name + "?"
+        if (generics[0].isReferenceType) generics[0].runtimeName!! else "builtin_structs/option/" + generics[0].name
     override fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isReferenceType
     override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> =
         if (generics[0].isReferenceType) generics[0].descriptor else generics[0].descriptor + listOf("Z")
@@ -33,6 +37,7 @@ object OptionType: BuiltinType {
         if (generics[0].isReferenceType) 1 else generics[0].stackSlots + 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isReferenceType
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val thisType = getGenericBuiltin(OptionType, generics, typeCache)
@@ -67,11 +72,16 @@ object OptionType: BuiltinType {
         } else {
             // Working with a value type + a bool!
             listOf(
-                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf()) {
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(), { writer, _, _ ->
                     val afterError = Label()
-                    it.visitJumpInsn(Opcodes.IFNE, afterError)
-                    errorInGet(it)
-                    it.visitLabel(afterError)
+                    writer.visitJumpInsn(Opcodes.IFNE, afterError)
+                    errorInGet(writer)
+                    writer.visitLabel(afterError)
+                }) {
+                    // Prepend existing desired fields with "value", and add an extra "ifPresent" desire.
+                    it.map<ConsList<FieldDef>> {
+                        Cons(thisType.fields.find { it.name == "value" }!!, it)
+                    }.appendElem(ConsList.of(thisType.fields.find { it.name == "isPresent" }!!))
                 },
                 MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf()) {
                     pushDefaultValue(innerType, it)

@@ -1,7 +1,9 @@
 package representation.asts.typed
 
+import builtins.ArrayType
 import builtins.BuiltinType
 import builtins.ObjectType
+import builtins.OptionType
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -10,6 +12,7 @@ import representation.passes.lexing.Loc
 import representation.passes.output.getMethodDescriptor
 import representation.passes.output.outputInstruction
 import representation.passes.typing.*
+import util.ConsList
 import util.ConsMap
 import util.Promise
 import util.caching.EqualityCache
@@ -27,6 +30,9 @@ sealed class TypeDef {
     abstract val stackSlots: Int
     abstract val isPlural: Boolean
     abstract val isReferenceType: Boolean
+
+    // If true, constructors are "static fn new() -> Type". Otherwise, "fn new() -> Unit"
+    abstract val hasStaticConstructor: Boolean
 
     abstract val primarySupertype: TypeDef?
     abstract val supertypes: List<TypeDef>
@@ -57,6 +63,14 @@ sealed class TypeDef {
         else
             throw IllegalStateException("Should never ask non-plural type for recursiveNonStaticFields - bug in compiler, please report!")
     }
+
+    // Helper to check whether this is an optional reference type, like "String?".
+    // Useful because this property is checked on several occasions, because optional
+    // reference types are very hooked into the working of the jvm (they are represented
+    // as nullable). Similar case for arrays of 0-sized objects, they are represented as an
+    // int on the jvm.
+    val isOptionalReferenceType: Boolean get() = this.builtin == OptionType && this.generics[0].isReferenceType
+    val isArrayOfZeroSizes: Boolean get() = this.builtin == ArrayType && this.generics[0].stackSlots == 0
 
     // For most types, their builtin is null. For instantiated builtins,
     // it's non-null. Including this property greatly reduces boilerplate
@@ -89,6 +103,9 @@ sealed class TypeDef {
         return false
     }
 
+    override fun hashCode(): Int =
+        if (this is Indirection) this.unwrap().hashCode() else System.identityHashCode(this)
+
     // An indirection which points to another TypeDef. Needed because of
     // self-references inside of types, i.e. if class A uses the type
     // A inside its definition (which is likely), the things in A need to
@@ -100,6 +117,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = promise.expect().stackSlots
         override val isPlural: Boolean get() = promise.expect().isPlural
         override val isReferenceType: Boolean get() = promise.expect().isReferenceType
+        override val hasStaticConstructor: Boolean get() = promise.expect().hasStaticConstructor
         override val primarySupertype: TypeDef? get() = promise.expect().primarySupertype
         override val supertypes: List<TypeDef> get() = promise.expect().supertypes
         override val fields: List<FieldDef> get() = promise.expect().fields
@@ -115,6 +133,7 @@ sealed class TypeDef {
         override val stackSlots: Int = innerTypes.sumOf { it.stackSlots }
         override val isPlural: Boolean get() = true
         override val isReferenceType: Boolean get() = false
+        override val hasStaticConstructor: Boolean get() = true
         override val primarySupertype: TypeDef? get() = null
         override val supertypes: List<TypeDef> get() = listOf()
         override val fields: List<FieldDef> = run {
@@ -136,6 +155,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = 1
         override val isPlural: Boolean get() = false
         override val isReferenceType: Boolean get() = true
+        override val hasStaticConstructor: Boolean get() = false
         override val primarySupertype: TypeDef = getBasicBuiltin(ObjectType, typeCache)
         override val supertypes: List<TypeDef> get() = listOf(primarySupertype)
         override val fields: List<FieldDef> get() = listOf()
@@ -159,6 +179,7 @@ sealed class TypeDef {
         override val stackSlots: Int = 1
         override val isPlural: Boolean = false
         override val isReferenceType: Boolean = true
+        override val hasStaticConstructor: Boolean = false
         override val primarySupertype: TypeDef = functionToImplement
         override val supertypes: List<TypeDef> = listOf(primarySupertype)
         override val generics: List<TypeDef> = functionToImplement.generics
@@ -228,6 +249,7 @@ sealed class TypeDef {
         override val stackSlots: Int = builtin.stackSlots(generics, typeCache)
         override val isPlural: Boolean = builtin.isPlural(generics, typeCache)
         override val isReferenceType: Boolean = builtin.isReferenceType(generics, typeCache)
+        override val hasStaticConstructor: Boolean = builtin.hasStaticConstructor(generics, typeCache)
         override val primarySupertype: TypeDef? = builtin.getPrimarySupertype(generics, typeCache)
         override val supertypes: List<TypeDef> = builtin.getAllSupertypes(generics, typeCache)
         override val fields: List<FieldDef> = builtin.getFields(generics, typeCache)
@@ -244,6 +266,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = 1
         override val isPlural: Boolean get() = false
         override val isReferenceType: Boolean get() = true
+        override val hasStaticConstructor: Boolean get() = false
         override val primarySupertype: TypeDef get() = supertype
         override val supertypes: List<TypeDef> = listOf(primarySupertype)
     }
@@ -258,6 +281,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = fields.filter { !it.static }.sumOf { it.type.stackSlots }
         override val isPlural: Boolean get() = true
         override val isReferenceType: Boolean get() = false
+        override val hasStaticConstructor: Boolean get() = true
         override val primarySupertype: TypeDef? get() = null
         override val supertypes: List<TypeDef> = listOf()
     }
@@ -274,9 +298,14 @@ sealed interface MethodDef {
     val paramTypes: List<TypeDef>
 
     // Override vals on the first line, important things on later lines
-
-    data class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
-                                 val bytecode: (MethodVisitor) -> Unit): MethodDef
+    class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
+                            val bytecode: (writer: MethodVisitor, maxVariable: Int, desiredFields: ConsList<ConsList<FieldDef>>) -> Unit,
+                            val desiredReceiverFields: (ConsList<ConsList<FieldDef>>) -> ConsList<ConsList<FieldDef>>): MethodDef {
+        constructor(pub: Boolean, static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, paramTypes: List<TypeDef>, bytecode: (MethodVisitor) -> Unit)
+            : this(pub, static, owningType, name, returnType, paramTypes,
+                { writer, _, _ -> bytecode(writer); },
+                { ConsList.of(ConsList.nil()) })
+    }
     data class ConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
                               val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef {
         override val static: Boolean get() = false

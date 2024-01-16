@@ -1,9 +1,6 @@
 package builtins.helpers
 
-import builtins.BoolType
-import builtins.FloatType
-import builtins.IntType
-import builtins.OptionType
+import builtins.*
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.typed.TypeDef
@@ -33,7 +30,7 @@ fun swapBasic(top: TypeDef, second: TypeDef, writer: MethodVisitor): Unit = when
 
 fun basicLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor): Unit = when {
     type.isPlural -> throw IllegalStateException("Calling basicLocal with plural type - bug in compiler, please report")
-    type.isReferenceType || (type.builtin == OptionType && type.generics[0].isReferenceType) ->
+    type.isReferenceType || type.isOptionalReferenceType ->
         writer.visitVarInsn(if (store) Opcodes.ASTORE else Opcodes.ALOAD, index)
     type.builtin is IntType -> when {
         (type.builtin as IntType).bits <= 32 -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
@@ -44,6 +41,7 @@ fun basicLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor)
         else -> writer.visitVarInsn(if (store) Opcodes.DSTORE else Opcodes.DLOAD, index)
     }
     type.builtin == BoolType -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
+    type.isArrayOfZeroSizes -> writer.visitVarInsn(if (store) Opcodes.ISTORE else Opcodes.ILOAD, index)
     else -> throw IllegalStateException("Unrecognized type \"${type.name}\" did not meet any condition for basicLocal? Bug in compiler, please report")
 }
 

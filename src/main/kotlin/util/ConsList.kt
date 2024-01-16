@@ -57,6 +57,8 @@ sealed interface ConsList<out T> : Iterable<T> {
         return res
     }
 
+    fun isEmpty(): Boolean = this == Nil.INSTANCE
+
     companion object {
         fun <T> nil(): Nil<T> {
             return Nil.INSTANCE as Nil<T>
@@ -77,6 +79,19 @@ fun <T> ConsList<T>.append(other: ConsList<T>): ConsList<T> {
     }
 }
 
+fun <T> ConsList<T>.appendElem(newElem: T): ConsList<T> {
+    return when (this) {
+        is Nil<T> -> Cons(newElem, this)
+        is Cons<T> -> Cons(elem, rest.appendElem(newElem))
+    }
+}
+
+fun <T> ConsList<T>.mapFirst(func: (elem: T) -> T): ConsList<T> {
+    return when (this) {
+        is Cons<T> -> Cons(func(elem), rest)
+        is Nil<T> -> ConsList.nil()
+    }
+}
 
 class Nil<T> private constructor() : ConsList<T> {
     init {
