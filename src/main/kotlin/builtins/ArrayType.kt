@@ -162,7 +162,12 @@ object ArrayType: BuiltinType {
             constructor,
             MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "size", u32, listOf(), { writer, _, _ ->
                 writer.visitInsn(Opcodes.ARRAYLENGTH)
-            }) { ConsList.of(ConsList.of(thisType.fields.first())) },
+            }) {
+                var innermostFirstField = thisType.nonStaticFields.first() // Array<innerType>
+                while (innermostFirstField.type.isPlural)
+                    innermostFirstField = innermostFirstField.type.nonStaticFields.first()
+                ConsList.of(ConsList.of(innermostFirstField))
+            },
             MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(u32), {writer, maxVariable, desiredFields ->
                 // Stack = [all desired arrays, index]
                 // Calculate how many desired arrays there are, and what types they are:

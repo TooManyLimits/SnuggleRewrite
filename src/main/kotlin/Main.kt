@@ -16,6 +16,7 @@ fun main() {
         let x: Vec3?[] = new(10)
         x[8] = new(new { 1, 2, 3 })
         print(x[8].get().y)
+        print(x.size())
     """.trimIndent()
     val lexer = Lexer("main", code)
 
