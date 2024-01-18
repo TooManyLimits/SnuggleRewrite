@@ -60,8 +60,12 @@ fun tokenOf(loc: Loc, string: String): Token? {
 
         "let" -> TokenType.LET
         "mut" -> TokenType.MUT
+        "=" -> TokenType.ASSIGN
 
         "return" -> TokenType.RETURN
+        "if" -> TokenType.IF
+        "else" -> TokenType.ELSE
+        "while" -> TokenType.WHILE
 
         ":" -> TokenType.COLON
         "::" -> TokenType.DOUBLE_COLON
@@ -84,7 +88,11 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "-" -> TokenType.MINUS
         "*" -> TokenType.STAR
         "/" -> TokenType.SLASH
-        "=" -> TokenType.EQUALS
+        "#" -> TokenType.HASHTAG
+        "==" -> TokenType.EQUALS
+        "!=" -> TokenType.NOT_EQUALS
+        ">=" -> TokenType.GREATER_EQUAL
+        "<=" -> TokenType.LESS_EQUAL
 
         "true" -> return Token(loc, TokenType.LITERAL, true)
         "false" -> return Token(loc, TokenType.LITERAL, false)
@@ -148,8 +156,12 @@ enum class TokenType {
 
     LET,
     MUT,
+    ASSIGN,
 
     RETURN,
+    IF,
+    ELSE,
+    WHILE,
 
     COLON,
     DOUBLE_COLON,
@@ -172,7 +184,11 @@ enum class TokenType {
     MINUS,
     STAR,
     SLASH,
+    HASHTAG,
     EQUALS,
+    NOT_EQUALS,
+    GREATER_EQUAL,
+    LESS_EQUAL,
 }
 
 data class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: Int)

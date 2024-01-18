@@ -74,7 +74,7 @@ private fun resolveFile(
     publicMemberCache: IdentityCache<ParsedFile, PublicMembers> // Memoize the set of public members of some file
 ): FileResolutionResult {
     // Update public member cache if necessary
-    publicMemberCache.get(file) { getPubMembers(it.block) }
+    publicMemberCache.get(file) { getPubMembers(it.block, startingMappings, ast, publicMemberCache) }
 
     val resolvedBlock = resolveExpr(file.block, startingMappings, startingMappings, ast, publicMemberCache)
     return FileResolutionResult(

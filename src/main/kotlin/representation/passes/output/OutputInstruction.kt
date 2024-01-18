@@ -46,6 +46,11 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
 
     // Helper function for return
     is Instruction.Return -> outputReturn(inst, writer)
+    is Instruction.IrLabel -> writer.visitLabel(inst.label)
+    is Instruction.Jump -> writer.visitJumpInsn(Opcodes.GOTO, inst.label)
+    is Instruction.JumpIfFalse -> writer.visitJumpInsn(Opcodes.IFEQ, inst.label)
+    is Instruction.JumpIfTrue -> writer.visitJumpInsn(Opcodes.IFNE, inst.label)
+
     // Helper function for push, it has lots of logic
     is Instruction.Push -> outputPush(inst, writer)
     // Pop the correct number of stack slots

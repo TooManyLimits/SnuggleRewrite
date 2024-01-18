@@ -63,7 +63,7 @@ private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: Identit
     lowerTypeDef(methodDef.returnType, typeCalc)
 
     val loweredBody = lowerExpr(methodDef.lazyBody.value, ConsList.of(ConsList.nil()), typeCalc)
-    val codeBlock = Instruction.CodeBlock(ConsList.fromIterable(loweredBody.asIterable()))
+    val codeBlock = Instruction.CodeBlock(loweredBody.toList())
     return GeneratedMethod.GeneratedSnuggleMethod(methodDef, codeBlock)
 }
 

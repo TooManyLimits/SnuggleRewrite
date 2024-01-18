@@ -12,11 +12,15 @@ import util.ConsList
 fun main() {
 
     val code = """
-        struct Vec3 { x: i32 y: i32 z: i32 }
-        let x: Vec3?[] = new(10)
-        x[8] = new(new { 1, 2, 3 })
-        print(x[8].get().y)
-        print(x.size())
+        import "list"
+        let x = new List<i32>()
+        x.push(10)
+        x.push(20)
+        x.push(30)
+        x.push(40)
+        x.push(50)
+        x.push(60)
+        x.forEach( fn(elem) print(elem) )
     """.trimIndent()
     val lexer = Lexer("main", code)
 
@@ -24,7 +28,7 @@ fun main() {
     val parsedAST = ParsedAST(mapOf("main" to file, "list" to parseFileLazy(Lexer("list", list))))
 //    parsedAST.debugReadAllFiles() // Remove lazy wrapping
 //    println(parsedAST)
-    val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType, ObjectType, StringType, OptionType, ArrayType, PrintType, IntLiteralType, *INT_TYPES, *FLOAT_TYPES))
+    val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType, ObjectType, StringType, OptionType, ArrayType, MaybeUninitType, PrintType, IntLiteralType, *INT_TYPES, *FLOAT_TYPES))
 //    println(resolvedAST)
     val typedAST = typeAST(resolvedAST)
 //    println(typedAST)
@@ -37,5 +41,41 @@ fun main() {
 
 
 val list = """
-    
+    pub class List<T> {
+        mut backing: MaybeUninit<T>[]
+        mut size: u32
+        pub fn new() {
+            super()
+            this.size = 0
+            this.backing = new(5)
+        }
+        pub fn size(): u32 { this.size }
+        pub fn push(elem: T) {
+            if #this == #this.backing this.grow(2 * #this)
+            this.backing[#this] = new(elem)
+            this.size = this.size + 1
+        }
+        pub fn get(index: u32): T {
+            // TODO error if index >= size
+            this.backing[index].get()
+        }
+        pub fn forEach(func: T -> ()) {
+            let mut i: u32 = 0
+            let size = #this
+            while i < size {
+                func(this[i])
+                i = i + 1
+            };
+        }
+        
+        fn grow(desiredSize: u32) {
+            let newBacking: MaybeUninit<T>[] = new(desiredSize)
+            let mut i = 0u32
+            while (i < #this) {
+                newBacking[i] = this.backing[i]
+                i = i + 1
+            }
+            this.backing = newBacking
+        }
+    }
 """.trimIndent()

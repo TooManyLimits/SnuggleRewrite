@@ -1,11 +1,11 @@
 package builtins
 
 import builtins.helpers.constBinary
+import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.lexing.IntLiteralData
 import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getBasicBuiltin
 import java.math.BigInteger
@@ -37,16 +37,17 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
         val intType = getBasicBuiltin(this, typeCache)
+        val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(
             constBinary(false, intType, "add", intType, listOf(intType), BigInteger::add)
                     orBytecode doThenConvert { it.visitInsn(if (this.bits <= 32) Opcodes.IADD else Opcodes.LADD) },
-            constBinary(false, intType, "sub", intType, listOf(intType), BigInteger::add)
+            constBinary(false, intType, "sub", intType, listOf(intType), BigInteger::subtract)
                     orBytecode doThenConvert { it.visitInsn(if (this.bits <= 32) Opcodes.ISUB else Opcodes.LSUB) },
-            constBinary(false, intType, "mul", intType, listOf(intType), BigInteger::add)
+            constBinary(false, intType, "mul", intType, listOf(intType), BigInteger::multiply)
                     orBytecode doThenConvert { it.visitInsn(if (this.bits <= 32) Opcodes.IMUL else Opcodes.LMUL) },
             // Division and remainder need special handling for signed/unsigned.
             // Unsigned operations are generally intrinsified anyway
-            constBinary(false, intType, "div", intType, listOf(intType), BigInteger::add)
+            constBinary(false, intType, "div", intType, listOf(intType), BigInteger::divide)
                     orBytecode doThenConvert {
                         if (bits <= 32) {
                             if (signed) it.visitInsn(Opcodes.IDIV)
@@ -55,7 +56,7 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
                             if (signed) it.visitInsn(Opcodes.LDIV)
                             else it.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "divideUnsigned", "(JJ)J", false)
                         }},
-            constBinary(false, intType, "rem", intType, listOf(intType), BigInteger::add)
+            constBinary(false, intType, "rem", intType, listOf(intType), BigInteger::remainder)
                     orBytecode doThenConvert {
                         if (bits <= 32) {
                             if (signed) it.visitInsn(Opcodes.IREM)
@@ -64,6 +65,17 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
                             if (signed) it.visitInsn(Opcodes.LREM)
                             else it.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "remainderUnsigned", "(JJ)J", false)
                         }},
+            // Comparisons
+            constBinary<BigInteger, BigInteger, Boolean>(false, intType, "gt", boolType, listOf(intType)) {a, b -> a > b}
+                    orBytecode intCompare(Opcodes.IF_ICMPGT),
+            constBinary<BigInteger, BigInteger, Boolean>(false, intType, "lt", boolType, listOf(intType)) {a, b -> a < b}
+                    orBytecode intCompare(Opcodes.IF_ICMPLT),
+            constBinary<BigInteger, BigInteger, Boolean>(false, intType, "ge", boolType, listOf(intType)) {a, b -> a >= b}
+                    orBytecode intCompare(Opcodes.IF_ICMPGE),
+            constBinary<BigInteger, BigInteger, Boolean>(false, intType, "le", boolType, listOf(intType)) {a, b -> a <= b}
+                    orBytecode intCompare(Opcodes.IF_ICMPLE),
+            constBinary<BigInteger, BigInteger, Boolean>(false, intType, "eq", boolType, listOf(intType)) {a, b -> a == b}
+                    orBytecode intCompare(Opcodes.IF_ICMPEQ)
         )
     }
 
@@ -90,6 +102,40 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
                 }
             }
         }
+    }
+
+    private fun intCompare(intCompareOp: Int): (MethodVisitor) -> Unit = { writer ->
+        val pushTrue = Label()
+        val end = Label()
+        if (!signed && intCompareOp != Opcodes.IF_ICMPEQ) {
+            //Add min_value to both args
+            for (i in 0..1) {
+                if (bits <= 32) {
+                    when (bits) {
+                        8 -> writer.visitIntInsn(Opcodes.BIPUSH, Byte.MIN_VALUE.toInt())
+                        16 -> writer.visitIntInsn(Opcodes.SIPUSH, Short.MIN_VALUE.toInt())
+                        32 -> writer.visitLdcInsn(Int.MIN_VALUE)
+                    }
+                    writer.visitInsn(Opcodes.IADD)
+                    writer.visitInsn(Opcodes.SWAP)
+                } else {
+                    writer.visitLdcInsn(Long.MIN_VALUE)
+                    writer.visitInsn(Opcodes.LADD)
+                    writer.visitInsn(Opcodes.DUP2_X2)
+                    writer.visitInsn(Opcodes.POP2)
+                }
+            }
+        }
+        if (bits == 64) {
+            writer.visitInsn(Opcodes.LCMP)
+            writer.visitInsn(Opcodes.ICONST_0)
+        }
+        writer.visitJumpInsn(intCompareOp, pushTrue)
+        writer.visitInsn(Opcodes.ICONST_0)
+        writer.visitJumpInsn(Opcodes.GOTO, end)
+        writer.visitLabel(pushTrue)
+        writer.visitInsn(Opcodes.ICONST_1)
+        writer.visitLabel(end)
     }
 
 }

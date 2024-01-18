@@ -21,7 +21,7 @@ fun lower(ast: TypedAST): Program {
     val topLevelCode = ast.allFiles.mapValues {
         // Lower the expr and wrap it in a code block
         val loweredCode = lowerExpr(it.value.code, ConsList.of(ConsList.nil()), typeCalc)
-        Instruction.CodeBlock(ConsList.fromIterable(loweredCode.asIterable()))
+        Instruction.CodeBlock(loweredCode.toList())
     }
     // Get the types list, and sort it so subtypes come after their supertypes
     val typesList = typeCalc.freeze().toList().filter { it.second != null }.toMutableList()

@@ -41,10 +41,20 @@ data class PublicMembers(
 
 // Scan a block to get its public members. Used for both regular blocks
 // and on entire files.
-fun getPubMembers(block: ParsedElement.ParsedExpr.Block): PublicMembers {
+fun getPubMembers(
+    block: ParsedElement.ParsedExpr.Block,
+    startingMappings: ConsMap<String, ResolvedTypeDef>,
+    ast: ParsedAST,
+    cache: IdentityCache<ParsedFile, PublicMembers>
+): PublicMembers {
     var pubTypes: ConsMap<String, ResolvedTypeDef> = ConsMap(nil());
     for (elem: ParsedElement in block.elements) {
-
+        if (elem is ParsedElement.ParsedTypeDef && elem.pub) {
+            pubTypes = pubTypes.extend(
+                elem.name,
+                resolveTypeDef(elem, startingMappings, startingMappings, ast, cache).resolvedTypeDef
+            )
+        }
     }
     return PublicMembers(pubTypes)
 }
@@ -110,7 +120,7 @@ fun resolveExpr(
         val otherFile = ast.files[expr.path]?.value
             ?: throw ResolutionException(expr.path, expr.loc)
         // Resolve the other file
-        val otherPubMembers = cache.get(otherFile) { getPubMembers(it.block) }
+        val otherPubMembers = cache.get(otherFile) { getPubMembers(it.block, startingMappings, ast, cache) }
         // Return an import, as well as all the things imported from the other file
         ExprResolutionResult(
             ResolvedExpr.Import(expr.loc, expr.path),
@@ -254,6 +264,26 @@ fun resolveExpr(
 
     is ParsedElement.ParsedExpr.Return -> resolveExpr(expr.rhs, startingMappings, currentMappings, ast, cache).let {
         ExprResolutionResult(ResolvedExpr.Return(it.expr.loc, it.expr), it.files, it.exposedTypes)
+    }
+
+    is ParsedElement.ParsedExpr.If -> {
+        val resolvedCond = resolveExpr(expr.cond, startingMappings, currentMappings, ast, cache)
+        val resolvedIfTrue = resolveExpr(expr.ifTrue, startingMappings, currentMappings, ast, cache)
+        val resolvedIfFalse = expr.ifFalse?.let {resolveExpr(it, startingMappings, currentMappings, ast, cache) }
+        ExprResolutionResult(
+            ResolvedExpr.If(expr.loc, resolvedCond.expr, resolvedIfTrue.expr, resolvedIfFalse?.expr),
+            union(resolvedCond.files, resolvedIfTrue.files, resolvedIfFalse?.files ?: setOf()),
+            resolvedCond.exposedTypes.extend(resolvedIfTrue.exposedTypes).extend(resolvedIfFalse?.exposedTypes ?: ConsMap.of())
+        )
+    }
+    is ParsedElement.ParsedExpr.While -> {
+        val resolvedCond = resolveExpr(expr.cond, startingMappings, currentMappings, ast, cache)
+        val resolvedBody = resolveExpr(expr.body, startingMappings, currentMappings, ast, cache)
+        ExprResolutionResult(
+            ResolvedExpr.While(expr.loc, resolvedCond.expr, resolvedBody.expr),
+            union(resolvedCond.files, resolvedBody.files),
+            resolvedCond.exposedTypes.extend(resolvedBody.exposedTypes)
+        )
     }
 
     // For ones where there's no nested expressions or other things, it's just a 1-liner.

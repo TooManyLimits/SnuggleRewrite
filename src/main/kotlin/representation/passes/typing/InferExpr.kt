@@ -16,6 +16,7 @@ import util.ConsMap
 import util.extend
 import util.lookup
 import java.math.BigInteger
+import kotlin.math.exp
 
 /**
  * The output of type-checking an expression. Always results in a TypedExpr,
@@ -232,6 +233,51 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.Return(expr.loc, typedRhs.expr, typedRhs.expr.type))
     }
 
+    is ResolvedExpr.If -> run {
+        // Check cond as bool
+        val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        val typedCondExpr = typedCond.expr
+        // If it's a literal boolean, fold it
+        if (typedCondExpr is TypedExpr.Literal) {
+            if (typedCondExpr.value is Boolean) {
+                if (typedCondExpr.value) {
+                    // Infer the true branch; if there's no false branch, then wrap in an Option
+                    val newScope = scope.extend(typedCond.newVarsIfTrue)
+                    val inferredTrueBranch = inferExpr(expr.ifTrue, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+                    if (expr.ifFalse != null) return@run just(inferredTrueBranch)
+                    return@run just(wrapInOption(inferredTrueBranch, scope, typeCache))
+                } else {
+                    val newScope = scope.extend(typedCond.newVarsIfFalse)
+                    // If there is a false branch, infer it and be done
+                    if (expr.ifFalse != null)
+                        return@run inferExpr(expr.ifFalse, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+                    // Otherwise, no false branch, return an empty optional.
+                    val trueBranchType = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr.type
+                    return@run just(emptyOption(trueBranchType, scope, typeCache))
+                }
+            } else throw IllegalStateException("Should have checked to boolean? Bug in compiler, please report")
+        }
+        // Can't constant fold, so let's output a TypedIf
+        val typedTrueBranch = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        just(if (expr.ifFalse != null) {
+            val typedFalseBranch = checkExpr(expr.ifFalse, typedTrueBranch.type, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            TypedExpr.If(expr.loc, typedCondExpr, typedTrueBranch, typedFalseBranch, typedTrueBranch.type)
+        } else {
+            val wrappedTrueBranch = wrapInOption(typedTrueBranch, scope, typeCache)
+            val generatedFalseBranch = emptyOption(typedTrueBranch.type, scope, typeCache)
+            TypedExpr.If(expr.loc, typedCondExpr, wrappedTrueBranch, generatedFalseBranch, wrappedTrueBranch.type)
+        })
+    }
+
+    is ResolvedExpr.While -> {
+        val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        val newScope = scope.extend(typedCond.newVarsIfTrue)
+        val inferredBody = inferExpr(expr.body, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        val wrappedBody = wrapInOption(inferredBody, scope, typeCache)
+        val emptyOption = emptyOption(inferredBody.type, scope, typeCache)
+        just(TypedExpr.While(expr.loc, typedCond.expr, wrappedBody, emptyOption, wrappedBody.type))
+    }
+
     is ResolvedExpr.Literal -> {
         var value = expr.value
         val type = when (expr.value) {
@@ -270,4 +316,16 @@ private fun checkMutable(lvalue: TypedExpr, assignLoc: Loc): Unit = when (lvalue
         else -> checkMutable(lvalue.receiver, assignLoc)
     }
     else -> throw CompilationException("Illegal assignment - can only assign to variables, fields, or [] results.", assignLoc)
+}
+
+// Wrap a given typedExpr inside an Optional
+fun wrapInOption(toBeWrapped: TypedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypedExpr {
+    val optionType = getGenericBuiltin(OptionType, listOf(toBeWrapped.type), typeCache)
+    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 1 }!!
+    return TypedExpr.StaticMethodCall(toBeWrapped.loc, optionType, "new", listOf(toBeWrapped), constructor, getTopIndex(scope), optionType)
+}
+fun emptyOption(genericType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypedExpr {
+    val optionType = getGenericBuiltin(OptionType, listOf(genericType), typeCache)
+    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 0 }!!
+    return TypedExpr.StaticMethodCall(Loc.NEVER, optionType, "new", listOf(), constructor, getTopIndex(scope), optionType)
 }

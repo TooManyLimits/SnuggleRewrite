@@ -49,6 +49,9 @@ sealed interface ParsedElement {
         data class Assignment(override val loc: Loc, val lhs: ParsedExpr, val rhs: ParsedExpr): ParsedExpr
         data class Return(override val loc: Loc, val rhs: ParsedExpr): ParsedExpr
 
+        data class If(override val loc: Loc, val cond: ParsedExpr, val ifTrue: ParsedExpr, val ifFalse: ParsedExpr?): ParsedExpr
+        data class While(override val loc: Loc, val cond: ParsedExpr, val body: ParsedExpr): ParsedExpr
+
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Super(override val loc: Loc): ParsedExpr
         data class Variable(override val loc: Loc, val name: String): ParsedExpr

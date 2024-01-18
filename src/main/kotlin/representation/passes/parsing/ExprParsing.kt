@@ -28,20 +28,30 @@ private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, methodGenerics
             TokenType.MINUS -> "sub"
             TokenType.STAR -> "mul"
             TokenType.SLASH -> "div"
+            TokenType.GREATER -> "gt"
+            TokenType.LESS -> "lt"
+            TokenType.GREATER_EQUAL -> "ge"
+            TokenType.LESS_EQUAL -> "le"
+            TokenType.EQUALS, TokenType.NOT_EQUALS -> "eq" // NotEquals is literally .eq().not()
             else -> throw IllegalStateException("Unexpected binary operator ${tok.type}. Bug in compiler, please report")
         }
         val rhs = parseBinary(lexer, typeGenerics, methodGenerics, rhsPrecedence)
         val loc = lhs.loc.merge(rhs.loc)
         lhs = ParsedExpr.MethodCall(loc, lhs, methodName, listOf(), listOf(rhs))
+        if (tok.type == TokenType.NOT_EQUALS) {
+            // Append the `.not()` if tok was NOT_EQUALS
+            lhs = ParsedExpr.MethodCall(loc, lhs, "not", listOf(), listOf())
+        }
     }
     return lhs
 }
 
 private fun parseUnary(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
-    if (lexer.consume(TokenType.MINUS)) {
+    if (lexer.consume(TokenType.MINUS, TokenType.HASHTAG)) {
         val tok = lexer.last()
         val methodName = when(tok.type) {
             TokenType.MINUS -> "neg"
+            TokenType.HASHTAG -> "size"
             else -> throw IllegalStateException("Unexpected unary operator ${tok.type}. Bug in compiler, please report")
         }
         val operand = parseUnary(lexer, typeGenerics, methodGenerics)
@@ -53,7 +63,7 @@ private fun parseUnary(lexer: Lexer, typeGenerics: List<String>, methodGenerics:
 
 private fun parseAssignment(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     var lhs = parseFieldAccessOrMethodCall(lexer, typeGenerics, methodGenerics)
-    if (lexer.consume(TokenType.EQUALS)) {
+    if (lexer.consume(TokenType.ASSIGN)) {
         val eqLoc = lexer.last().loc
         val rhs = parseExpr(lexer, typeGenerics, methodGenerics)
         lhs = if (lhs is ParsedExpr.Variable || lhs is ParsedExpr.FieldAccess)
@@ -125,6 +135,8 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>, methodGenerics: 
         TokenType.LET -> parseDeclaration(lexer, typeGenerics, methodGenerics)
 
         TokenType.RETURN -> ParsedExpr.Return(lexer.last().loc, parseExpr(lexer, typeGenerics, methodGenerics))
+        TokenType.IF -> parseIf(lexer, typeGenerics, methodGenerics)
+        TokenType.WHILE -> parseWhile(lexer, typeGenerics, methodGenerics)
 
         else -> throw ParsingException(expected = "Expression", found = lexer.last().type.toString(), loc = lexer.last().loc)
     }
@@ -203,9 +215,25 @@ private fun parseConstructor(lexer: Lexer, typeGenerics: List<String>, methodGen
 private fun parseDeclaration(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     val let = lexer.last()
     val pat = parsePattern(lexer, typeGenerics, methodGenerics)
-    lexer.expect(TokenType.EQUALS)
+    lexer.expect(TokenType.ASSIGN)
     val initializer = parseExpr(lexer, typeGenerics, methodGenerics)
     return ParsedExpr.Declaration(let.loc, pat, initializer)
+}
+
+private fun parseIf(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    val loc = lexer.last().loc
+    val cond = wrapTruthy(parseExpr(lexer, typeGenerics, methodGenerics))
+    val ifTrue = parseExpr(lexer, typeGenerics, methodGenerics)
+    val ifFalse = if (lexer.consume(TokenType.ELSE)) parseExpr(lexer, typeGenerics, methodGenerics)
+        else null
+    return ParsedExpr.If(loc, cond, ifTrue, ifFalse)
+}
+
+private fun parseWhile(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    val loc = lexer.last().loc
+    val cond = wrapTruthy(parseExpr(lexer, typeGenerics, methodGenerics))
+    val body = parseExpr(lexer, typeGenerics, methodGenerics)
+    return ParsedExpr.While(loc, cond, body)
 }
 
 /**
@@ -215,12 +243,17 @@ private fun parseDeclaration(lexer: Lexer, typeGenerics: List<String>, methodGen
 private val TOKS_BY_PRECEDENCE: Array<Array<TokenType>> = arrayOf(
     arrayOf(),
     arrayOf(),
-    arrayOf(),
-    arrayOf(),
+    arrayOf(TokenType.EQUALS, TokenType.NOT_EQUALS),
+    arrayOf(TokenType.GREATER, TokenType.LESS, TokenType.GREATER_EQUAL, TokenType.LESS_EQUAL),
     arrayOf(TokenType.PLUS, TokenType.MINUS),
     arrayOf(TokenType.STAR, TokenType.SLASH)
 )
 
 private fun isRightAssociative(op: TokenType): Boolean {
     return false; // the only one is exponent operator, currently
+}
+
+// Util for wrapping in .bool() call
+private fun wrapTruthy(expr: ParsedExpr): ParsedExpr {
+    return ParsedExpr.MethodCall(expr.loc, expr, "bool", listOf(), listOf())
 }

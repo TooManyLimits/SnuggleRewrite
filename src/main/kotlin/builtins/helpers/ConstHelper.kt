@@ -47,3 +47,19 @@ inline fun <reified A, reified B, reified C> constBinary(static: Boolean, owning
         }
     }
 }
+
+inline fun <reified A, reified B> constUnary(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, argTypes: List<TypeDef>, crossinline replacer: (A) -> B): ConstWrapperTemp {
+    return ConstWrapperTemp(static, owningType, name, returnType, argTypes) {
+        { call ->
+            val receiver = call.receiver
+            if (receiver is TypedExpr.Literal) {
+                if (receiver.value !is A)
+                    throw IllegalStateException("Unexpected types to constUnary")
+                val replaced = replacer(receiver.value)
+                TypedExpr.Literal(call.loc, replaced as Any, call.type)
+            } else {
+                it(call)
+            }
+        }
+    }
+}

@@ -1,7 +1,9 @@
 package representation.passes.typing
 
+import builtins.BoolType
 import builtins.IntLiteralType
 import builtins.IntType
+import builtins.OptionType
 import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
@@ -158,6 +160,66 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     // (though we don't have a representation of such)
     is ResolvedExpr.Return -> inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
 
+    // Similar to the infer() version, but with certain infer() calls replaced with check()
+    is ResolvedExpr.If -> run {
+        // Check cond as bool
+        val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        val typedCondExpr = typedCond.expr
+        // If it's a literal boolean, fold it
+        if (typedCondExpr is TypedExpr.Literal) {
+            if (typedCondExpr.value is Boolean) {
+                // If there is an else branch, ensure the correct branch is as expected, and return it
+                if (expr.ifFalse != null) {
+                    if (typedCondExpr.value)
+                        return@run checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+                    else
+                        return@run checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+                }
+                // There was no false branch. Ensure that the expected type was an Option.
+                if (expectedType.builtin != OptionType)
+                    throw TypeCheckingException("Expected type \"${expectedType.name}\", but if-expression without else outputs Option", expr.loc)
+                val innerType = expectedType.generics[0]
+                val res = if (typedCondExpr.value) {
+                    // Check the true branch and wrap in an option
+                    val newScope = scope.extend(typedCond.newVarsIfTrue)
+                    val checkedTrueBranch = checkExpr(expr.ifTrue, innerType, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+                    wrapInOption(checkedTrueBranch, scope, typeCache)
+                } else {
+                    // Just an empty option
+                    emptyOption(innerType, scope, typeCache)
+                }
+                return@run just(res)
+            } else throw IllegalStateException("Should have checked to boolean? Bug in compiler, please report")
+        }
+        // Can't constant fold, so let's check both branches and ouput TypedExpr.If
+        if (expr.ifFalse != null) {
+            val typedTrueBranch = checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            val typedFalseBranch = checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            just(TypedExpr.If(expr.loc, typedCondExpr, typedTrueBranch, typedFalseBranch, expectedType))
+        } else {
+            if (expectedType.builtin != OptionType)
+                throw TypeCheckingException("Expected type \"${expectedType.name}\", but if-expression without else outputs Option", expr.loc)
+            val innerType = expectedType.generics[0]
+            val typedTrueBranch = checkExpr(expr.ifTrue, innerType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            val wrappedTrueBranch = wrapInOption(typedTrueBranch, scope, typeCache)
+            val generatedFalseBranch = emptyOption(typedTrueBranch.type, scope, typeCache)
+            just(TypedExpr.If(expr.loc, typedCondExpr, wrappedTrueBranch, generatedFalseBranch, expectedType))
+        }
+    }
+
+    // Similar to infer(), but with checking the body instead of inferring
+    is ResolvedExpr.While -> {
+        val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        val newScope = scope.extend(typedCond.newVarsIfTrue)
+        if (expectedType.builtin != OptionType)
+            throw TypeCheckingException("Expected type \"${expectedType.name}\", but while-expression outputs Option", expr.loc)
+        val innerType = expectedType.generics[0]
+        val typedBody = checkExpr(expr.body, innerType, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        val wrappedBody = wrapInOption(typedBody, scope, typeCache)
+        val emptyOption = emptyOption(innerType, scope, typeCache)
+        just(TypedExpr.While(expr.loc, typedCond.expr, wrappedBody, emptyOption, expectedType))
+    }
+
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
     // e.g. Import, Literal, Variable, Declaration.
@@ -269,6 +331,8 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.Declaration -> findThisFieldAccesses(expr.initializer)
     is TypedExpr.Assignment -> union(findThisFieldAccesses(expr.lhs), findThisFieldAccesses(expr.rhs))
     is TypedExpr.Return -> findThisFieldAccesses(expr.rhs)
+    is TypedExpr.If -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.ifTrue), findThisFieldAccesses(expr.ifFalse))
+    is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.wrappedBody), findThisFieldAccesses(expr.neverRanAlternative))
     is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
         setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
     is TypedExpr.MethodCall -> union(listOf(findThisFieldAccesses(expr.receiver)), expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
@@ -276,7 +340,8 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.SuperMethodCall -> union(expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
     is TypedExpr.ClassConstructorCall -> union(expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
     is TypedExpr.RawStructConstructor -> union(expr.fieldValues.asSequence().map(::findThisFieldAccesses).asIterable())
-    else -> setOf()
+
+    is TypedExpr.Import, is TypedExpr.Literal, is TypedExpr.StaticFieldAccess, is TypedExpr.Variable -> setOf()
 }
 
 

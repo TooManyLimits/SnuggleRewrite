@@ -96,6 +96,9 @@ sealed interface ResolvedExpr {
 
     data class Return(override val loc: Loc, val rhs: ResolvedExpr): ResolvedExpr
 
+    data class If(override val loc: Loc, val cond: ResolvedExpr, val ifTrue: ResolvedExpr, val ifFalse: ResolvedExpr?): ResolvedExpr
+    data class While(override val loc: Loc, val cond: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
+
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
     data class Tuple(override val loc: Loc, val elements: List<ResolvedExpr>): ResolvedExpr

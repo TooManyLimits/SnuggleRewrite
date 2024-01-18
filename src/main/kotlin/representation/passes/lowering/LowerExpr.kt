@@ -1,5 +1,6 @@
 package representation.passes.lowering
 
+import org.objectweb.asm.Label
 import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
 import representation.asts.typed.FieldDef
@@ -115,7 +116,6 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
                 if (lastField.type.isPlural) {
                     // If the last field in the chain is plural, store the reference type
                     // as a top local variable, then repeatedly grab it and GetReferenceTypeField.
-                    yield(Instruction.StoreLocal(expr.maxVariable, expr.receiver.type))
                     for ((pathToField, field) in lastField.type.recursiveNonStaticFields) {
                         if (neededToStoreLocal)
                             yield(Instruction.LoadLocal(expr.maxVariable, expr.receiver.type))
@@ -239,6 +239,52 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             yield(Instruction.Return(returnType))
         }
     }
+
+    is TypedExpr.If -> {
+        val ifFalseLabel = Label()
+        val doneLabel = Label()
+        sequence {
+            // Cond, jump if false to false branch
+            yieldAll(lowerExpr(expr.cond, ConsList.of(ConsList.nil()), typeCalc))
+            yield(Instruction.JumpIfFalse(ifFalseLabel))
+            // True branch
+            val loweredTrueBranch = lowerExpr(expr.ifTrue, ConsList.of(ConsList.nil()), typeCalc)
+            yield(Instruction.CodeBlock(loweredTrueBranch.toList()))
+            yield(Instruction.Jump(doneLabel))
+            // False branch
+            yield(Instruction.IrLabel(ifFalseLabel))
+            val loweredFalseBranch = lowerExpr(expr.ifFalse, ConsList.of(ConsList.nil()), typeCalc)
+            yield(Instruction.CodeBlock(loweredFalseBranch.toList()))
+            // Done
+            yield(Instruction.IrLabel(doneLabel))
+        }
+    }
+
+    is TypedExpr.While -> {
+        val condLabel = Label()
+        val doneLabel = Label()
+        sequence {
+            // Push optional "none" on the stack
+            yieldAll(lowerExpr(expr.neverRanAlternative, desiredFields, typeCalc))
+            // Cond label
+            yield(Instruction.IrLabel(condLabel))
+            // Yield the lowered cond + jump as its own code block
+            val loweredCond = sequence {
+                yieldAll(lowerExpr(expr.cond, ConsList.of(ConsList.nil()), typeCalc))
+                yield(Instruction.JumpIfFalse(doneLabel))
+            }
+            yield(Instruction.CodeBlock(loweredCond.toList()))
+            // Yield the lowered body + jump as its own code block
+            val loweredBody = sequence {
+                yield(Instruction.Pop(expr.type))
+                yieldAll(lowerExpr(expr.wrappedBody, ConsList.of(ConsList.nil()), typeCalc))
+                yield(Instruction.Jump(condLabel))
+            }
+            yield(Instruction.CodeBlock(loweredBody.toList()))
+            // Done label
+            yield(Instruction.IrLabel(doneLabel))
+        }
+    }
 }
 
 private fun getPluralOffset(fieldsToFollow: ConsList<FieldDef>): Int = fieldsToFollow.sumOf { it.pluralOffset!! }
@@ -312,10 +358,10 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
     }
 
     lhs is TypedExpr.StaticFieldAccess -> sequence {
-        val nameSuffix = fieldsToFollow.fold(lhs.fieldName) { suffix, field -> suffix + "$" + field.name }
+        val namePrefix = fieldsToFollow.fold(lhs.fieldName) { prefix, field -> prefix + "$" + field.name }
         if (rhs.type.isPlural) {
             for ((pathToField, field) in rhs.type.recursiveNonStaticFields.asReversed())
-                yield(Instruction.PutStaticField(lhs.receiverType, field.type, pathToField + "$" + nameSuffix))
+                yield(Instruction.PutStaticField(lhs.receiverType, field.type, namePrefix + "$" + pathToField))
         } else {
             yield(Instruction.PutStaticField(lhs.receiverType, rhs.type, lhs.fieldName))
         }
@@ -323,7 +369,7 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
 
     lhs is TypedExpr.FieldAccess && lhs.receiver.type.isReferenceType -> sequence {
         yieldAll(lowerExpr(lhs.receiver, ConsList.of(ConsList.nil()), typeCalc))
-        val nameSuffix = fieldsToFollow.fold(lhs.fieldName) { suffix, field -> suffix + "$" + field.name }
+        val namePrefix = fieldsToFollow.fold(lhs.fieldName) { prefix, field -> prefix + "$" + field.name }
         //TODO: Use a "neededToStore" like above to avoid storing as local for 1-elem structs
         if (rhs.type.isPlural) {
             // Store the reference type as a local, to grab later
@@ -334,12 +380,12 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
             for ((pathToField, field) in rhs.type.recursiveNonStaticFields.asReversed()) {
                 yield(Instruction.LoadLocal(maxVariable, lhs.receiver.type))
                 yield(Instruction.SwapBasic(lhs.receiver.type, field.type))
-                yield(Instruction.PutReferenceTypeField(lhs.receiver.type, field.type, pathToField + "$" + nameSuffix))
+                yield(Instruction.PutReferenceTypeField(lhs.receiver.type, field.type, namePrefix + "$" + pathToField))
             }
         } else {
             // Just set the field directly
             yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), typeCalc))
-            yield(Instruction.PutReferenceTypeField(lhs.receiver.type, rhs.type, nameSuffix))
+            yield(Instruction.PutReferenceTypeField(lhs.receiver.type, rhs.type, namePrefix))
         }
     }
 

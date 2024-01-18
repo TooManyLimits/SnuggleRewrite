@@ -1,5 +1,6 @@
 package representation.asts.ir
 
+import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.typed.FieldDef
@@ -37,7 +38,7 @@ sealed interface GeneratedMethod {
 
 sealed interface Instruction {
     // A collection of other instructions
-    data class CodeBlock(val instructions: ConsList<Instruction>): Instruction
+    data class CodeBlock(val instructions: List<Instruction>): Instruction
     // Some raw bytecodes supplied by the enclosing program
     data class Bytecodes(val cost: Long, val bytecodes: (MethodVisitor) -> Unit): Instruction
     // Import the file of the given name
@@ -70,6 +71,10 @@ sealed interface Instruction {
 
     // If null, return void
     data class Return(val basicTypeToReturn: TypeDef?): Instruction
+    data class IrLabel(val label: Label): Instruction
+    data class Jump(val label: Label): Instruction
+    data class JumpIfFalse(val label: Label): Instruction
+    data class JumpIfTrue(val label: Label): Instruction
 
     // Push the given value onto the stack
     data class Push(val valueToPush: Any, val type: TypeDef): Instruction
