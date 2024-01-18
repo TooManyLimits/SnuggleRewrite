@@ -61,14 +61,14 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     is ResolvedExpr.MethodCall -> {
         // Largely the same as the infer() version, just passes the "expectedType" parameter
         // Infer the type of the receiver
-        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.type.nonStaticMethods
+        val methods = typedReceiver.expr.type.nonStaticMethods
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val maxVariable = scope.sumOf { it.second.type.stackSlots }
-        val call = TypedExpr.MethodCall(expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
+        val call = TypedExpr.MethodCall(expr.loc, typedReceiver.expr, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
 
         // Repeatedly replace const method calls until done
         var resultExpr: TypedExpr = call
@@ -77,7 +77,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             // apply it like a macro, replacing the expression with a new one.
             resultExpr = (resultExpr.methodDef as MethodDef.ConstMethodDef).replacer(resultExpr)
         }
-        pullUpLiteral(just(resultExpr), expectedType)
+        pullUpLiteral(TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfTrue, typedReceiver.newVarsIfFalse), expectedType)
     }
 
     is ResolvedExpr.StaticMethodCall -> {
@@ -194,7 +194,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // Can't constant fold, so let's check both branches and ouput TypedExpr.If
         if (expr.ifFalse != null) {
             val typedTrueBranch = checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-            val typedFalseBranch = checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            val typedFalseBranch = checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
             just(TypedExpr.If(expr.loc, typedCondExpr, typedTrueBranch, typedFalseBranch, expectedType))
         } else {
             if (expectedType.builtin != OptionType)

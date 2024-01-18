@@ -13,14 +13,10 @@ fun main() {
 
     val code = """
         import "list"
-        let x = new List<i32>()
-        x.push(10)
-        x.push(20)
-        x.push(30)
-        x.push(40)
-        x.push(50)
-        x.push(60)
-        x.forEach( fn(elem) print(elem) )
+        if let x = 10i32 {
+            print(x)
+        }
+        //print(x)
     """.trimIndent()
     val lexer = Lexer("main", code)
 

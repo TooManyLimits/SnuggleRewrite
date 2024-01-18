@@ -148,18 +148,19 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.StaticFieldAccess(expr.loc, receiverType, expr.fieldName, bestField, bestField.type))
     }
 
+    // Vars from the receiver escape
     is ResolvedExpr.MethodCall -> {
         // Infer the type of the receiver
-        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.type.nonStaticMethods
+        val methods = typedReceiver.expr.type.nonStaticMethods
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Create a method call
         val maxVariable = scope.sumOf { it.second.type.stackSlots }
         val call = TypedExpr.MethodCall(
-            expr.loc, typedReceiver, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
+            expr.loc, typedReceiver.expr, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
 
         // Repeatedly replace const method calls until done
         var resultExpr: TypedExpr = call
@@ -169,7 +170,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             resultExpr = (resultExpr.methodDef as MethodDef.ConstMethodDef).replacer(resultExpr)
         }
 
-        just(resultExpr)
+        TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfTrue, typedReceiver.newVarsIfFalse)
     }
 
     is ResolvedExpr.StaticMethodCall -> {
@@ -242,8 +243,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             if (typedCondExpr.value is Boolean) {
                 if (typedCondExpr.value) {
                     // Infer the true branch; if there's no false branch, then wrap in an Option
-                    val newScope = scope.extend(typedCond.newVarsIfTrue)
-                    val inferredTrueBranch = inferExpr(expr.ifTrue, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+                    val inferredTrueBranch = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
                     if (expr.ifFalse != null) return@run just(inferredTrueBranch)
                     return@run just(wrapInOption(inferredTrueBranch, scope, typeCache))
                 } else {
