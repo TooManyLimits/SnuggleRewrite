@@ -3,6 +3,7 @@ package representation.asts.resolved
 import representation.passes.lexing.Loc
 import builtins.BuiltinType
 import util.Promise
+import java.util.IdentityHashMap
 
 /**
  * Here, the raw string data of the previous AST (ParsedAST)
@@ -45,7 +46,7 @@ data class ResolvedAST(
     // All files used in the program. (No longer lazy. Things that are never imported do not appear, and were never parsed.)
     val allFiles: Map<String, ResolvedFile>,
     // The builtin map. Builtins are mapped to their corresponding ResolvedTypeDefs.
-    val builtinMap: Map<BuiltinType, ResolvedTypeDef>
+    val builtinMap: IdentityHashMap<BuiltinType, ResolvedTypeDef.Builtin>
 )
 
 data class ResolvedFile(val name: String, val code: ResolvedExpr)

@@ -24,11 +24,8 @@ class SnuggleInstance(compiledProgram: CompiledProgram) {
     init {
         // Add the other classes to the class loader
         for (otherClass in compiledProgram.otherClasses) {
-//            ClassReader(otherClass).accept(TraceClassVisitor(PrintWriter(System.err)), ClassReader.SKIP_DEBUG)
-//            Thread.sleep(1000)
             loader.defineClass(otherClass)
         }
-//        compiledProgram.otherClasses.forEach { loader.defineClass(it) }
         // Create the runtime and add it to the loader
         val runtimeClass = loader.defineClass(compiledProgram.runtimeClass)
         runtime = runtimeClass.getConstructor().newInstance() as SnuggleRuntime

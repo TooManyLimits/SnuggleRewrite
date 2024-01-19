@@ -1,22 +1,23 @@
 import builtins.*
-import representation.passes.name_resolving.resolveAST
-import representation.passes.lexing.Lexer
+import reflection.ReflectedBuiltinType
 import representation.asts.parsed.ParsedAST
+import representation.passes.lexing.Lexer
+import representation.passes.lowering.lower
+import representation.passes.name_resolving.resolveAST
+import representation.passes.output.output
 import representation.passes.parsing.parseFileLazy
 import representation.passes.typing.typeAST
-import representation.passes.lowering.lower
-import representation.passes.output.output
 import runtime.SnuggleInstance
 import util.ConsList
 
 fun main() {
 
     val code = """
-        import "list"
-        if let x = 10i32 {
-            print(x)
-        }
-        //print(x)
+        let a = TestClass.getInstance()
+        print(a.x)
+        print(a.y)
+        print(a.z)
+        print(a)
     """.trimIndent()
     val lexer = Lexer("main", code)
 
@@ -24,7 +25,11 @@ fun main() {
     val parsedAST = ParsedAST(mapOf("main" to file, "list" to parseFileLazy(Lexer("list", list))))
 //    parsedAST.debugReadAllFiles() // Remove lazy wrapping
 //    println(parsedAST)
-    val resolvedAST = resolveAST(parsedAST, ConsList.of(BoolType, ObjectType, StringType, OptionType, ArrayType, MaybeUninitType, PrintType, IntLiteralType, *INT_TYPES, *FLOAT_TYPES))
+    val resolvedAST = resolveAST(parsedAST, ConsList.of(
+        BoolType, ObjectType, StringType, OptionType, ArrayType,
+        MaybeUninitType, PrintType, IntLiteralType, *INT_TYPES, *FLOAT_TYPES,
+        ReflectedBuiltinType(TestClass::class.java)
+    ))
 //    println(resolvedAST)
     val typedAST = typeAST(resolvedAST)
 //    println(typedAST)

@@ -4,6 +4,7 @@ import representation.asts.resolved.ResolvedAST
 import representation.asts.resolved.ResolvedType
 import representation.asts.resolved.ResolvedTypeDef
 import builtins.BuiltinType
+import reflection.ReflectedBuiltinType
 import representation.asts.typed.FieldDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
@@ -12,6 +13,7 @@ import util.ConsList.Companion.nil
 import util.ConsMap
 import util.caching.EqualityCache
 import util.caching.IdentityCache
+import java.util.IdentityHashMap
 
 /**
  * Convert a ResolvedAST into a TypedAST.
@@ -23,7 +25,8 @@ import util.caching.IdentityCache
  */
 fun typeAST(ast: ResolvedAST): TypedAST {
 
-    val typeCache = TypeDefCache(IdentityCache(), EqualityCache(), EqualityCache(), ast.builtinMap)
+    val reflectedBuiltins = ast.builtinMap.keys.filterIsInstance<ReflectedBuiltinType>().associateByTo(IdentityHashMap()) { it.reflectedClass }
+    val typeCache = TypeDefCache(IdentityCache(), EqualityCache(), EqualityCache(), ast.builtinMap, reflectedBuiltins)
 
     return TypedAST(ast.allFiles.mapValues {
         // Top-level code does not have any currentTypeGenerics.
@@ -127,7 +130,8 @@ fun getTuple(elements: List<TypeDef>, cache: TypeDefCache): TypeDef.Tuple =
 fun getUnit(cache: TypeDefCache): TypeDef.Tuple = getTuple(listOf(), cache)
 fun getFunc(paramTypes: List<TypeDef>, returnType: TypeDef, cache: TypeDefCache): TypeDef.Func =
     cache.getFunc(paramTypes, returnType) { p, r -> TypeDef.Func(p, r, cache) }
-
+fun getReflectedBuiltin(jClass: Class<*>, cache: TypeDefCache): TypeDef =
+    getBasicBuiltin(cache.reflectedBuiltins[jClass] ?: throw IllegalStateException("Attempt to get builtin for java class \"${jClass.name}\", but none was registered?"), cache)
 
 // The type def cache, with related useful extension methods get() and put().
 // It also stores the mapping of builtin objects to their corresponding resolved type defs.
@@ -135,7 +139,8 @@ data class TypeDefCache(
     val basicCache: IdentityCache<ResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>,
     val tupleCache: EqualityCache<List<TypeDef>, TypeDef.Tuple>,
     val funcCache: EqualityCache<List<TypeDef>, IdentityCache<TypeDef, TypeDef.Func>>,
-    val builtins: Map<BuiltinType, ResolvedTypeDef>
+    val builtins: IdentityHashMap<BuiltinType, ResolvedTypeDef.Builtin>,
+    val reflectedBuiltins: IdentityHashMap<Class<*>, ReflectedBuiltinType>
 )
 private fun TypeDefCache.getBasic(base: ResolvedTypeDef, generics: List<TypeDef>, func: (ResolvedTypeDef, List<TypeDef>) -> TypeDef) =
     this.basicCache.get(base) { EqualityCache() }.get(generics) {func(base, it)}
@@ -149,5 +154,3 @@ private fun TypeDefCache.getFunc(paramTypes: List<TypeDef>, returnType: TypeDef,
     this.funcCache.get(paramTypes) {IdentityCache()}.get(returnType) {func(paramTypes, returnType)}
 private fun TypeDefCache.putFunc(paramTypes: List<TypeDef>, returnType: TypeDef, value: TypeDef.Func) =
     this.getFunc(paramTypes, returnType) { _, _ -> value }
-
-

@@ -8,6 +8,7 @@ import representation.asts.resolved.ResolvedFile
 import representation.asts.resolved.ResolvedTypeDef
 import util.*
 import util.caching.IdentityCache
+import java.util.IdentityHashMap
 import java.util.LinkedList
 import java.util.Queue
 
@@ -53,7 +54,7 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ResolvedAST
     // Also create the map of builtins, out of the starting mappings.
     val builtinMap = startingMappings
         .map { it.second } // Select the values, the Builtin ResolvedTypeDefs
-        .associateBy { it.builtin } // Map them according to their builtin
+        .associateByTo(IdentityHashMap()) { it.builtin } // Map them according to their builtin
 
     return ResolvedAST(allFiles, builtinMap)
 }
