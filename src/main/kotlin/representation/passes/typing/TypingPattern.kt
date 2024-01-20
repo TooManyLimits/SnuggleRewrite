@@ -4,11 +4,9 @@ import builtins.IntLiteralType
 import errors.CompilationException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedPattern
-import representation.asts.resolved.ResolvedType
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedPattern
 import util.ConsMap
-import util.extendMany
 
 data class VariableBinding(val type: TypeDef, val mutable: Boolean, val index: Int)
 

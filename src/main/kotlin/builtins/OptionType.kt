@@ -15,7 +15,6 @@ import representation.passes.typing.getGenericBuiltin
 import representation.passes.typing.getUnit
 import util.Cons
 import util.ConsList
-import util.append
 import util.appendElem
 
 /**

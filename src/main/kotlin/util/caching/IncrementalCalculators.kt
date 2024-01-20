@@ -1,6 +1,6 @@
 package util.caching
 
-import java.util.IdentityHashMap
+import java.util.*
 
 /**
  * Functionality of these types is rather similar to the Cache, but with a key difference.

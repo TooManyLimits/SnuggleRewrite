@@ -1,7 +1,6 @@
 package runtime
 
 import errors.SnuggleException
-import kotlin.jvm.Throws
 
 /**
  * Represents a running "instance" of some Snuggle code.

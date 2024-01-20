@@ -1,16 +1,15 @@
 package representation.passes.name_resolving
 
+import builtins.BuiltinType
 import representation.asts.parsed.ParsedAST
 import representation.asts.parsed.ParsedFile
-import builtins.BuiltinType
 import representation.asts.resolved.ResolvedAST
 import representation.asts.resolved.ResolvedFile
 import representation.asts.resolved.ResolvedTypeDef
-import util.*
+import util.ConsList
+import util.ConsMap
 import util.caching.IdentityCache
-import java.util.IdentityHashMap
-import java.util.LinkedList
-import java.util.Queue
+import java.util.*
 
 /**
  *

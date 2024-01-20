@@ -1,7 +1,5 @@
 package util
 
-import java.util.Optional
-
 
 sealed interface ConsList<out T> : Iterable<T> {
 

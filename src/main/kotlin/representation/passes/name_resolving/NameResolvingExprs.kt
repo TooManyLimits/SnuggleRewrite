@@ -2,13 +2,13 @@ package representation.passes.name_resolving
 
 import errors.CompilationException
 import errors.ParsingException
-import representation.asts.resolved.ResolvedExpr
-import representation.asts.resolved.ResolvedType
-import representation.asts.resolved.ResolvedTypeDef
 import representation.asts.parsed.ParsedAST
 import representation.asts.parsed.ParsedElement
 import representation.asts.parsed.ParsedFile
 import representation.asts.parsed.ParsedType
+import representation.asts.resolved.ResolvedExpr
+import representation.asts.resolved.ResolvedType
+import representation.asts.resolved.ResolvedTypeDef
 import representation.passes.lexing.Loc
 import util.*
 import util.ConsList.Companion.fromIterable

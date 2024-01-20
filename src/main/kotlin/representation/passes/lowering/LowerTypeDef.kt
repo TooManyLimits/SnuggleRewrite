@@ -1,6 +1,9 @@
 package representation.passes.lowering
 
-import representation.asts.ir.*
+import representation.asts.ir.GeneratedField
+import representation.asts.ir.GeneratedMethod
+import representation.asts.ir.GeneratedType
+import representation.asts.ir.Instruction
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef

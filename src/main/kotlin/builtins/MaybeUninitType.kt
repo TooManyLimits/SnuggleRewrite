@@ -6,7 +6,6 @@ import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getGenericBuiltin
-import representation.passes.typing.getUnit
 import util.toGeneric
 
 /**

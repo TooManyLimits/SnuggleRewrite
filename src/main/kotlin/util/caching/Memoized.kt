@@ -1,7 +1,6 @@
 package util.caching
 
 import java.util.*
-import kotlin.collections.HashMap
 
 // Memoized function backed by a cache
 abstract class Memoized<K, V, M: MutableMap<K, V>>(cacheSupplier: () -> Cache<K, V, M>, private val func: (K) -> V) {

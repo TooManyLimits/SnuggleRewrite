@@ -1,9 +1,9 @@
 package representation.asts.resolved
 
-import representation.passes.lexing.Loc
 import builtins.BuiltinType
+import representation.passes.lexing.Loc
 import util.Promise
-import java.util.IdentityHashMap
+import java.util.*
 
 /**
  * Here, the raw string data of the previous AST (ParsedAST)

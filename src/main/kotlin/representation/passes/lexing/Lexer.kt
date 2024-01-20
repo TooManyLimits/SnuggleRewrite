@@ -2,7 +2,7 @@ package representation.passes.lexing
 
 import errors.ParsingException
 import java.io.StringReader
-import java.util.Scanner
+import java.util.*
 
 class Lexer(val fileName: String, private val scanner: Scanner): Iterable<Token> {
 

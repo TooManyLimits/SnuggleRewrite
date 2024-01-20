@@ -1,9 +1,9 @@
 package representation.passes.name_resolving
 
+import representation.asts.parsed.*
 import representation.asts.resolved.ResolvedFieldDef
 import representation.asts.resolved.ResolvedMethodDef
 import representation.asts.resolved.ResolvedTypeDef
-import representation.asts.parsed.*
 import util.ConsMap
 import util.caching.IdentityCache
 import util.union

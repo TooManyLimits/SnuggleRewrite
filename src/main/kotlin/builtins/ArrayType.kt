@@ -7,9 +7,11 @@ import org.objectweb.asm.Type
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.*
+import representation.passes.typing.TypeDefCache
+import representation.passes.typing.getBasicBuiltin
+import representation.passes.typing.getGenericBuiltin
+import representation.passes.typing.getUnit
 import util.ConsList
-import util.mapFirst
 
 object ArrayType: BuiltinType {
     override val numGenerics: Int get() = 1

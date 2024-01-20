@@ -13,7 +13,10 @@ import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.passes.lexing.Loc
-import util.*
+import util.ConsMap
+import util.extend
+import util.lookup
+import util.union
 import java.math.BigInteger
 import kotlin.math.max
 
@@ -37,7 +40,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             // Check its new vars. If neither side is empty, add the vars in.
             if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                 // Extend the scope with the new vars
-                assert(inferred.newVarsIfTrue == inferred.newVarsIfFalse) { "Failed assertion - different vars ifTrue vs ifFalse, but neither is empty? Bug in compiler, please report!" }
+                if (inferred.newVarsIfTrue != inferred.newVarsIfFalse)
+                    throw IllegalStateException("Failed assertion - different vars ifTrue vs ifFalse, but neither is empty? Bug in compiler, please report!")
                 scope = scope.extend(inferred.newVarsIfTrue)
             } else {
                 // TODO: Warn; this is a useless binding

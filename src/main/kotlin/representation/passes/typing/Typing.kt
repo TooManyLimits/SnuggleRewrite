@@ -1,10 +1,10 @@
 package representation.passes.typing
 
+import builtins.BuiltinType
+import reflection.ReflectedBuiltinType
 import representation.asts.resolved.ResolvedAST
 import representation.asts.resolved.ResolvedType
 import representation.asts.resolved.ResolvedTypeDef
-import builtins.BuiltinType
-import reflection.ReflectedBuiltinType
 import representation.asts.typed.FieldDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
@@ -13,7 +13,7 @@ import util.ConsList.Companion.nil
 import util.ConsMap
 import util.caching.EqualityCache
 import util.caching.IdentityCache
-import java.util.IdentityHashMap
+import java.util.*
 
 /**
  * Convert a ResolvedAST into a TypedAST.

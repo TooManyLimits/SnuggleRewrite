@@ -1,6 +1,5 @@
 package representation.asts.parsed
 
-import representation.asts.typed.TypeDef
 import representation.passes.lexing.Loc
 
 /**

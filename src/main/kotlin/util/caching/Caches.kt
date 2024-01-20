@@ -1,7 +1,6 @@
 package util.caching
 
 import java.util.*
-import kotlin.collections.HashMap
 
 abstract class Cache<K, V, M: MutableMap<K, V>>(mapSupplier: () -> M) {
 

@@ -1,10 +1,10 @@
 package representation.passes.parsing
 
-import representation.asts.parsed.ParsedElement.*
-import representation.passes.lexing.Lexer
-import representation.passes.lexing.TokenType
 import errors.ParsingException
 import representation.asts.parsed.ParsedElement
+import representation.asts.parsed.ParsedElement.ParsedExpr
+import representation.passes.lexing.Lexer
+import representation.passes.lexing.TokenType
 
 /**
  * Expression parsing !

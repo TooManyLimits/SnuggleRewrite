@@ -8,7 +8,6 @@ import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getBasicBuiltin
 import representation.passes.typing.getUnit
 import java.io.PrintStream
-import java.io.PrintWriter
 
 // Temporary builtin to allow printing
 object PrintType: BuiltinType {

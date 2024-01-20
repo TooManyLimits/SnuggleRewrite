@@ -16,7 +16,6 @@ import util.ConsMap
 import util.extend
 import util.lookup
 import java.math.BigInteger
-import kotlin.math.exp
 
 /**
  * The output of type-checking an expression. Always results in a TypedExpr,
@@ -79,7 +78,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
                 // Check its new vars. If neither side is empty, add the vars in.
                 if (inferred.newVarsIfTrue.isNotEmpty() && inferred.newVarsIfFalse.isNotEmpty()) {
                     // Extend the scope with the new vars
-                    assert(inferred.newVarsIfTrue == inferred.newVarsIfFalse) { "Failed assertion - different vars ifTrue vs ifFalse, but neither is empty? Bug in compiler, please report!" }
+                    if (inferred.newVarsIfTrue != inferred.newVarsIfFalse)
+                        throw IllegalStateException("Failed assertion - different vars ifTrue vs ifFalse, but neither is empty? Bug in compiler, please report!")
                     scope = scope.extend(inferred.newVarsIfTrue)
                 } else {
                     // TODO: Warn; this is a useless binding

@@ -8,7 +8,6 @@ import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.passes.lexing.Loc
 import util.ConsMap
-import util.caching.IdentityCache
 import util.allIndexed
 import util.caching.EqualityCache
 import util.insertionSort
