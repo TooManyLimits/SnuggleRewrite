@@ -17,7 +17,7 @@ import java.util.IdentityHashMap
 abstract class IncrementalCalculator<K, V, M: MutableMap<K, V?>>(mapSupplier: () -> M) {
     private var map: M? = mapSupplier()
 
-    fun compute(key: K, func: (K) -> V?) {
+    fun <K2: K> compute(key: K2, func: (K2) -> V?) {
         val map = map ?: throw IllegalStateException("Attempt to use frozen calculator")
         if (!map.containsKey(key)) {
             map.put(key, null)

@@ -1,14 +1,4 @@
-import builtins.*
-import reflection.ReflectedBuiltinType
-import representation.asts.parsed.ParsedAST
-import representation.passes.lexing.Lexer
-import representation.passes.lowering.lower
-import representation.passes.name_resolving.resolveAST
-import representation.passes.output.output
-import representation.passes.parsing.parseFileLazy
-import representation.passes.typing.typeAST
-import runtime.SnuggleInstance
-import util.ConsList
+import runtime.InstanceBuilder
 
 fun main() {
 
@@ -16,8 +6,10 @@ fun main() {
         import "list"
         class Event<Input>: List<Input -> ()> {
             pub fn new() super()
+            // Currently requires "this." for closed over variables...
+            // Since those closed-over variables are *fields* of the closure object
             pub fn invoke(input: Input)
-                this.forEach(fn(elem) elem(this.input))
+                this.forEach(fn(elem) elem(this.input)) 
         }
         let x = new Event<i32>()
         x.push(fn(arg) print(arg))
@@ -26,25 +18,12 @@ fun main() {
         x(10)
         x(9)
     """.trimIndent()
-    val lexer = Lexer("main", code)
 
-    val file = parseFileLazy(lexer)
-    val parsedAST = ParsedAST(mapOf("main" to file, "list" to parseFileLazy(Lexer("list", list))))
-//    parsedAST.debugReadAllFiles() // Remove lazy wrapping
-//    println(parsedAST)
-    val resolvedAST = resolveAST(parsedAST, ConsList.of(
-        BoolType, ObjectType, StringType, OptionType, ArrayType,
-        MaybeUninitType, PrintType, IntLiteralType, *INT_TYPES, *FLOAT_TYPES,
-        ReflectedBuiltinType(TestClass::class.java)
-    ))
-//    println(resolvedAST)
-    val typedAST = typeAST(resolvedAST)
-//    println(typedAST)
-    val ir = lower(typedAST)
-//    println(ir)
-    val instance = SnuggleInstance(output(ir))
+    val instance = InstanceBuilder(mutableMapOf("main" to code))
+        .addFile("list", list)
+        .build()
+
     instance.runtime.runCode()
-
 }
 
 
