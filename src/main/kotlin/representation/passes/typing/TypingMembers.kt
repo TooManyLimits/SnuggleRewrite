@@ -1,6 +1,8 @@
 package representation.passes.typing
 
 import representation.asts.resolved.ResolvedMethodDef
+import representation.asts.resolved.ResolvedPattern
+import representation.asts.resolved.ResolvedType
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
@@ -89,11 +91,13 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
         // If this is a class and the name is "new", make runtime name be "<init>" instead.
         // TODO: Still need to disambiguate jvm constructor methods
         (owningType.unwrap() is TypeDef.ClassDef) && methodDef.name == "new" -> "<init>"
-        // If the disambiguation index is > 0, use it
-        disambiguationIndex > 0 ->
-            mangleSlashes(toGeneric( methodDef.name + "$" + disambiguationIndex, methodGenerics))
-        // Default, just the name
-        else -> mangleSlashes(toGeneric(methodDef.name, methodGenerics))
+        // Second version: Incorporate a "signature" into the runtime name
+        else -> {
+            val paramTypeStr = methodDef.params.joinToString(separator = "-") { getSignature(getResolvedType(it)) }
+            val returnTypeStr = getSignature(methodDef.returnType)
+            val fullName = methodDef.name + "-" + paramTypeStr + "-" + returnTypeStr
+            mangleSlashes(toGeneric(fullName, methodGenerics))
+        }
     }}}
 
     // Create the generic method def
@@ -108,4 +112,25 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
         genericSnuggleMethodDef.getSpecialization(listOf())
     else
         genericSnuggleMethodDef
+}
+
+
+// Get the signature for a given pattern. Generally involves the type of the pattern.
+// Patterns passed to here should always be explicitly typed (for instance, params to a function)
+fun getResolvedType(pattern: ResolvedPattern): ResolvedType = when (pattern) {
+    is ResolvedPattern.EmptyPattern -> pattern.typeAnnotation!!
+    is ResolvedPattern.BindingPattern -> pattern.typeAnnotation!!
+    is ResolvedPattern.TuplePattern -> ResolvedType.Tuple(pattern.loc, pattern.elements.map(::getResolvedType))
+}
+
+// Essentially a uniquely identifying string. Used for overloading detection.
+fun getSignature(type: ResolvedType): String = when (type) {
+    is ResolvedType.Basic -> type.base.name +
+            "(" + type.generics.joinToString(separator = "-") { getSignature(it) } + ")"
+    is ResolvedType.Tuple -> "(" + type.elements.joinToString(separator = "-") { getSignature(it) } + ")"
+    is ResolvedType.Func ->
+        "\$f(" + type.paramTypes.joinToString(separator = "-") { getSignature(it) } +
+            "-" + getSignature(type.returnType) + ")"
+    is ResolvedType.TypeGeneric -> "\$tg${type.index}"
+    is ResolvedType.MethodGeneric -> "\$mg${type.index}"
 }

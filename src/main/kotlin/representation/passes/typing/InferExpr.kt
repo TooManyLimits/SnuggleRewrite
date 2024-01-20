@@ -137,14 +137,14 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
 
     is ResolvedExpr.FieldAccess -> {
         val receiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-        val bestField = findField(receiver.type, false, expr.fieldName, expr.loc)
+        val bestField = findNonStaticField(receiver.type, expr.fieldName, expr.loc)
         val maxVariable = scope.sumOf { it.second.type.stackSlots }
         just(TypedExpr.FieldAccess(expr.loc, receiver, expr.fieldName, bestField, maxVariable, bestField.type))
     }
 
     is ResolvedExpr.StaticFieldAccess -> {
         val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics, currentMethodGenerics)
-        val bestField = findField(receiverType, true, expr.fieldName, expr.loc)
+        val bestField = findStaticField(receiverType, expr.fieldName, expr.loc)
         just(TypedExpr.StaticFieldAccess(expr.loc, receiverType, expr.fieldName, bestField, bestField.type))
     }
 
@@ -153,7 +153,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Infer the type of the receiver
         val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.expr.type.nonStaticMethods
+        val methods = typedReceiver.expr.type.allNonStaticMethods
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)

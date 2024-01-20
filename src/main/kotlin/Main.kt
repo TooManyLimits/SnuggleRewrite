@@ -13,11 +13,18 @@ import util.ConsList
 fun main() {
 
     val code = """
-        let a = TestClass.getInstance()
-        print(a.x)
-        print(a.y)
-        print(a.z)
-        print(a)
+        import "list"
+        class Event<Input>: List<Input -> ()> {
+            pub fn new() super()
+            pub fn invoke(input: Input)
+                this.forEach(fn(elem) elem(this.input))
+        }
+        let x = new Event<i32>()
+        x.push(fn(arg) print(arg))
+        x.push(fn(arg) print(arg * 2))
+        x.push(fn(arg) print(arg * arg))
+        x(10)
+        x(9)
     """.trimIndent()
     val lexer = Lexer("main", code)
 

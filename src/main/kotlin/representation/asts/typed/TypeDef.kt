@@ -48,6 +48,23 @@ sealed class TypeDef {
     val staticFields: List<FieldDef> by lazy { fields.filter { it.static } }
     val nonStaticMethods: List<MethodDef> by lazy { methods.filter { !it.static } }
     val staticMethods: List<MethodDef> by lazy { methods.filter { it.static } }
+    // "all", including inherited ones.
+    val allNonStaticFields: List<FieldDef> by lazy {
+        val supers = primarySupertype?.allNonStaticFields?.filter { superField -> nonStaticFields.none { it.name == superField.name } } ?: listOf()
+        nonStaticFields + supers
+    }
+    // Generic methods cannot be overridden, this is just because it seemed like it would be hard to implement lmao
+    val allNonStaticMethods: List<MethodDef> by lazy {
+        val supers = primarySupertype?.allNonStaticMethods?.filter { superMethod ->
+            superMethod is MethodDef.GenericMethodDef<*> || // Generics are inherited but cannot be overridden
+            nonStaticMethods.none {
+                it.name == superMethod.name &&
+                it.paramTypes == superMethod.paramTypes &&
+                it.returnType == superMethod.returnType
+            }
+        } ?: listOf()
+        nonStaticMethods + supers
+    }
 
     // Helper for obtaining a recursing tree of non-static fields,
     // as well as full names for each. This is useful when lowering

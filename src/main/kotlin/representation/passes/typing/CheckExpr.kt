@@ -63,7 +63,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // Infer the type of the receiver
         val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.expr.type.nonStaticMethods
+        val methods = typedReceiver.expr.type.allNonStaticMethods
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)

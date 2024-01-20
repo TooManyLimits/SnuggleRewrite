@@ -74,7 +74,7 @@ fun resolveExpr(
         // Shadow currentMappings
         var currentMappings = currentMappings
         var files: Set<ParsedFile> = setOf()
-        var exposedTypes: ConsMap<String, ResolvedTypeDef> = ConsMap(nil())
+        var exposedTypes: ConsMap<String, ResolvedTypeDef> = ConsMap.of()
         val innerExprs: ArrayList<ResolvedExpr> = ArrayList()
 
         // For self-referencing concerns, create a list of type indirections first.
@@ -89,14 +89,7 @@ fun resolveExpr(
         currentMappings = currentMappings.extend(indirections.mapKeys { it.name })
         exposedTypes = exposedTypes.extend(indirections.filterKeys { it.pub }.mapKeys { it.name })
 
-        //Now resolve all the type defs, with the extended mappings.
-        indirections.forEach {
-            val resolved = resolveTypeDef(it.first, startingMappings, currentMappings, ast, cache)
-            // Once we resolve, fill the promise
-            it.second.promise.fulfill(resolved.resolvedTypeDef)
-            // Track the files
-            files = union(files, resolved.files)
-        }
+        val indirectionIterator = indirections.iterator()
 
         // For each expr, call recursively, and update our vars
         for (element in expr.elements) {
@@ -109,9 +102,21 @@ fun resolveExpr(
                     files = union(files, resolved.files)
                     innerExprs += resolved.expr
                 }
-                else -> {}
+                is ParsedElement.ParsedTypeDef -> {
+                    // Finish its indirection.
+                    val (parsedDef, indirection) = indirectionIterator.next()
+                    if (parsedDef !== element) throw IllegalStateException("Name resolution failed, bug in compiler, please report")
+                    val resolved = resolveTypeDef(parsedDef, startingMappings, currentMappings, ast, cache)
+                    // Once we resolve, fill the promise
+                    indirection.promise.fulfill(resolved.resolvedTypeDef)
+                    // Track the files
+                    files = union(files, resolved.files)
+                }
             }
         }
+
+        if (indirectionIterator.hasNext()) throw IllegalStateException("Name resolution failed(2), bug in compiler, please report")
+
         ExprResolutionResult(ResolvedExpr.Block(expr.loc, innerExprs), files, exposedTypes)
     }
     // Import, the other of the 2 important expressions
