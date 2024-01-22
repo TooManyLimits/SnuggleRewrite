@@ -5,6 +5,7 @@
 plugins {
     `java-library`
     `maven-publish`
+    id("com.github.johnrengelman.shadow") version "8.1.1"
     id("java")
     kotlin("jvm") version "2.0.0-Beta3" apply true
 }
@@ -28,16 +29,11 @@ repositories {
     gradlePluginPortal()
 }
 
-//https://discuss.gradle.org/t/how-to-include-dependencies-in-jar/19571/4
-val extraLibs by configurations.creating
-
 dependencies {
-    //https://discuss.gradle.org/t/how-to-include-dependencies-in-jar/19571/4
-//    api("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
-    extraLibs("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
-    api("org.ow2.asm:asm:9.6")
-    api("org.ow2.asm:asm-util:9.4")
-    api("org.ow2.asm:asm-tree:9.4")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
+    implementation("org.ow2.asm:asm:9.6")
+    implementation("org.ow2.asm:asm-util:9.4")
+    implementation("org.ow2.asm:asm-tree:9.4")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:1.8.10")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.0")
 }
@@ -48,9 +44,9 @@ publishing {
     }
 }
 
-//https://discuss.gradle.org/t/how-to-include-dependencies-in-jar/19571/4
-tasks.jar {
-    from(extraLibs.map { if (it.isDirectory) it else zipTree(it) })
+tasks.shadowJar {
+    isEnableRelocation = true
+    relocationPrefix = "snuggle_dependencies"
 }
 
 tasks.withType<JavaCompile>() {
