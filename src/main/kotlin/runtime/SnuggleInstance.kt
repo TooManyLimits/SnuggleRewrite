@@ -46,7 +46,8 @@ class SnuggleInstance(compiledProgram: CompiledProgram) {
 
 }
 
-class InstanceBuilder(private val userFiles: MutableMap<String, String>) {
+class InstanceBuilder(userFiles: Map<String, String>) {
+    private val userFiles = mutableMapOf<String, String>().also { it.putAll(userFiles) } // Make mutable
     private var reflectedClasses: ConsList<Class<*>> = ConsList.of()
     private var otherBuiltins: ConsList<BuiltinType> = ConsList.of()
     fun addFile(name: String, source: String): InstanceBuilder

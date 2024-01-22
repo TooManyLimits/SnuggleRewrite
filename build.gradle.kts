@@ -9,6 +9,13 @@ plugins {
     kotlin("jvm") version "2.0.0-Beta3" apply true
 }
 
+java.sourceCompatibility = JavaVersion.VERSION_17
+java.targetCompatibility = JavaVersion.VERSION_17
+
+group = "io.github.toomanylimits"
+version = "0.1.0"
+description = "Snuggle"
+
 repositories {
     mavenLocal()
     maven {
@@ -21,8 +28,13 @@ repositories {
     gradlePluginPortal()
 }
 
+//https://discuss.gradle.org/t/how-to-include-dependencies-in-jar/19571/4
+val extraLibs by configurations.creating
+
 dependencies {
-    api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.10")
+    //https://discuss.gradle.org/t/how-to-include-dependencies-in-jar/19571/4
+//    api("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
+    extraLibs("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
     api("org.ow2.asm:asm:9.6")
     api("org.ow2.asm:asm-util:9.4")
     api("org.ow2.asm:asm-tree:9.4")
@@ -30,15 +42,15 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.0")
 }
 
-group = "io.github.toomanylimits"
-version = "0.1.0"
-description = "Snuggle"
-java.sourceCompatibility = JavaVersion.VERSION_11
-
 publishing {
     publications.create<MavenPublication>("maven") {
         from(components["java"])
     }
+}
+
+//https://discuss.gradle.org/t/how-to-include-dependencies-in-jar/19571/4
+tasks.jar {
+    from(extraLibs.map { if (it.isDirectory) it else zipTree(it) })
 }
 
 tasks.withType<JavaCompile>() {
