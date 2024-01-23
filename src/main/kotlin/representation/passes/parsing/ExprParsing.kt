@@ -122,7 +122,11 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>, methodGenerics: 
 
         TokenType.IMPORT -> parseImport(lexer)
 
-        TokenType.LEFT_CURLY -> parseBlock(lexer, typeGenerics, methodGenerics)
+        TokenType.PUB -> { // Pub blocks export their pub types to the surrounding environment
+            lexer.expect(TokenType.LEFT_CURLY, "after \"pub\"");
+            parseBlock(lexer, true, typeGenerics, methodGenerics)
+        }
+        TokenType.LEFT_CURLY -> parseBlock(lexer, false, typeGenerics, methodGenerics)
         TokenType.LEFT_PAREN -> parseParenOrTuple(lexer, typeGenerics, methodGenerics)
         TokenType.FN -> parseLambda(lexer, typeGenerics, methodGenerics)
 
@@ -148,7 +152,7 @@ private fun parseImport(lexer: Lexer): ParsedExpr {
     return ParsedExpr.Import(loc, lit.string())
 }
 
-private fun parseBlock(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+private fun parseBlock(lexer: Lexer, isPub: Boolean, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     val startLoc = lexer.last().loc
     val elems = ArrayList<ParsedElement>()
     while (!lexer.consume(TokenType.RIGHT_CURLY))
@@ -157,7 +161,7 @@ private fun parseBlock(lexer: Lexer, typeGenerics: List<String>, methodGenerics:
         ParsedExpr.Tuple(startLoc.merge(lexer.last().loc), listOf())
     else {
         elems.trimToSize()
-        ParsedExpr.Block(startLoc.merge(lexer.last().loc), elems)
+        ParsedExpr.Block(startLoc.merge(lexer.last().loc), isPub, elems)
     }
 }
 

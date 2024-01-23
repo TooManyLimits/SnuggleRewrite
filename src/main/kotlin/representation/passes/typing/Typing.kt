@@ -26,7 +26,7 @@ import java.util.*
 fun typeAST(ast: ResolvedAST): TypedAST {
 
     val reflectedBuiltins = ast.builtinMap.keys.filterIsInstance<ReflectedBuiltinType>().associateByTo(IdentityHashMap()) { it.reflectedClass }
-    val typeCache = TypeDefCache(IdentityCache(), EqualityCache(), EqualityCache(), ast.builtinMap, reflectedBuiltins)
+    val typeCache = TypeDefCache(EqualityCache(), EqualityCache(), EqualityCache(), ast.builtinMap, reflectedBuiltins)
 
     return TypedAST(ast.allFiles.mapValues {
         // Top-level code does not have any currentTypeGenerics.
@@ -136,7 +136,7 @@ fun getReflectedBuiltin(jClass: Class<*>, cache: TypeDefCache): TypeDef =
 // The type def cache, with related useful extension methods get() and put().
 // It also stores the mapping of builtin objects to their corresponding resolved type defs.
 data class TypeDefCache(
-    val basicCache: IdentityCache<ResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>,
+    val basicCache: EqualityCache<ResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>>,
     val tupleCache: EqualityCache<List<TypeDef>, TypeDef.Tuple>,
     val funcCache: EqualityCache<List<TypeDef>, IdentityCache<TypeDef, TypeDef.Func>>,
     val builtins: IdentityHashMap<BuiltinType, ResolvedTypeDef.Builtin>,

@@ -11,7 +11,6 @@ import representation.passes.output.getRuntimeClassName
 import representation.passes.output.getStaticObjectName
 import representation.passes.typing.TypeDefCache
 import representation.passes.typing.getReflectedBuiltin
-import util.ConsList
 import java.lang.reflect.AnnotatedElement
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier

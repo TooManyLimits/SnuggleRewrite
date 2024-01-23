@@ -278,6 +278,22 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.While(expr.loc, typedCond.expr, wrappedBody, emptyOption, wrappedBody.type))
     }
 
+    is ResolvedExpr.For -> {
+
+//        if (isExplicitlyTyped(expr.pattern)) {
+//            // Pattern is explicitly typed
+//            val typedPattern = inferPattern(expr.pattern, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
+//
+//            val inferredIterable = inferExpr(expr.iterable, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+//
+//
+//        } else {
+//
+//        }
+
+        TODO()
+    }
+
     is ResolvedExpr.Literal -> {
         var value = expr.value
         val type = when (expr.value) {

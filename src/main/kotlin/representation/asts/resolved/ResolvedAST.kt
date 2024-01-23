@@ -51,40 +51,56 @@ data class ResolvedAST(
 
 data class ResolvedFile(val name: String, val code: ResolvedExpr)
 
-sealed interface ResolvedTypeDef {
-    val pub: Boolean
-    val name: String
-    val numGenerics: Int
+sealed class ResolvedTypeDef {
+    abstract val pub: Boolean
+    abstract val name: String
+    abstract val numGenerics: Int
+
+    // Unwrap the typedef's indirections
+    fun unwrap(): ResolvedTypeDef =
+        if (this is ResolvedTypeDef.Indirection) promise.expect().unwrap() else this
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other is ResolvedTypeDef) return this.unwrap() === other.unwrap()
+        return false
+    }
 
     // Indirection type, required for self-referencing data.
     // See TypeDef.Indirection
-    data class Indirection(val promise: Promise<ResolvedTypeDef> = Promise()): ResolvedTypeDef {
+    class Indirection(val promise: Promise<ResolvedTypeDef> = Promise()): ResolvedTypeDef() {
         override val pub: Boolean get() = promise.expect().pub
         override val name: String get() = promise.expect().name
         override val numGenerics: Int get() = promise.expect().numGenerics
     }
 
-    data class Builtin(val builtin: BuiltinType): ResolvedTypeDef {
+    class Builtin(val builtin: BuiltinType): ResolvedTypeDef() {
         override val name: String get() = builtin.baseName
         override val pub: Boolean get() = true
         override val numGenerics: Int get() = builtin.numGenerics
     }
-    data class Class(val loc: Loc, override val pub: Boolean, override val name: String,
+    class Class(val loc: Loc, override val pub: Boolean, override val name: String,
                      override val numGenerics: Int,
                      val superType: ResolvedType,
                      val fields: List<ResolvedFieldDef>,
-                     val methods: List<ResolvedMethodDef>): ResolvedTypeDef
+                     val methods: List<ResolvedMethodDef>): ResolvedTypeDef()
 
-    data class Struct(val loc: Loc, override val pub: Boolean, override val name: String,
+    class Struct(val loc: Loc, override val pub: Boolean, override val name: String,
                      override val numGenerics: Int,
                      val fields: List<ResolvedFieldDef>,
-                     val methods: List<ResolvedMethodDef>): ResolvedTypeDef
+                     val methods: List<ResolvedMethodDef>): ResolvedTypeDef()
 
 }
 
-data class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ResolvedType)
-data class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
+class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ResolvedType)
+class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
 
+sealed interface ResolvedImplBlock {
+
+    fun unwrap(): Base = if (this is Indirect) promise.expect().unwrap() else this as Base
+    class Indirect(val promise: Promise<ResolvedImplBlock> = Promise()): ResolvedImplBlock
+    class Base(val loc: Loc, val pub: Boolean, val numGenerics: Int, val implType: ResolvedType, val methods: List<ResolvedMethodDef>): ResolvedImplBlock
+
+}
 sealed interface ResolvedExpr {
     val loc: Loc
 
@@ -99,6 +115,7 @@ sealed interface ResolvedExpr {
 
     data class If(override val loc: Loc, val cond: ResolvedExpr, val ifTrue: ResolvedExpr, val ifFalse: ResolvedExpr?): ResolvedExpr
     data class While(override val loc: Loc, val cond: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
+    data class For(override val loc: Loc, val pattern: ResolvedPattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
 
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr

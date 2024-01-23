@@ -1,14 +1,11 @@
 package runtime;
 
 import builtins.*
-import org.objectweb.asm.ClassReader
-import org.objectweb.asm.util.TraceClassVisitor
 import reflection.ReflectedBuiltinType
-import reflection.annotations.SnuggleStatic
 import representation.asts.parsed.ParsedAST
 import representation.passes.lexing.Lexer
 import representation.passes.lowering.lower
-import representation.passes.name_resolving.resolveAST
+import representation.passes.name_resolving2.resolveAST
 import representation.passes.output.CompiledProgram
 import representation.passes.output.getRuntimeClassName
 import representation.passes.output.getStaticObjectName
@@ -19,7 +16,6 @@ import representation.passes.verify_generics.verify
 import util.Cons
 import util.ConsList
 import util.append
-import java.io.PrintWriter
 import java.util.concurrent.atomic.AtomicInteger
 
 

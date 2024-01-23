@@ -298,6 +298,8 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             yield(Instruction.IrLabel(doneLabel))
         }
     }
+
+    is TypedExpr.For -> TODO()
 }
 
 private fun getPluralOffset(fieldsToFollow: ConsList<FieldDef>): Int = fieldsToFollow.sumOf { it.pluralOffset!! }

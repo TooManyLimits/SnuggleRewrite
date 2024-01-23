@@ -224,6 +224,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         just(TypedExpr.While(expr.loc, typedCond.expr, wrappedBody, emptyOption, expectedType))
     }
 
+    is ResolvedExpr.For -> TODO()
+
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
     // e.g. Import, Literal, Variable, Declaration.
@@ -337,6 +339,7 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.Return -> findThisFieldAccesses(expr.rhs)
     is TypedExpr.If -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.ifTrue), findThisFieldAccesses(expr.ifFalse))
     is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.wrappedBody), findThisFieldAccesses(expr.neverRanAlternative))
+    is TypedExpr.For -> union(findThisFieldAccesses(expr.iterable), findThisFieldAccesses(expr.body))
     is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
         setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
     is TypedExpr.MethodCall -> union(listOf(findThisFieldAccesses(expr.receiver)), expr.args.asSequence().map(::findThisFieldAccesses).asIterable())

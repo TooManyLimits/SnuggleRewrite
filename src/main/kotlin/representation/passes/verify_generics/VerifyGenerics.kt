@@ -35,6 +35,7 @@ private fun verifyExpr(expr: ResolvedExpr, calc: VerifyCalc): Unit = when (expr)
         expr.ifFalse?.let { verifyExpr(it, calc) } ?: Unit
     }
     is ResolvedExpr.While -> verifyExprs(calc, expr.cond, expr.body)
+    is ResolvedExpr.For -> verifyExprs(calc, expr.iterable, expr.body)
     is ResolvedExpr.Literal -> {}
     is ResolvedExpr.Variable -> {}
     is ResolvedExpr.Tuple -> expr.elements.forEach { verifyExpr(it, calc) }

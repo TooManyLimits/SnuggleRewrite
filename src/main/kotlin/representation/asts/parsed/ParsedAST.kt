@@ -35,14 +35,14 @@ sealed interface ParsedElement {
 //    data class FuncDef(override val loc: Loc, val pub: Boolean, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedExpr): ParsedElement
 //    data class PubVar(override val loc: Loc, val mutable: Boolean, val lhs: ParsedPattern, val annotatedType: ParsedType, val initializer: ParsedExpr): ParsedElement
 
-//    data class ImplBlock(override val loc: Loc): ParsedElement
+    data class ParsedImplBlock(override val loc: Loc, val pub: Boolean, val numGenerics: Int, val implType: ParsedType, val methods: List<ParsedMethodDef>): ParsedElement
 //    data class SpecBlock(override val loc: Loc): ParsedElement
 
     sealed interface ParsedExpr: ParsedElement {
 
         data class Import(override val loc: Loc, val path: String): ParsedExpr
 
-        data class Block(override val loc: Loc, val elements: List<ParsedElement>): ParsedExpr
+        data class Block(override val loc: Loc, val pub: Boolean, val elements: List<ParsedElement>): ParsedExpr
         data class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
         // Lhs is one of: FieldAccess or Variable
         data class Assignment(override val loc: Loc, val lhs: ParsedExpr, val rhs: ParsedExpr): ParsedExpr
@@ -50,6 +50,7 @@ sealed interface ParsedElement {
 
         data class If(override val loc: Loc, val cond: ParsedExpr, val ifTrue: ParsedExpr, val ifFalse: ParsedExpr?): ParsedExpr
         data class While(override val loc: Loc, val cond: ParsedExpr, val body: ParsedExpr): ParsedExpr
+        data class For(override val loc: Loc, val pattern: ParsedPattern, val iterable: ParsedExpr, val body: ParsedExpr): ParsedExpr
 
         data class Literal(override val loc: Loc, val value: Any): ParsedExpr
         data class Super(override val loc: Loc): ParsedExpr

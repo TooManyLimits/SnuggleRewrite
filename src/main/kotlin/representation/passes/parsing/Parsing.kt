@@ -16,5 +16,5 @@ fun parseFile(lexer: Lexer): ParsedFile {
     while (!lexer.isDone())
         elems += parseElement(lexer, listOf(), listOf()) // Generics start empty
     val loc = lexer.curLoc.merge(Loc(1, 0, 1, 0, lexer.fileName))
-    return ParsedFile(lexer.fileName, ParsedElement.ParsedExpr.Block(loc, elems))
+    return ParsedFile(lexer.fileName, ParsedElement.ParsedExpr.Block(loc, true, elems))
 }
