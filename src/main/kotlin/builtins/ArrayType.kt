@@ -129,7 +129,7 @@ object ArrayType: BuiltinType {
         // If the type contains any reference types, then it can't be instantiated via new().
         val containsAnyReferenceType = innerType.recursiveNonStaticFields.any { it.second.type.isReferenceType }
         val constructor = if (!containsAnyReferenceType)
-            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf(u32), { writer, maxVariable, desiredFields ->
+            MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf(u32), null, { writer, maxVariable, desiredFields ->
                 //TODO replace with dup/swap, not local variable
                 val needsToStoreLocal = (desiredFields.count() > 1 || desiredFields.any {
                     val innerElemType = it.lastOrNull()?.type ?: innerType
@@ -162,7 +162,7 @@ object ArrayType: BuiltinType {
             }) { throw IllegalStateException() } else null
         return listOfNotNull(
             constructor,
-            MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "size", u32, listOf(), { writer, _, _ ->
+            MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "size", u32, listOf(), null, { writer, _, _ ->
                 writer.visitInsn(Opcodes.ARRAYLENGTH)
             }) {
                 var innermostFirstField = thisType.nonStaticFields.first() // Array<innerType>
@@ -170,7 +170,7 @@ object ArrayType: BuiltinType {
                     innermostFirstField = innermostFirstField.type.nonStaticFields.first()
                 ConsList.of(ConsList.of(innermostFirstField))
             },
-            MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(u32), {writer, maxVariable, desiredFields ->
+            MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(u32), null, {writer, maxVariable, desiredFields ->
                 // Stack = [all desired arrays, index]
                 // Calculate how many desired arrays there are, and what types they are:
                 val desiredInnerTypes = desiredFields.asIterable().flatMap {
@@ -209,7 +209,7 @@ object ArrayType: BuiltinType {
                     }
                 }
             },
-            MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "set", unit, listOf(u32, innerType), {writer, maxVariable, desiredFields ->
+            MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "set", unit, listOf(u32, innerType), null, {writer, maxVariable, desiredFields ->
                 // Stack = [arr1, ..., arrN, index, elem1, ..., elemN]
                 // Part 1: store elem1, ... elemN into local variables.
                 var curMaxVariable = maxVariable

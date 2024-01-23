@@ -3,32 +3,34 @@ package representation.passes.output
 import representation.asts.ir.Program
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
+import util.ConsList
 
 class CompiledProgram(
-    val runtimeClass: ByteArray,
-    val otherClasses: List<ByteArray>
+    val classes: Map<String, ByteArray>,
+//    val runtimeClass: ByteArray,
+//    val otherClasses: List<ByteArray>
 )
 
 /**
  * The final stage - deals with converting our lowered IR structure
  * into JVM bytecode.
  */
-fun output(ir: Program): CompiledProgram {
+fun output(ir: Program, staticInstances: ConsList<Any>): CompiledProgram {
     // Create the runtime
-    val runtimeClass = outputRuntime(ir)
+    val runtime = outputRuntime(ir, staticInstances)
     // Create the importer
     val importer = outputImporter(ir)
     // Create the other types
-//    println(ir.generatedTypes.map { it.runtimeName })
-    val otherTypes = ir.generatedTypes.map { outputType(it) } + importer
+    val otherTypes = ir.generatedTypes.map { outputType(it) } + importer + runtime
     // Return the compiled program
-    return CompiledProgram(runtimeClass, otherTypes)
+    return CompiledProgram(mapOf(*otherTypes.toTypedArray()))
 }
 
 /**
  * Helpers to get the string names of various things when outputting.
  */
 fun getRuntimeClassName() = "Runtime"
+fun getStaticObjectName(index: Int) = "#STATIC_OBJECT#$index"
 fun getImporterClassName() = "Importer"
 fun getImporterFieldName(fileName: String) = "hasImported_$fileName"
 fun getImporterMethodName(fileName: String) = "runFile_$fileName"

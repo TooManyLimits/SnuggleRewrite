@@ -7,7 +7,7 @@ import representation.asts.ir.GeneratedMethod
 import representation.asts.ir.GeneratedType
 import representation.asts.typed.TypeDef
 
-fun outputType(type: GeneratedType): ByteArray = when (type) {
+fun outputType(type: GeneratedType): Pair<String, ByteArray> = type.runtimeName to when (type) {
     is GeneratedType.GeneratedClass -> {
         // Create a class writer
         val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)

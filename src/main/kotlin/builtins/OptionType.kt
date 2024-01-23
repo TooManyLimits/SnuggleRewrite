@@ -71,7 +71,7 @@ object OptionType: BuiltinType {
         } else {
             // Working with a value type + a bool!
             listOf(
-                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(), { writer, _, _ ->
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(), null, { writer, _, _ ->
                     val afterError = Label()
                     writer.visitJumpInsn(Opcodes.IFNE, afterError)
                     errorInGet(writer)

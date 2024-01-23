@@ -158,9 +158,13 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
 
     // Compile arguments, make call
     is TypedExpr.MethodCall -> sequence {
-        val receiverDesiredFields = if (expr.methodDef is MethodDef.BytecodeMethodDef)
-                expr.methodDef.desiredReceiverFields(desiredFields)
+        // Pre-bytecode if needed
+        if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
+            yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
+        val receiverDesiredFields = if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.desiredReceiverFields != null)
+                expr.methodDef.desiredReceiverFields!!(desiredFields)
             else ConsList.of(ConsList.nil())
+
         yieldAll(lowerExpr(expr.receiver, receiverDesiredFields, typeCalc))
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), typeCalc))
@@ -171,11 +175,17 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
     }
     is TypedExpr.StaticMethodCall -> sequence {
         lowerTypeDef(expr.receiverType, typeCalc)
+        // Pre-bytecode if needed
+        if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
+            yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
         for (arg in expr.args)
             yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), typeCalc))
         yieldAll(createCall(expr.methodDef, desiredFields, expr.maxVariable) { Instruction.MethodCall.Static(it) })
     }
     is TypedExpr.SuperMethodCall -> sequence {
+        // Pre-bytecode if needed
+        if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
+            yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
         // Load "this" on the stack
         yield(Instruction.LoadRefType(expr.thisVariableIndex))
         // Push args
@@ -186,6 +196,9 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
     }
     is TypedExpr.ClassConstructorCall -> sequence {
         lowerTypeDef(expr.type, typeCalc)
+        // Pre-bytecode if needed
+        if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
+            yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
         // Push and dup the receiver
         yield(Instruction.NewRefAndDup(expr.type))
         // Push args

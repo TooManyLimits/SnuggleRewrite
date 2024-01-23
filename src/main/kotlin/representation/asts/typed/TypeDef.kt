@@ -316,12 +316,15 @@ sealed interface MethodDef {
 
     // Override vals on the first line, important things on later lines
     class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
+                            // Bytecode which runs early, before the receiver or the args have been pushed to the stack yet.
+                            val preBytecode: ((writer: MethodVisitor, maxVariable: Int, desiredFields: ConsList<ConsList<FieldDef>>) -> Unit)?,
                             val bytecode: (writer: MethodVisitor, maxVariable: Int, desiredFields: ConsList<ConsList<FieldDef>>) -> Unit,
-                            val desiredReceiverFields: (ConsList<ConsList<FieldDef>>) -> ConsList<ConsList<FieldDef>>): MethodDef {
+                            val desiredReceiverFields: ((ConsList<ConsList<FieldDef>>) -> ConsList<ConsList<FieldDef>>)?): MethodDef {
         constructor(pub: Boolean, static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, paramTypes: List<TypeDef>, bytecode: (MethodVisitor) -> Unit)
             : this(pub, static, owningType, name, returnType, paramTypes,
+                null,
                 { writer, _, _ -> bytecode(writer); },
-                { ConsList.of(ConsList.nil()) })
+                null)
     }
     data class ConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
                               val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef {

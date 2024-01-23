@@ -21,6 +21,7 @@ fun main() {
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
         .addFile("list", list)
+        .reflectObject(EvilPrinter(", lol!!"))
         .build()
 
     instance.runtime.runCode()

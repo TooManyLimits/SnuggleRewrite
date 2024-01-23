@@ -6,13 +6,14 @@ import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import representation.asts.ir.Program
 import runtime.SnuggleRuntime
+import util.ConsList
 
 /**
  * File that creates the runtime class. This is in its
  * own file since the SnuggleRuntime interface will
  * later have many methods to implement.
  */
-fun outputRuntime(ir: Program): ByteArray {
+fun outputRuntime(ir: Program, staticInstances: ConsList<Any>): Pair<String, ByteArray> {
     // Create the class writer
     val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
     writer.visit(
@@ -21,8 +22,10 @@ fun outputRuntime(ir: Program): ByteArray {
     // Create its methods
     addConstructor(writer)
     addRunCode(writer)
+    // Create its static instance fields
+    addStaticInstanceFields(writer, staticInstances)
     // Return it
-    return writer.toByteArray()
+    return getRuntimeClassName() to writer.toByteArray()
 }
 
 // Create the runCode() implementation
@@ -50,4 +53,13 @@ private fun addConstructor(classWriter: ClassWriter) {
     constructor.visitInsn(Opcodes.RETURN)
     constructor.visitMaxs(0, 0)
     constructor.visitEnd()
+}
+
+private fun addStaticInstanceFields(writer: ClassWriter, staticInstances: ConsList<Any>) {
+    staticInstances.forEachIndexed { index, instance ->
+        val access = Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC
+        val name = getStaticObjectName(index)
+        val descriptor = Type.getDescriptor(instance.javaClass)
+        writer.visitField(access, name, descriptor, null, null)
+    }
 }

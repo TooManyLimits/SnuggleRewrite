@@ -39,9 +39,9 @@ fun fetchType(type: AnnotatedType, typeCache: TypeDefCache): TypeDef {
             val u = type.getAnnotation(Unsigned::class.java)
             when {
                 u == null -> getBasicBuiltin(I32Type, typeCache)
-                u.bits == 8 -> getBasicBuiltin(U8Type, typeCache)
-                u.bits == 16 -> getBasicBuiltin(U16Type, typeCache)
-                u.bits == -1 || u.bits == 32 -> getBasicBuiltin(U32Type, typeCache)
+                u.value == 8 -> getBasicBuiltin(U8Type, typeCache)
+                u.value == 16 -> getBasicBuiltin(U16Type, typeCache)
+                u.value == -1 || u.value == 32 -> getBasicBuiltin(U32Type, typeCache)
                 else -> throw IllegalStateException("Failed to reflect class: for \"@Unsigned(n) int\", n should be -1 (default), 8, 16, or 32!")
             }
         }
@@ -49,7 +49,7 @@ fun fetchType(type: AnnotatedType, typeCache: TypeDefCache): TypeDef {
             val u = type.getAnnotation(Unsigned::class.java)
             when {
                 u == null -> getBasicBuiltin(I64Type, typeCache)
-                u.bits == -1 || u.bits == 64 -> getBasicBuiltin(U64Type, typeCache)
+                u.value == -1 || u.value == 64 -> getBasicBuiltin(U64Type, typeCache)
                 else -> throw IllegalStateException("Failed to reflect class: for \"@Unsigned(n) long\", n should be -1 (default), or 64!")
             }
         }

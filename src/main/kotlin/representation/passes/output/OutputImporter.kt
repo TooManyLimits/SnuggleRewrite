@@ -10,7 +10,7 @@ import representation.asts.ir.Program
  * to run that file's contents, as well as a boolean field
  * for whether the file has been run yet.
  */
-fun outputImporter(ir: Program): ByteArray {
+fun outputImporter(ir: Program): Pair<String, ByteArray> {
     // Create the class writer
     val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
     writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, getImporterClassName(), null, "java/lang/Object", null)
@@ -37,5 +37,5 @@ fun outputImporter(ir: Program): ByteArray {
     }
     // The class writer is done, return its byte array
     writer.visitEnd()
-    return writer.toByteArray()
+    return getImporterClassName() to writer.toByteArray()
 }
