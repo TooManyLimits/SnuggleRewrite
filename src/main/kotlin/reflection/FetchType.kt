@@ -12,7 +12,7 @@ import java.lang.reflect.AnnotatedType
  * to a TypeDef.
  */
 
-fun fetchType(type: AnnotatedType, typeCache: TypeDefCache): TypeDef {
+fun fetchType(type: AnnotatedType, typeCache: TypingCache): TypeDef {
 
     if (type is AnnotatedArrayType) {
         // If array, recurse

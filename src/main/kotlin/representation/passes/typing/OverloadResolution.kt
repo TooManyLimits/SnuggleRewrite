@@ -29,7 +29,7 @@ fun getBestMethod(
     arguments: List<ResolvedExpr>,
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
-    typeCache: TypeDefCache,
+    typeCache: TypingCache,
     returnType: TypeDef?,
     currentType: TypeDef?,
     currentTypeGenerics: List<TypeDef>,
@@ -95,7 +95,7 @@ private fun getApplicableMethods(
     scope: ConsMap<String, VariableBinding>,
 
     // The TypeDefCache holding data for all types in this AST.
-    typeCache: TypeDefCache,
+    typeCache: TypingCache,
     // The desired return type at the site of the method call.
     returnType: TypeDef?,
     // The current type which our method call is inside.
@@ -197,7 +197,7 @@ private fun tryChooseBestMethod(
     arguments: List<ResolvedExpr>,
     expectedResult: TypeDef?,
     scope: ConsMap<String, VariableBinding>,
-    typeCache: TypeDefCache,
+    typeCache: TypingCache,
     returnType: TypeDef?,
     currentType: TypeDef?,
     currentTypeGenerics: List<TypeDef>,

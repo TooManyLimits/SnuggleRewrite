@@ -7,7 +7,7 @@ import org.objectweb.asm.Type
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getBasicBuiltin
 import representation.passes.typing.getGenericBuiltin
 import representation.passes.typing.getUnit
@@ -17,28 +17,28 @@ object ArrayType: BuiltinType {
     override val numGenerics: Int get() = 1
 
     override val baseName: String get() = "Array"
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = generics[0].name + "[]"
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String = generics[0].name + "[]"
     override val nameable: Boolean get() = true
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? {
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String? {
         if (generics[0].isPlural && generics[0].stackSlots > 0)
             return "builtin_structs/array/" + generics[0].name
         return null
     }
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> {
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> {
         if (generics[0].stackSlots > 0)
             return generics[0].descriptor.map { "[$it" }
         return listOf("I")
     }
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int {
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int {
         if (generics[0].isPlural && generics[0].stackSlots > 0)
-            return generics[0].recursiveNonStaticFields.size
+            return generics[0].recursivePluralFields.size
         return 1
     }
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = generics[0].isPlural
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isPlural
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = generics[0].isPlural
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = !generics[0].isPlural
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
-    override fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> {
+    override fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> {
         val u32 = getBasicBuiltin(U32Type, typeCache)
         if (generics[0].stackSlots == 0)
             return listOf(FieldDef.BuiltinField(false, false, false, "length", 0, u32))
@@ -54,7 +54,7 @@ object ArrayType: BuiltinType {
         return listOf()
     }
 
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         // Grab some useful types
         val thisType = getGenericBuiltin(ArrayType, generics, typeCache)
         val innerType = generics[0]
@@ -127,20 +127,20 @@ object ArrayType: BuiltinType {
     // into multiple smaller arrays, one for each field of the plural type.
     private fun pluralMethods(thisType: TypeDef, innerType: TypeDef, u32: TypeDef, unit: TypeDef): List<MethodDef> {
         // If the type contains any reference types, then it can't be instantiated via new().
-        val containsAnyReferenceType = innerType.recursiveNonStaticFields.any { it.second.type.isReferenceType }
+        val containsAnyReferenceType = innerType.recursivePluralFields.any { it.second.type.isReferenceType }
         val constructor = if (!containsAnyReferenceType)
             MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf(u32), null, { writer, maxVariable, desiredFields ->
                 //TODO replace with dup/swap, not local variable
                 val needsToStoreLocal = (desiredFields.count() > 1 || desiredFields.any {
                     val innerElemType = it.lastOrNull()?.type ?: innerType
-                    innerElemType.isPlural && innerElemType.recursiveNonStaticFields.size > 1
+                    innerElemType.isPlural && innerElemType.recursivePluralFields.size > 1
                 })
                 if (needsToStoreLocal)
                     writer.visitVarInsn(Opcodes.ISTORE, maxVariable)
                 for (fieldGroup in desiredFields) {
                     val innerArrayElemType = fieldGroup.lastOrNull()?.type ?: innerType
                     if (innerArrayElemType.isPlural) {
-                        for ((_, field) in innerArrayElemType.recursiveNonStaticFields) {
+                        for ((_, field) in innerArrayElemType.recursivePluralFields) {
                             if (needsToStoreLocal)
                                 writer.visitVarInsn(Opcodes.ILOAD, maxVariable)
                             val opcodes = getOpcodesFor(field.type)
@@ -176,7 +176,7 @@ object ArrayType: BuiltinType {
                 val desiredInnerTypes = desiredFields.asIterable().flatMap {
                     val lastFieldType = it.lastOrNull()?.type ?: innerType
                     if (lastFieldType.isPlural)
-                        lastFieldType.recursiveNonStaticFields.map { it.second.type }
+                        lastFieldType.recursivePluralFields.map { it.second.type }
                     else listOf(lastFieldType)
                 }
                 if (desiredInnerTypes.isEmpty()) throw IllegalStateException("Expected at least 1 desiredInnerType")
@@ -213,14 +213,14 @@ object ArrayType: BuiltinType {
                 // Stack = [arr1, ..., arrN, index, elem1, ..., elemN]
                 // Part 1: store elem1, ... elemN into local variables.
                 var curMaxVariable = maxVariable
-                for ((_, field) in innerType.recursiveNonStaticFields.asReversed()) {
+                for ((_, field) in innerType.recursivePluralFields.asReversed()) {
                     writer.visitVarInsn(getOpcodesFor(field.type).storeInLocal, curMaxVariable)
                     curMaxVariable += field.type.stackSlots
                 }
                 curMaxVariable = maxVariable // Reset, as we'll count upwards (increment) again.
                 // Stack = [arr1, ..., arrN, index]
                 // Part 2: Store elements into the arrays
-                for ((_, field) in innerType.recursiveNonStaticFields.asReversed()) {
+                for ((_, field) in innerType.recursivePluralFields.asReversed()) {
                     // [arr1, ..., arrI, index]
                     writer.visitInsn(Opcodes.DUP_X1) // [arr1, ..., index, arrI, index]
                     val opcodes = getOpcodesFor(field.type)

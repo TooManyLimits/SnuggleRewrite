@@ -56,9 +56,9 @@ private fun outputField(field: GeneratedField, classWriter: ClassWriter) {
 
 private fun outputMethod(method: GeneratedMethod, classWriter: ClassWriter) = when (method) {
     is GeneratedMethod.GeneratedSnuggleMethod -> {
-        // If the method is static, or part of a StructDef, then tag it with static
+        // If the method is static, has a static override, or is part of a StructDef, then tag it with static
         var access = Opcodes.ACC_PUBLIC
-        if (method.methodDef.static || method.methodDef.owningType.unwrap() is TypeDef.StructDef)
+        if (method.methodDef.static || method.methodDef.staticOverrideReceiverType != null || method.methodDef.owningType.unwrap() is TypeDef.StructDef)
             access += Opcodes.ACC_STATIC
         // Create the writer
         val writer = classWriter.visitMethod(

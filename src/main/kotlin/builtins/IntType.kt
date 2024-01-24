@@ -6,7 +6,7 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getBasicBuiltin
 import java.math.BigInteger
 
@@ -20,22 +20,22 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
     fun fits(value: BigInteger) = value >= minValue && value <= maxValue
 
     override val baseName: String = (if (signed) "i" else "u") + bits
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String = baseName
     override val nameable: Boolean get() = true
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf(when (bits) {
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> = listOf(when (bits) {
         8 -> "B"
         16 -> "S"
         32 -> "I"
         64 -> "J"
         else -> throw IllegalStateException()
     })
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = if (bits == 64) 2 else 1
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = if (bits == 64) 2 else 1
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val intType = getBasicBuiltin(this, typeCache)
         val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(

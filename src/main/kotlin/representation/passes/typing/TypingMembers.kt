@@ -46,7 +46,7 @@ import util.toGeneric
  * - typeCache: The cache of TypeDefs that have been created while typing this AST.
  * - currentTypeGenerics: The generics of the owningType that we're currently instantiating with.
  */
-fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, methodDef: ResolvedMethodDef, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>): MethodDef {
+fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, methodDef: ResolvedMethodDef, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, staticOverrideReceiverType: TypeDef?): MethodDef {
 
     // First, create a generic method def. Then, if the original method had no generics,
     // simply specialize the generic method with 0 generics. This keeps the system general.
@@ -73,9 +73,11 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
     val bodyGetterByGeneric = EqualityMemoized<List<TypeDef>, Lazy<TypedExpr>> { methodGenerics -> lazy {
         // Get the bindings for the body, from the params
         var bodyBindings: ConsMap<String, VariableBinding> = ConsMap.of()
-        // If non-static, add a "this" parameter as the first one in the bindings
-        if (!methodDef.static)
-            bodyBindings = bodyBindings.extend("this", VariableBinding(owningType, false, 0))
+        // If non-static, add a "this" parameter as the first one in the bindings. Type depends on static override.
+        if (!methodDef.static) {
+            val thisType = staticOverrideReceiverType ?: owningType
+            bodyBindings = bodyBindings.extend("this", VariableBinding(thisType, false, 0))
+        }
         // Populate the bindings
         for (typedParam in paramPatternsByGeneric(methodGenerics))
             bodyBindings = bodyBindings.extend(bindings(typedParam, getTopIndex(bodyBindings)))
@@ -103,6 +105,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
     // Create the generic method def
     val genericSnuggleMethodDef = MethodDef.GenericMethodDef.GenericSnuggleMethodDef(
         methodDef.loc, methodDef.pub, methodDef.static, methodDef.numGenerics, owningType, methodDef.name,
+        staticOverrideReceiverType,
         returnTypeGetterByGeneric, paramTypesGetterByGeneric, runtimeNameGetterByGeneric, bodyGetterByGeneric
     )
 

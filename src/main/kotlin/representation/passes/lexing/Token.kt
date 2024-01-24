@@ -51,6 +51,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "pub" -> TokenType.PUB
         "static" -> TokenType.STATIC
         "import" -> TokenType.IMPORT
+        "impl" -> TokenType.IMPL
         "class" -> TokenType.CLASS
         "struct" -> TokenType.STRUCT
         "fn" -> TokenType.FN
@@ -147,6 +148,7 @@ enum class TokenType {
     PUB,
     STATIC,
     IMPORT,
+    IMPL,
     CLASS,
     STRUCT,
     FN,

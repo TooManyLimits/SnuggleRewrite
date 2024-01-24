@@ -4,7 +4,7 @@ import builtins.helpers.pushDefaultValue
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getGenericBuiltin
 import util.toGeneric
 
@@ -18,17 +18,17 @@ import util.toGeneric
 object MaybeUninitType: BuiltinType {
     override val numGenerics: Int get() = 1
     override val baseName: String get() = "MaybeUninit"
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String
         = toGeneric(baseName, generics, "<", ">")
     override val nameable: Boolean get() = true
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = generics[0].runtimeName
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = generics[0].descriptor
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = generics[0].stackSlots
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String? = generics[0].runtimeName
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> = generics[0].descriptor
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = generics[0].stackSlots
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
-    override fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> {
+    override fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> {
         // MaybeUninit<ReferenceType> -> field is Option<ReferenceType>
         // MaybeUninit<PluralType> -> fields are MaybeUninit<Each member of the plural type>
         // MaybeUninit<OtherType> -> field is OtherType
@@ -53,7 +53,7 @@ object MaybeUninitType: BuiltinType {
 
     // Methods are essentially all no-ops, except for creating a new empty MaybeUninit, which
     // just pushes default value
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val thisType = getGenericBuiltin(MaybeUninitType, generics, typeCache)
         val inner = generics[0]
         return listOf(

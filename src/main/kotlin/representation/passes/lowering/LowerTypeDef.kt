@@ -12,15 +12,9 @@ import util.caching.IdentityIncrementalCalculator
 
 fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Unit =
     typeCalc.compute(typeDef.unwrap()) {
-        // Generate the SnuggleMethodDefs, as well as any GenericSnuggleMethodDefs.
-        // Additionally generate for custom method defs.
+        // Generate the methods that need to be
         val generatedMethods: List<GeneratedMethod> =
-            it.methods.filterIsInstance<MethodDef.SnuggleMethodDef>().map { lowerMethod(it, typeCalc) } +
-            it.methods.filterIsInstance<MethodDef.CustomMethodDef>().map { GeneratedMethod.GeneratedCustomMethod(it) } +
-            it.methods.filterIsInstance<MethodDef.InterfaceMethodDef>().map { GeneratedMethod.GeneratedInterfaceMethod(it) } +
-            it.methods.filterIsInstance<MethodDef.GenericMethodDef.GenericSnuggleMethodDef>().flatMap {
-                it.specializations.freeze().values.map { lowerMethod(it, typeCalc) }
-            }
+            it.methods.mapNotNull { getGeneratedMethod(it, typeCalc) }.flatten()
         when (it) {
             // Generate types for snuggle-defined types like ClassDef
             is TypeDef.ClassDef -> {
@@ -32,15 +26,15 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
                     generatedMethods
                 )
             }
-            is TypeDef.Tuple, is TypeDef.StructDef, is TypeDef.InstantiatedBuiltin -> {
+            is TypeDef.Tuple, is TypeDef.StructDef, is TypeDef.InstantiatedBuiltin, is TypeDef.ImplBlockBackingDef -> {
                 if (it.fields.isEmpty() && generatedMethods.isEmpty()) null
                 else if (it is TypeDef.InstantiatedBuiltin && !it.shouldGenerateClassAtRuntime) null
                 else if (!it.isPlural) throw IllegalStateException("Only expected plural types to make it this far in lowering for builtins, but \"${it.name}\" did too? Bug in compiler, please report")
-                else if (it.recursiveNonStaticFields.size <= 1 && it.staticFields.isEmpty() && generatedMethods.isEmpty()) null
+                else if (it.recursivePluralFields.size <= 1 && it.staticFields.isEmpty() && generatedMethods.isEmpty()) null
                 else {
                     GeneratedType.GeneratedValueType(
                         it.runtimeName!!,
-                        it.recursiveNonStaticFields.drop(1).map { (pathToField, field) ->
+                        it.recursivePluralFields.drop(1).map { (pathToField, field) ->
                             lowerTypeDef(field.type, typeCalc)
                             GeneratedField(field, true, "RETURN! $$pathToField")
                         },
@@ -60,6 +54,18 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
         }
     }
 
+fun getGeneratedMethod(methodDef: MethodDef, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedMethod>? = when (methodDef) {
+    is MethodDef.SnuggleMethodDef -> listOf(lowerMethod(methodDef, typeCalc))
+    is MethodDef.CustomMethodDef -> listOf(GeneratedMethod.GeneratedCustomMethod(methodDef))
+    is MethodDef.InterfaceMethodDef -> listOf(GeneratedMethod.GeneratedInterfaceMethod(methodDef))
+    is MethodDef.GenericMethodDef<*> -> methodDef.specializations.freeze().values.mapNotNull { getGeneratedMethod(it, typeCalc) }.flatten()
+
+    is MethodDef.BytecodeMethodDef -> null
+    is MethodDef.ConstMethodDef -> null
+    is MethodDef.StaticConstMethodDef -> null
+}
+
+
 private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): GeneratedMethod.GeneratedSnuggleMethod {
     // Lower type defs for arg types and return type
     methodDef.paramTypes.forEach { lowerTypeDef(it, typeCalc) }
@@ -75,7 +81,7 @@ private fun lowerField(fieldDef: FieldDef, runtimeStatic: Boolean, runtimeNamePr
     lowerTypeDef(fieldDef.type, typeCalc)
     return if (fieldDef.type.isPlural) {
         // If plural, lower the recursive fields
-        fieldDef.type.recursiveNonStaticFields.map { (pathToField, field) ->
+        fieldDef.type.recursivePluralFields.map { (pathToField, field) ->
             lowerTypeDef(field.type, typeCalc)
             GeneratedField(field, runtimeStatic, runtimeNamePrefix + "$" + pathToField)
         }

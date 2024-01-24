@@ -4,19 +4,15 @@ import builtins.ArrayType
 import builtins.BuiltinType
 import builtins.ObjectType
 import builtins.OptionType
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.Instruction
+import representation.asts.resolved.ResolvedTypeDef
 import representation.passes.lexing.Loc
 import representation.passes.output.getMethodDescriptor
 import representation.passes.output.outputInstruction
 import representation.passes.typing.*
-import util.ConsList
 import util.ConsMap
 import util.Promise
-import util.caching.EqualityCache
-import util.caching.EqualityMemoized
 import util.toGeneric
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -69,16 +65,16 @@ sealed class TypeDef {
     // Helper for obtaining a recursing tree of non-static fields,
     // as well as full names for each. This is useful when lowering
     // plural types.
-    val recursiveNonStaticFields: List<Pair<String, FieldDef>> by lazy {
+    val recursivePluralFields: List<Pair<String, FieldDef>> by lazy {
         if (isPlural)
             nonStaticFields.flatMap { myField ->
                 if (myField.type.isPlural)
-                    myField.type.recursiveNonStaticFields.map { (myField.name + "$" + it.first) to it.second }
+                    myField.type.recursivePluralFields.map { (myField.name + "$" + it.first) to it.second }
                 else
                     listOf(myField.name to myField)
             }
         else
-            throw IllegalStateException("Should never ask non-plural type for recursiveNonStaticFields - bug in compiler, please report!")
+            throw IllegalStateException("Should never ask non-plural type for recursivePluralFields - bug in compiler, please report!")
     }
 
     // Helper to check whether this is an optional reference type, like "String?".
@@ -164,7 +160,7 @@ sealed class TypeDef {
         override val generics: List<TypeDef> get() = innerTypes
     }
 
-    class Func(val paramTypes: List<TypeDef>, val returnType: TypeDef, typeCache: TypeDefCache): TypeDef() {
+    class Func(val paramTypes: List<TypeDef>, val returnType: TypeDef, typeCache: TypingCache): TypeDef() {
         val nextImplementationIndex: AtomicInteger = AtomicInteger()
         override val name: String = toGeneric("", paramTypes).ifEmpty { "()" } + "_to_" + returnType.name
         override val runtimeName: String = "lambdas/$name/base"
@@ -206,7 +202,7 @@ sealed class TypeDef {
             FieldDef.BuiltinField(pub = true, static = false, mutable = false, name, null, binding.type) }
         override val methods: List<MethodDef> = mutableListOf(implementation)
         // Finishes the creation of the type, and returns the generated constructor
-        fun finishCreation(typeCache: TypeDefCache): MethodDef {
+        fun finishCreation(typeCache: TypingCache): MethodDef {
             // Finish the creation of this type def. This involves removing any unnecessary fields as well as
             // adding the constructor method.
             // Fetch the lazy body:
@@ -233,7 +229,7 @@ sealed class TypeDef {
                 var curIndex = 1
                 for (field in this.fields) {
                     if (field.type.isPlural) {
-                        for ((pathToField, field2) in field.type.recursiveNonStaticFields) {
+                        for ((pathToField, field2) in field.type.recursivePluralFields) {
                             // Load this, load param we're storing, store in ref type, inc index
                             outputInstruction(Instruction.LoadLocal(0, this), writer)
                             outputInstruction(Instruction.LoadLocal(curIndex, field2.type), writer)
@@ -258,7 +254,8 @@ sealed class TypeDef {
         }
     }
 
-    class InstantiatedBuiltin(override val builtin: BuiltinType, override val generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef() {
+    class InstantiatedBuiltin(override val builtin: BuiltinType, override val generics: List<TypeDef>, override val typeHead: ResolvedTypeDef,
+                              typeCache: TypingCache): TypeDef(), FromTypeHead {
         override val name: String = builtin.name(generics, typeCache)
         override val runtimeName: String? = builtin.runtimeName(generics, typeCache)
         val shouldGenerateClassAtRuntime = builtin.shouldGenerateClassAtRuntime(generics, typeCache)
@@ -276,8 +273,9 @@ sealed class TypeDef {
     class ClassDef(val loc: Loc, override val name: String, val supertype: TypeDef,
                    override val generics: List<TypeDef>,
                    override val fields: List<FieldDef>,
-                   override val methods: List<MethodDef>
-    ): TypeDef() {
+                   override val methods: List<MethodDef>,
+                   override val typeHead: ResolvedTypeDef
+    ): TypeDef(), FromTypeHead {
         override val runtimeName: String get() = name
         override val descriptor: List<String> get() = listOf("L$runtimeName;")
         override val stackSlots: Int get() = 1
@@ -291,8 +289,9 @@ sealed class TypeDef {
     class StructDef(val loc: Loc, override val name: String,
                    override val generics: List<TypeDef>,
                    override val fields: List<FieldDef>,
-                   override val methods: List<MethodDef>
-    ): TypeDef() {
+                   override val methods: List<MethodDef>,
+                   override val typeHead: ResolvedTypeDef
+    ): TypeDef(), FromTypeHead {
         override val runtimeName: String get() = name
         override val descriptor: List<String> = fields.filter { !it.static }.flatMap { it.type.descriptor }
         override val stackSlots: Int get() = fields.filter { !it.static }.sumOf { it.type.stackSlots }
@@ -302,104 +301,27 @@ sealed class TypeDef {
         override val primarySupertype: TypeDef? get() = null
         override val supertypes: List<TypeDef> = listOf()
     }
+
+    /**
+     * Impl blocks only contain snuggle methods. Furthermore, their methods should all be tagged with the "staticOverride"
+     * set to true.
+     */
+    class ImplBlockBackingDef(val loc: Loc, override val name: String, override val generics: List<TypeDef>, override val methods: List<MethodDef>): TypeDef() {
+        override val fields: List<FieldDef> get() = listOf()
+        override val runtimeName: String get() = name
+        override val descriptor: List<String> get() = listOf()
+        override val stackSlots: Int get() = 0
+        override val isPlural: Boolean get() = true
+        override val isReferenceType: Boolean get() = false
+        override val hasStaticConstructor: Boolean get() = true
+        override val primarySupertype: TypeDef? get() = null
+        override val supertypes: List<TypeDef> get() = listOf()
+    }
+
 }
 
-// A method definition,
-sealed interface MethodDef {
-    val pub: Boolean //
-    val static: Boolean
-    val owningType: TypeDef
-    val name: String
-    val runtimeName: String get() = name // For most, the runtime name is the same as the name.
-    val returnType: TypeDef
-    val paramTypes: List<TypeDef>
-
-    // Override vals on the first line, important things on later lines
-    class BytecodeMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
-                            // Bytecode which runs early, before the receiver or the args have been pushed to the stack yet.
-                            val preBytecode: ((writer: MethodVisitor, maxVariable: Int, desiredFields: ConsList<ConsList<FieldDef>>) -> Unit)?,
-                            val bytecode: (writer: MethodVisitor, maxVariable: Int, desiredFields: ConsList<ConsList<FieldDef>>) -> Unit,
-                            val desiredReceiverFields: ((ConsList<ConsList<FieldDef>>) -> ConsList<ConsList<FieldDef>>)?): MethodDef {
-        constructor(pub: Boolean, static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, paramTypes: List<TypeDef>, bytecode: (MethodVisitor) -> Unit)
-            : this(pub, static, owningType, name, returnType, paramTypes,
-                null,
-                { writer, _, _ -> bytecode(writer); },
-                null)
-    }
-    data class ConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
-                              val replacer: (TypedExpr.MethodCall) -> TypedExpr): MethodDef {
-        override val static: Boolean get() = false
-    }
-    data class StaticConstMethodDef(override val pub: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
-                                    val replacer: (TypedExpr.StaticMethodCall) -> TypedExpr): MethodDef {
-        override val static: Boolean get() = true
-    }
-    // Method def without an implementation, used in things like TypeDef.Func
-    data class InterfaceMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>): MethodDef
-    // A MethodDef which has custom behavior for lowering itself and outputting itself to the ClassWriter
-    data class CustomMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val runtimeName: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
-                               val lowerer: () -> Sequence<Instruction>,
-                               val outputter: (ClassWriter) -> Unit): MethodDef
-    // runtimeName field: often, SnuggleMethodDef will need to have a different name
-    // at runtime than in the internal representation. These are the case for:
-    // - constructors, whose names are changed to "<init>" to match java's requirement
-    // - overloaded methods, whose names are changed to have a disambiguation number appended
-    //
-    // Note that some of these fields are lazily calculated to allow for self-referencing concerns.
-    data class SnuggleMethodDef(val loc: Loc, override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String,
-                                val returnTypeGetter: Lazy<TypeDef>,
-                                val paramTypesGetter: Lazy<List<TypeDef>>,
-                                val runtimeNameGetter: Lazy<String>,
-                                val lazyBody: Lazy<TypedExpr>)
-        : MethodDef {
-            override val returnType by returnTypeGetter
-            override val paramTypes by paramTypesGetter
-            override val runtimeName by runtimeNameGetter
-        }
-
-    abstract class GenericMethodDef<T: MethodDef>(val numGenerics: Int): MethodDef {
-        // The specializations created from this generic method def
-        val specializations: EqualityCache<List<TypeDef>, T> = EqualityCache()
-        fun getSpecialization(generics: List<TypeDef>) = specializations.get(generics) { specialize(it) }
-        // Abstract: Specialize this GenericMethodDef into a (non-generic!) MethodDef by replacing the generics.
-        protected abstract fun specialize(generics: List<TypeDef>): T
-        // Unspecialized generic method defs cannot know certain properties
-        override val paramTypes: List<TypeDef> get() = throw IllegalStateException("Should not be asking generic method def for its param types - it doesn't know them")
-        override val returnType: TypeDef get() = throw IllegalStateException("Should not be asking generic method def for its return type - it doesn't know it")
-        override val runtimeName: String get() = throw IllegalStateException("Should not be asking generic method def for its runtime name - it doesn't know it")
-
-        // A generic method defined in Snuggle code
-        class GenericSnuggleMethodDef(val loc: Loc, override val pub: Boolean, override val static: Boolean, numGenerics: Int,
-                                      override val owningType: TypeDef, override val name: String,
-                                      val returnTypeGetter: EqualityMemoized<List<TypeDef>, Lazy<TypeDef>>,
-                                      val paramTypeGetter: EqualityMemoized<List<TypeDef>, Lazy<List<TypeDef>>>,
-                                      val runtimeNameGetter: EqualityMemoized<List<TypeDef>, Lazy<String>>,
-                                      val lazyBodyGetter: EqualityMemoized<List<TypeDef>, Lazy<TypedExpr>>
-        )
-        : GenericMethodDef<SnuggleMethodDef>(numGenerics) {
-            override fun specialize(generics: List<TypeDef>): SnuggleMethodDef = SnuggleMethodDef(
-                loc, pub, static, owningType, name, returnTypeGetter(generics),
-                paramTypeGetter(generics), runtimeNameGetter(generics), lazyBodyGetter(generics)
-            )
-        }
-
-    }
-}
-
-sealed interface FieldDef {
-    val pub: Boolean
-    val static: Boolean
-    val mutable: Boolean
-    val pluralOffset: Int? // If the owning type is plural, and this is non-static, this should be the field's offset.
-    val name: String
-    val type: TypeDef
-
-    data class BuiltinField(
-        override val pub: Boolean, override val static: Boolean, override val mutable: Boolean,
-        override val name: String, override val pluralOffset: Int?, override val type: TypeDef
-    ): FieldDef
-    data class SnuggleFieldDef(
-        val loc: Loc, override val pub: Boolean, override val static: Boolean, override val mutable: Boolean,
-        override val name: String, override val pluralOffset: Int?, override val type: TypeDef
-    ): FieldDef
+// For TypeDefs that came from a typehead (ResolvedTypeDef) + some generics.
+// Classes, Structs, Builtins.
+interface FromTypeHead {
+    val typeHead: ResolvedTypeDef
 }

@@ -1,11 +1,13 @@
 package runtime;
 
 import builtins.*
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.util.TraceClassVisitor
 import reflection.ReflectedBuiltinType
 import representation.asts.parsed.ParsedAST
 import representation.passes.lexing.Lexer
 import representation.passes.lowering.lower
-import representation.passes.name_resolving2.resolveAST
+import representation.passes.name_resolving.resolveAST
 import representation.passes.output.CompiledProgram
 import representation.passes.output.getRuntimeClassName
 import representation.passes.output.getStaticObjectName
@@ -16,6 +18,7 @@ import representation.passes.verify_generics.verify
 import util.Cons
 import util.ConsList
 import util.append
+import java.io.PrintWriter
 import java.util.concurrent.atomic.AtomicInteger
 
 
@@ -25,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * by the compiler, alongside several other class
  * files, and the ClassLoader holding them is here.
  */
-class SnuggleInstance(compiledProgram: CompiledProgram, staticInstances: ConsList<Any>, allReflectedClasses: ConsList<Class<*>>) {
+class SnuggleInstance(compiledProgram: CompiledProgram, staticInstances: ConsList<Any>, allReflectedClasses: ConsList<Class<*>>, debugBytecode: Boolean) {
 
     // Contains the runtime, and the class loader
     // holding the bytecodes for this runtime.
@@ -48,7 +51,7 @@ class SnuggleInstance(compiledProgram: CompiledProgram, staticInstances: ConsLis
                 throw IllegalStateException("Reflected classes have no common deepest classloader!")
         }
         // Create the loader, passing in the compiled class map
-        loader = CustomLoader(compiledProgram.classes.toMutableMap(), deepestClassLoader)
+        loader = CustomLoader(compiledProgram.classes.toMutableMap(), deepestClassLoader, debugBytecode)
 
         // Create the runtime and add it to the loader
         val runtimeClass = loader.findClass(getRuntimeClassName())!!
@@ -69,6 +72,7 @@ class InstanceBuilder(userFiles: Map<String, String>) {
     private var reflectedClasses: ConsList<Class<*>> = ConsList.of()
     private var reflectedObjects: ConsList<Any> = ConsList.of()
     private var otherBuiltins: ConsList<BuiltinType> = ConsList.of()
+    private var debugBytecode: Boolean = false
     fun addFile(name: String, source: String): InstanceBuilder
         = this.also { userFiles[name] = source }
     fun reflect(clas: Class<*>): InstanceBuilder
@@ -77,6 +81,7 @@ class InstanceBuilder(userFiles: Map<String, String>) {
         = this.also { reflectedObjects = Cons(instance, reflectedObjects) }
     fun addBuiltin(builtin: BuiltinType): InstanceBuilder
             = this.also { otherBuiltins = Cons(builtin, otherBuiltins) }
+    fun debugBytecode(): InstanceBuilder = this.also { debugBytecode = true }
     fun build(): SnuggleInstance {
         // Create a list of static objects
         val staticObjects = reflectedObjects.mapIndexed { index, obj ->
@@ -108,7 +113,8 @@ class InstanceBuilder(userFiles: Map<String, String>) {
                 ), reflectedObjects
             ),
             reflectedObjects,
-            reflectedObjects.map { it.javaClass }.append(reflectedClasses)
+            reflectedObjects.map { it.javaClass }.append(reflectedClasses),
+            debugBytecode
         )
     }
 
@@ -120,12 +126,14 @@ class InstanceBuilder(userFiles: Map<String, String>) {
  * for some instance.
  */
 private val nextLoaderId = AtomicInteger()
-private class CustomLoader(val classes: MutableMap<String, ByteArray>, deepestCommonChild: ClassLoader)
+private class CustomLoader(val classes: MutableMap<String, ByteArray>, deepestCommonChild: ClassLoader, private val debugBytecode: Boolean)
     : ClassLoader("SnuggleLoader${nextLoaderId.getAndIncrement()}", deepestCommonChild) {
 
     public override fun findClass(name: String): Class<*>? {
         val runtimeName = name.replace('.', '/')
         val bytes = classes.remove(runtimeName) ?: return null
+        if (debugBytecode)
+            ClassReader(bytes).accept(TraceClassVisitor(PrintWriter(System.err)), ClassReader.SKIP_DEBUG)
         return defineClass(name, bytes, 0, bytes.size)
     }
 

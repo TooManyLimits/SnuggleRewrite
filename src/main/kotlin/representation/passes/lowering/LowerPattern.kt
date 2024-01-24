@@ -28,7 +28,7 @@ fun lowerPattern(pattern: TypedPattern, typeCalc: IdentityIncrementalCalculator<
             lowerTypeDef(pattern.type, typeCalc)
             if (pattern.type.isPlural) sequence {
                 var curIndex = pattern.variableIndex + pattern.type.stackSlots
-                pattern.type.recursiveNonStaticFields.asReversed().forEach {(_, fieldDef) ->
+                pattern.type.recursivePluralFields.asReversed().forEach { (_, fieldDef) ->
                     curIndex -= fieldDef.type.stackSlots
                     yield(Instruction.StoreLocal(curIndex, fieldDef.type))
                 }

@@ -33,7 +33,7 @@ fun isExplicitlyTyped(pattern: ResolvedPattern): Boolean = when (pattern) {
  * Create a typed pattern by checking this pattern against the inferred
  * scrutinee type, and ensuring it matches.
  */
-fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedPattern {
+fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedPattern {
     // If scrutinee is an unstorable type, like IntLiteral, error here
     if (scrutineeType.builtin == IntLiteralType)
         throw CompilationException("Cannot infer type of literal - try adding more annotations", pattern.loc)
@@ -86,7 +86,7 @@ fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, topIndex: Int
  * Attempt to create a typed pattern out of only the import-resolved
  * pattern. Only possible when the pattern is explicitly typed.
  */
-fun inferPattern(pattern: ResolvedPattern, topIndex: Int, typeCache: TypeDefCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedPattern = when (pattern) {
+fun inferPattern(pattern: ResolvedPattern, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedPattern = when (pattern) {
     is ResolvedPattern.EmptyPattern -> {
         val annotatedType = pattern.typeAnnotation ?: throw IllegalStateException("Bug in compiler - attempt to infer pattern that isn't explicitly typed? Please report!")
         val type = getTypeDef(annotatedType, typeCache, currentTypeGenerics, currentMethodGenerics)

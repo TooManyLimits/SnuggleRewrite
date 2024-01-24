@@ -2,6 +2,7 @@ package representation.asts.resolved
 
 import builtins.BuiltinType
 import representation.passes.lexing.Loc
+import util.ConsList
 import util.Promise
 import java.util.*
 
@@ -58,11 +59,15 @@ sealed class ResolvedTypeDef {
 
     // Unwrap the typedef's indirections
     fun unwrap(): ResolvedTypeDef =
-        if (this is ResolvedTypeDef.Indirection) promise.expect().unwrap() else this
+        if (this is Indirection) promise.expect().unwrap() else this
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other is ResolvedTypeDef) return this.unwrap() === other.unwrap()
         return false
+    }
+
+    override fun hashCode(): Int {
+        return System.identityHashCode(this.unwrap())
     }
 
     // Indirection type, required for self-referencing data.
@@ -94,12 +99,20 @@ sealed class ResolvedTypeDef {
 class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ResolvedType)
 class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
 
-sealed interface ResolvedImplBlock {
+sealed class ResolvedImplBlock {
 
     fun unwrap(): Base = if (this is Indirect) promise.expect().unwrap() else this as Base
-    class Indirect(val promise: Promise<ResolvedImplBlock> = Promise()): ResolvedImplBlock
-    class Base(val loc: Loc, val pub: Boolean, val numGenerics: Int, val implType: ResolvedType, val methods: List<ResolvedMethodDef>): ResolvedImplBlock
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other is ResolvedImplBlock) return this.unwrap() === other.unwrap()
+        return false
+    }
+    override fun hashCode(): Int {
+        return System.identityHashCode(this.unwrap())
+    }
 
+    class Indirect(val promise: Promise<ResolvedImplBlock> = Promise()): ResolvedImplBlock()
+    class Base(val loc: Loc, val pub: Boolean, val numGenerics: Int, val implType: ResolvedType, val methods: List<ResolvedMethodDef>): ResolvedImplBlock()
 }
 sealed interface ResolvedExpr {
     val loc: Loc
@@ -124,10 +137,13 @@ sealed interface ResolvedExpr {
 
     data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
-    data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>): ResolvedExpr
-    data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>): ResolvedExpr
-    data class SuperMethodCall(override val loc: Loc, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>): ResolvedExpr
-    data class ConstructorCall(override val loc: Loc, val type: ResolvedType?, val args: List<ResolvedExpr>): ResolvedExpr
+
+    // Method calls carry with them a list of ImplBlock, which were in scope when the method call was made.
+    // Methods from these ImplBlock will be added to the pool of potentially callable methods.
+    data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    data class SuperMethodCall(override val loc: Loc, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    data class ConstructorCall(override val loc: Loc, val type: ResolvedType?, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
     data class RawStructConstructor(override val loc: Loc, val type: ResolvedType?, val fieldValues: List<ResolvedExpr>): ResolvedExpr
 
 

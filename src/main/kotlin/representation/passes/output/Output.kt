@@ -42,9 +42,12 @@ fun getMethodDescriptor(methodDef: MethodDef): String {
     // If it's a method on a struct, and it's non-static, add the struct's descriptor as the first arg
     if (methodDef.owningType.unwrap() is TypeDef.StructDef && !methodDef.static)
         argString = methodDef.owningType.unwrap().descriptor.joinToString(separator = "") + argString
-    // Get the return type; if it has 1 element use that, otherwise use void return
+    // Otherwise, if it's a snuggle method with a static override, add the override receiver type as the first arg
+    else if (methodDef is MethodDef.SnuggleMethodDef && methodDef.staticOverrideReceiverType != null)
+        argString = methodDef.staticOverrideReceiverType.descriptor.joinToString(separator = "") + argString
+    // Get the return type; if it has at least 1 element use that, otherwise use void return
     val returnTypeDesc = methodDef.returnType.descriptor
-    val returnTypeString = if (returnTypeDesc.isNotEmpty()) returnTypeDesc[0] else "V"
+    val returnTypeString = returnTypeDesc.getOrNull(0) ?: "V"
     // Return the descriptor, "(args)returnType"
     return "($argString)$returnTypeString"
 }

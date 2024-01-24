@@ -4,7 +4,7 @@ import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getBasicBuiltin
 import representation.passes.typing.getUnit
 import java.io.PrintStream
@@ -12,16 +12,16 @@ import java.io.PrintStream
 // Temporary builtin to allow printing
 object PrintType: BuiltinType {
     override val baseName: String get() = "print"
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String = baseName
     override val nameable: Boolean get() = true
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf()
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 0
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> = listOf()
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = 0
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val thisType = getBasicBuiltin(this, typeCache)
         val boolType = getBasicBuiltin(BoolType, typeCache)
         val unitType = getUnit(typeCache)

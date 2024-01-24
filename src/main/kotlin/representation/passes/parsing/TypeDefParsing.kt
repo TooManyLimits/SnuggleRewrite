@@ -27,9 +27,18 @@ fun parseStruct(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedTypeDef.Struc
     val structLoc = lexer.last().loc
     val structName = lexer.expect(TokenType.IDENTIFIER, extraInfo = "after \"struct\"").string()
     val typeGenerics = parseGenerics(lexer)
-    lexer.expect(TokenType.LEFT_CURLY, "to begin class definition")
+    lexer.expect(TokenType.LEFT_CURLY, "to begin struct definition")
     val members = parseMembers(lexer, typeGenerics, TypeType.STRUCT)
     return ParsedElement.ParsedTypeDef.Struct(structLoc, isPub, structName, typeGenerics.size, members.first, members.second)
+}
+
+fun parseImpl(lexer: Lexer, isPub: Boolean): ParsedElement.ParsedImplBlock {
+    val implLoc = lexer.last().loc
+    val typeGenerics = parseGenerics(lexer)
+    val implType = parseType(lexer, typeGenerics, listOf(), "as type to impl")
+    lexer.expect(TokenType.LEFT_CURLY, "to begin impl block")
+    val members = parseMembers(lexer, typeGenerics, TypeType.IMPL)
+    return ParsedElement.ParsedImplBlock(implLoc, isPub, typeGenerics.size, implType, members.second)
 }
 
 private fun parseGenerics(lexer: Lexer): List<String> {
@@ -39,7 +48,8 @@ private fun parseGenerics(lexer: Lexer): List<String> {
 }
 
 private enum class TypeType {
-    CLASS, STRUCT, ENUM
+    CLASS, STRUCT, ENUM,
+    IMPL, // Not technically a type but kinda sorta I guess, shares enough similarity
 }
 
 // Parses members. The { was just consumed. Continues until finding a }.
@@ -75,6 +85,12 @@ private fun parseMembers(lexer: Lexer, typeGenerics: List<String>, typeType: Typ
                 methods += ParsedMethodDef(nameTok.loc, isPub, isStatic, methodGenerics.size, nameTok.string(), params, returnType, body)
             }
         } else {
+            // Impl and Enum can't have extra fields
+            if (typeType == TypeType.IMPL)
+                throw ParsingException("Cannot have fields in impl{} block. Expected FN, found " + lexer.last().type, lexer.last().loc)
+            if (typeType == TypeType.ENUM)
+                throw ParsingException("Cannot have fields in enum type. Expected FN, found " + lexer.last().type, lexer.last().loc)
+
             // Otherwise, we must have field(s).
             val isMut = lexer.consume(TokenType.MUT)
             val fieldName = lexer.expect(TokenType.IDENTIFIER, "to begin field name, or a function definition")

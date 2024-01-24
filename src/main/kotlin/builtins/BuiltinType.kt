@@ -3,7 +3,7 @@ package builtins
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 
 /**
  * A type that is defined through Java code, not through
@@ -20,7 +20,7 @@ interface BuiltinType {
 
     // The name of this type, as it appears in error messages,
     // and how it is written in Snuggle code.
-    fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String
+    fun name(generics: List<TypeDef>, typeCache: TypingCache): String
 
     // Whether the type is nameable. Can it be referred to by
     // name? This is almost always the case, except for elusive
@@ -37,17 +37,17 @@ interface BuiltinType {
     // Some types, like bool or f32, have no runtimeName, since
     // there is no class associated with them. This is why it's
     // optional.
-    fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String?
+    fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String?
 
     // Whether this type should generate a corresponding class at runtime. The class
     // will have name given by runtimeName. Used by a few types, like Option<T> where
     // T is not a reference type, but for most cases it's just false.
-    fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
+    fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
 
     // The java descriptor of this type. For instance, booleans
     // have "Z". Integers have "I". Longs are "J". Strings are
     // "Ljava/lang/String;".
-    fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String>
+    fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String>
 
     // The number of generics this type has. 0 by default.
     val numGenerics: Int get() = 0
@@ -55,39 +55,39 @@ interface BuiltinType {
     // The number of slots on the stack this takes up.
     // For most basic java types, it's 1. For longs and doubles,
     // it's 2. For plural types, the value can be anything >= 0.
-    fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int
+    fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int
 
     // If a type is plural, that means it consists of multiple
     // JVM values, stored together on the stack. For example,
     // structs are plural types. When translating to the jvm,
     // special care needs to be given for plural types.
-    fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
+    fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean
 
     // Whether the type can be considered a reference type.
     // I don't have a perfect definition of this, unfortunately, but one
     // way of looking at it would be to say "field accesses on this type
     // should work the same way as they would for a normal class". There
     // may be some variance in how this is interpreted.
-    fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
+    fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean
 
     // Whether the type uses a static constructor style. If true, constructors
     // should be of the form "static fn new() -> Type", returning an instance,
     // if false they should be "fn new() -> Unit", initializing an existing instance.
-    fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean
+    fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean
 
     // Get the fields of this type, given the generics.
-    fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> = listOf() //listOf() for now
+    fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> = listOf() //listOf() for now
 
     // Get the methods of this type, given the generics.
-    fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> = listOf() //listOf() for now
+    fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> = listOf() //listOf() for now
 
     // Get the primary supertype of this type (used for inheritance purposes)
     // Default is null.
-    fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef? = null
+    fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypingCache): TypeDef? = null
 
     // Get all supertypes of this type (used for type-checking purposes)
     // Default is just the primary supertype.
-    fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =
+    fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypingCache): List<TypeDef> =
         getPrimarySupertype(generics, typeCache)?.let { listOf(it) } ?: listOf()
 
 }

@@ -1,4 +1,4 @@
-package representation.passes.name_resolving2
+package representation.passes.name_resolving
 
 import builtins.BuiltinType
 import representation.asts.parsed.ParsedAST

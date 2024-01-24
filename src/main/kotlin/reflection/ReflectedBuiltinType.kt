@@ -9,7 +9,7 @@ import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.passes.output.getRuntimeClassName
 import representation.passes.output.getStaticObjectName
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getReflectedBuiltin
 import java.lang.reflect.AnnotatedElement
 import java.lang.reflect.Method
@@ -42,20 +42,20 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
 
     override val baseName: String = reflectedClass.annotationOrElse(SnuggleRename::class, reflectedClass.simpleName) { it.value }
 
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String = baseName
     override val nameable: Boolean = true //TODO configurable with annotation
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String =
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String =
         Type.getInternalName(reflectedClass)
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> =
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> =
         listOf("L" + this.runtimeName(generics, typeCache) + ";")
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = 1
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false //TODO Configurable
-    override fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypeDefCache): TypeDef
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = 1
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false //TODO Configurable
+    override fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypingCache): TypeDef
         = fetchType(reflectedClass.annotatedSuperclass, typeCache)
 
-    override fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> {
+    override fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> {
         return reflectedClass.declaredFields.mapNotNull {
             // If this is denied, or neither this nor the class is allowed, don't emit a field.
             if (it.isAnnotationPresent(SnuggleDeny::class.java) ||
@@ -76,7 +76,7 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
         }
     }
 
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val thisType = getReflectedBuiltin(reflectedClass, typeCache)
         return reflectedClass.declaredMethods.mapNotNull {
             reflectMethod(it, thisType, typeCache)
@@ -85,7 +85,7 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
         }
     }
 
-    private fun reflectMethod(method: Method, owningType: TypeDef, typeCache: TypeDefCache): MethodDef? {
+    private fun reflectMethod(method: Method, owningType: TypeDef, typeCache: TypingCache): MethodDef? {
         // If this is denied, or neither this nor the class is allowed, don't emit the method.
         if (method.isAnnotationPresent(SnuggleDeny::class.java) ||
             !method.isAnnotationPresent(SnuggleAllow::class.java) &&

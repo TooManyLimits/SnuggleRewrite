@@ -3,25 +3,17 @@ import runtime.InstanceBuilder
 fun main() {
 
     val code = """
-        import "list"
-        class Event<Input>: List<Input -> ()> {
-            pub fn new() super()
-            // Currently requires "this." for closed over variables...
-            // Since those closed-over variables are *fields* of the closure object
-            pub fn invoke(input: Input)
-                this.forEach(fn(elem) elem(this.input)) 
+        impl<T> T {
+            fn print() print(this)
         }
-        let x = new Event<i32>()
-        x.push(fn(arg) print(arg))
-        x.push(fn(arg) print(arg * 2))
-        x.push(fn(arg) print(arg * arg))
-        x(10)
-        x(9)
+        5i32.print()
+        "helo".print()
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
+//        .debugBytecode()
         .addFile("list", list)
-        .reflectObject(EvilPrinter(", lol!!"))
+        .reflectObject(ExtraPrinter(" :3"))
         .build()
 
     instance.runtime.runCode()

@@ -4,28 +4,28 @@ import builtins.helpers.constBinary
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getBasicBuiltin
 import java.math.BigInteger
 
 object IntLiteralType: BuiltinType {
     override val baseName: String get() = "IntLiteral"
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = baseName // Name used for error messages
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String = baseName // Name used for error messages
     override val nameable: Boolean get() = false // Not nameable, can't refer to type "IntLiteral" in code
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String? = null
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> = listOf()
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String? = null
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> = listOf()
 
     // If we ever use this value anyway, something has already gone terribly wrong
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int = -1000
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = -1000
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
     // Supertypes are the various int types and float types
-    override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypeDefCache): List<TypeDef> =
+    override fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypingCache): List<TypeDef> =
         INT_TYPES.map { getBasicBuiltin(it, typeCache) } + FLOAT_TYPES.map { getBasicBuiltin(it, typeCache) }
 
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val intLiteralType = getBasicBuiltin(IntLiteralType, typeCache)
         val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(

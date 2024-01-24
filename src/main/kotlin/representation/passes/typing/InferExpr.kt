@@ -55,7 +55,7 @@ fun just(expr: TypedExpr): TypingResult.JustExpr = TypingResult.JustExpr(expr)
  *                              Works essentially the same as currentTypeGenerics, except with
  *                              method generics instead.
  */
-fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult = when (expr) {
+fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult = when (expr) {
 
     // Import has type unit
     is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getUnit(typeCache)))
@@ -153,7 +153,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Infer the type of the receiver
         val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.expr.type.allNonStaticMethods
+        val methods = typedReceiver.expr.type.allNonStaticMethods + getNonStaticExtensions(typedReceiver.expr.type, expr.implBlocks, typeCache)
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
@@ -176,7 +176,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     is ResolvedExpr.StaticMethodCall -> {
         // Largely same as above, MethodCall
         val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics, currentMethodGenerics)
-        val methods = receiverType.staticMethods
+        val methods = receiverType.staticMethods + getStaticExtensions(receiverType, expr.implBlocks, typeCache)
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // TODO: Const static method calls
@@ -188,7 +188,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Ensure we can use super here
         val superType = (currentType ?: throw ParsingException("Cannot use keyword \"super\" outside of a type definition", expr.loc))
             .primarySupertype ?: throw ParsingException("Cannot use keyword \"super\" here. Type \"${currentType.name} does not have a supertype.", expr.loc)
-        val methods = superType.nonStaticMethods
+        val methods = superType.nonStaticMethods + getNonStaticExtensions(superType, expr.implBlocks, typeCache)
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, null, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
@@ -335,12 +335,12 @@ private fun checkMutable(lvalue: TypedExpr, assignLoc: Loc): Unit = when (lvalue
 }
 
 // Wrap a given typedExpr inside an Optional
-fun wrapInOption(toBeWrapped: TypedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypedExpr {
+fun wrapInOption(toBeWrapped: TypedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
     val optionType = getGenericBuiltin(OptionType, listOf(toBeWrapped.type), typeCache)
     val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 1 }!!
     return TypedExpr.StaticMethodCall(toBeWrapped.loc, optionType, "new", listOf(toBeWrapped), constructor, getTopIndex(scope), optionType)
 }
-fun emptyOption(genericType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache): TypedExpr {
+fun emptyOption(genericType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
     val optionType = getGenericBuiltin(OptionType, listOf(genericType), typeCache)
     val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 0 }!!
     return TypedExpr.StaticMethodCall(Loc.NEVER, optionType, "new", listOf(), constructor, getTopIndex(scope), optionType)

@@ -1,4 +1,4 @@
-package representation.passes.name_resolving2
+package representation.passes.name_resolving
 
 import errors.CompilationException
 import errors.ParsingException
@@ -120,7 +120,7 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
                     // Return a static method call result
                     return@run join(resolvedArgs) {
                         val receiverType = ResolvedType.Basic(expr.receiver.loc, type, listOf())
-                        ResolvedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, genericArgs, it)
+                        ResolvedExpr.StaticMethodCall(expr.loc, receiverType, expr.methodName, genericArgs, it, currentMappings.implBlocks)
                     }
                 }
             }
@@ -129,7 +129,7 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
             is ParsedElement.ParsedExpr.Super -> {
                 // This is a super method call.
                 return@run join(resolvedArgs) {
-                    ResolvedExpr.SuperMethodCall(expr.loc, expr.methodName, genericArgs, it)
+                    ResolvedExpr.SuperMethodCall(expr.loc, expr.methodName, genericArgs, it, currentMappings.implBlocks)
                 }
             }
             else -> {}
@@ -137,7 +137,7 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
 
         val resolvedReceiver = resolveExpr(expr.receiver, startingMappings, currentMappings, ast, cache)
         join(resolvedArgs + resolvedReceiver) {
-            ResolvedExpr.MethodCall(expr.loc, it.last(), expr.methodName, genericArgs, it.dropLast(1))
+            ResolvedExpr.MethodCall(expr.loc, it.last(), expr.methodName, genericArgs, it.dropLast(1), currentMappings.implBlocks)
         }
     }
 
@@ -147,7 +147,7 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
     is ParsedElement.ParsedExpr.ConstructorCall -> {
         val resolvedType = expr.type?.let { resolveType(it, currentMappings) }
         join(expr.args.map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }) {
-            ResolvedExpr.ConstructorCall(expr.loc, resolvedType, it)
+            ResolvedExpr.ConstructorCall(expr.loc, resolvedType, it, currentMappings.implBlocks)
         }
     }
     is ParsedElement.ParsedExpr.RawStructConstructor -> {

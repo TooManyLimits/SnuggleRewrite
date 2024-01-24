@@ -4,22 +4,21 @@ import reflection.annotations.SnuggleStatic;
 
 @SnuggleRename("print")
 @SnuggleStatic
-public class EvilPrinter {
+public class ExtraPrinter {
 
     private String extra;
 
-    public EvilPrinter(String extraMessage) {
+    public ExtraPrinter(String extraMessage) {
         this.extra = extraMessage;
     }
 
-    @SnuggleAllow
+    @SnuggleAllow //print(string)
     public void invoke(String message) {
         System.out.println(message + extra);
     }
 
-    @SnuggleAllow
+    @SnuggleAllow //print(i32)
     public void invoke(int i) {
         System.out.println(i + extra);
     }
-
 }

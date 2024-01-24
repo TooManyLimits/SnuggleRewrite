@@ -8,15 +8,13 @@ import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
+import representation.asts.resolved.ResolvedImplBlock
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
 import representation.passes.lexing.Loc
-import util.ConsMap
-import util.extend
-import util.lookup
-import util.union
+import util.*
 import java.math.BigInteger
 import kotlin.math.max
 
@@ -27,7 +25,7 @@ import kotlin.math.max
  * This one adds one additional parameter, expectedType. It makes sure
  * that the expr's type is a subtype of expectedType, or else it will error.
  */
-fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult = when(expr) {
+fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult = when(expr) {
 
     // Very similar to inferring a block; we just need to
     // checkExpr() on the last expression, not infer it.
@@ -67,7 +65,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // Infer the type of the receiver
         val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // Gather the set of non-static methods on the receiver
-        val methods = typedReceiver.expr.type.allNonStaticMethods
+        val methods = typedReceiver.expr.type.allNonStaticMethods + getNonStaticExtensions(typedReceiver.expr.type, expr.implBlocks, typeCache)
         // Choose the best method from among them
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
@@ -86,7 +84,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
 
     is ResolvedExpr.StaticMethodCall -> {
         val receiverType = getTypeDef(expr.receiverType, typeCache, currentTypeGenerics, currentMethodGenerics)
-        val methods = receiverType.staticMethods
+        val methods = receiverType.staticMethods + getStaticExtensions(receiverType, expr.implBlocks, typeCache)
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         // TODO: Const static method calls
@@ -97,7 +95,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     is ResolvedExpr.SuperMethodCall -> {
         val superType = (currentType ?: throw ParsingException("Cannot use keyword \"super\" outside of a type definition", expr.loc))
             .primarySupertype ?: throw ParsingException("Cannot use keyword \"super\" here. Type \"${currentType.name} does not have a supertype.", expr.loc)
-        val methods = superType.nonStaticMethods
+        val methods = superType.nonStaticMethods + getNonStaticExtensions(superType, expr.implBlocks, typeCache)
         val mappedGenerics = expr.genericArgs.map { getTypeDef(it, typeCache, currentTypeGenerics, currentMethodGenerics) }
         val best = getBestMethod(methods, expr.loc, expr.methodName, mappedGenerics, expr.args, expectedType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val thisIndex = scope.lookup("this")?.index ?: throw IllegalStateException("Failed to locate \"this\" variable when typing super - but there should always be one? Bug in compiler, please report")
@@ -268,13 +266,24 @@ fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult {
     else result
 }
 
-fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult {
+fun getStaticExtensions(type: TypeDef, implBlocks: ConsList<ResolvedImplBlock>, typeCache: TypingCache): List<MethodDef> {
+    return implBlocks
+        .mapNotNull { implBlockMatches(it, type)?.let { generics -> getImplBlock(it, generics, typeCache) } }
+        .flatMap { it.staticMethods }
+}
+fun getNonStaticExtensions(type: TypeDef, implBlocks: ConsList<ResolvedImplBlock>, typeCache: TypingCache): List<MethodDef> {
+    return implBlocks
+        .mapNotNull { implBlockMatches(it, type)?.let { generics -> getImplBlock(it, generics, typeCache) } }
+        .flatMap { it.nonStaticMethods }
+}
+
+fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypingResult {
     // Different situations depending on the type we're trying to construct
     return if (knownType.hasStaticConstructor) {
         // Some constructors work differently from java -
         // Instead of being nonstatic methods that initialize
         // an object, they're static methods that return the type.
-        val methods = knownType.staticMethods
+        val methods = knownType.staticMethods + getStaticExtensions(knownType, expr.implBlocks, typeCache)
         val best = getBestMethod(methods, expr.loc, "new", listOf(), expr.args, knownType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val maxVariable = scope.sumOf { it.second.type.stackSlots }
         just(TypedExpr.StaticMethodCall(
@@ -291,11 +300,12 @@ fun typeCheckConstructor(expr: ResolvedExpr.ConstructorCall, knownType: TypeDef,
     }
 }
 
-private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType: TypeDef.Func, scope: ConsMap<String, VariableBinding>, typeCache: TypeDefCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedExpr {
+private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType: TypeDef.Func, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache, returnType: TypeDef?, currentType: TypeDef?, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedExpr {
     // Create a new artificial SnuggleMethodDef, binding the expected type's params as its variables,
     // and type check its body to be the return type
     val indirect = TypeDef.Indirection()
     val implementationMethod = MethodDef.SnuggleMethodDef(lambda.loc, pub = true, static = false, indirect, "invoke",
+        staticOverrideReceiverType = null,
         returnTypeGetter = lazy { expectedType.returnType },
         paramTypesGetter = lazy { expectedType.paramTypes },
         runtimeNameGetter = lazy { "invoke" },

@@ -9,7 +9,7 @@ import org.objectweb.asm.Type
 import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
-import representation.passes.typing.TypeDefCache
+import representation.passes.typing.TypingCache
 import representation.passes.typing.getBasicBuiltin
 import representation.passes.typing.getGenericBuiltin
 import representation.passes.typing.getUnit
@@ -25,20 +25,20 @@ import util.appendElem
 object OptionType: BuiltinType {
     override val numGenerics: Int get() = 1
     override val baseName: String get() = "Option"
-    override fun name(generics: List<TypeDef>, typeCache: TypeDefCache): String = generics[0].name + "?"
+    override fun name(generics: List<TypeDef>, typeCache: TypingCache): String = generics[0].name + "?"
     override val nameable: Boolean get() = true
-    override fun runtimeName(generics: List<TypeDef>, typeCache: TypeDefCache): String =
+    override fun runtimeName(generics: List<TypeDef>, typeCache: TypingCache): String =
         if (generics[0].isReferenceType) generics[0].runtimeName!! else "builtin_structs/option/" + generics[0].name
-    override fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isReferenceType
-    override fun descriptor(generics: List<TypeDef>, typeCache: TypeDefCache): List<String> =
+    override fun shouldGenerateClassAtRuntime(generics: List<TypeDef>, typeCache: TypingCache): Boolean = !generics[0].isReferenceType
+    override fun descriptor(generics: List<TypeDef>, typeCache: TypingCache): List<String> =
         if (generics[0].isReferenceType) generics[0].descriptor else generics[0].descriptor + listOf("Z")
-    override fun stackSlots(generics: List<TypeDef>, typeCache: TypeDefCache): Int =
+    override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int =
         if (generics[0].isReferenceType) 1 else generics[0].stackSlots + 1
-    override fun isPlural(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = !generics[0].isReferenceType
-    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = false
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypeDefCache): Boolean = true
+    override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = !generics[0].isReferenceType
+    override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
-    override fun getMethods(generics: List<TypeDef>, typeCache: TypeDefCache): List<MethodDef> {
+    override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val thisType = getGenericBuiltin(OptionType, generics, typeCache)
         val innerType = generics[0]
         val boolType = getBasicBuiltin(BoolType, typeCache)
@@ -105,7 +105,7 @@ object OptionType: BuiltinType {
         }
     }
 
-    override fun getFields(generics: List<TypeDef>, typeCache: TypeDefCache): List<FieldDef> {
+    override fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> {
         // If inside is a reference type, this has no fields
         if (generics[0].isReferenceType)
             return listOf()

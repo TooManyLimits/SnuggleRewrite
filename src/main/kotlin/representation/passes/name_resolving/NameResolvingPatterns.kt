@@ -1,4 +1,4 @@
-package representation.passes.name_resolving2
+package representation.passes.name_resolving
 
 import representation.asts.parsed.ParsedPattern
 import representation.asts.parsed.ParsedType

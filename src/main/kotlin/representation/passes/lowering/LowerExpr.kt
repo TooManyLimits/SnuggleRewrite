@@ -79,7 +79,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             val wantedType = fieldGroup.lastOrNull()?.type ?: expr.type
             var startIndex = expr.variableIndex + getPluralOffset(fieldGroup)
             if (wantedType.isPlural) {
-                for ((_, field) in wantedType.recursiveNonStaticFields) {
+                for ((_, field) in wantedType.recursivePluralFields) {
                     yield(Instruction.LoadLocal(startIndex, field.type))
                     startIndex += field.type.stackSlots
                 }
@@ -104,7 +104,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             // need to store the receiver as a local variable.
             val neededToStoreLocal = numberOfGroups > 1 || desiredFields.any {
                 val lastField = it.lastOrNull() ?: expr.fieldDef
-                lastField.type.isPlural && lastField.type.recursiveNonStaticFields.size > 1
+                lastField.type.isPlural && lastField.type.recursivePluralFields.size > 1
             }
             if (neededToStoreLocal)
                 yield(Instruction.StoreLocal(expr.maxVariable, expr.receiver.type))
@@ -116,7 +116,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
                 if (lastField.type.isPlural) {
                     // If the last field in the chain is plural, store the reference type
                     // as a top local variable, then repeatedly grab it and GetReferenceTypeField.
-                    for ((pathToField, field) in lastField.type.recursiveNonStaticFields) {
+                    for ((pathToField, field) in lastField.type.recursivePluralFields) {
                         if (neededToStoreLocal)
                             yield(Instruction.LoadLocal(expr.maxVariable, expr.receiver.type))
                         yield(Instruction.GetReferenceTypeField(expr.receiver.type, field.type, namePrefix + "$" + pathToField))
@@ -148,7 +148,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             val namePrefix = fieldGroup.fold(expr.fieldName) {prefix, field -> prefix + "$" + field.name}
             val lastField = fieldGroup.lastOrNull() ?: expr.fieldDef
             if (lastField.type.isPlural) {
-                for ((pathToField, field) in lastField.type.recursiveNonStaticFields)
+                for ((pathToField, field) in lastField.type.recursivePluralFields)
                     yield(Instruction.GetStaticField(expr.receiverType, field.type, namePrefix + "$" + pathToField))
             } else {
                 yield(Instruction.GetStaticField(expr.receiverType, lastField.type, lastField.name))
@@ -158,6 +158,8 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
 
     // Compile arguments, make call
     is TypedExpr.MethodCall -> sequence {
+        lowerTypeDef(expr.methodDef.owningType, typeCalc)
+
         // Pre-bytecode if needed
         if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
             yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
@@ -233,19 +235,19 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
         // If it's plural, decompose into static field writes and one return.
         if (returnType.isPlural) {
             // Empty plural type: Just return void (null)
-            if (returnType.recursiveNonStaticFields.isEmpty())
+            if (returnType.recursivePluralFields.isEmpty())
                 yield(Instruction.Return(null))
             else {
                 // The code here closely mirrors the code for getMethodResults.
                 // This is where the static fields are STORED, and in getMethodResults,
                 // they're READ.
                 val namePrefix = "RETURN! "
-                returnType.recursiveNonStaticFields.asReversed().dropLast(1).forEach { (pathToField, field) ->
+                returnType.recursivePluralFields.asReversed().dropLast(1).forEach { (pathToField, field) ->
                     // Put all except the first into static fields.
                     yield(Instruction.PutStaticField(returnType, field.type, namePrefix + "$" + pathToField))
                 }
                 // Return the last.
-                yield(Instruction.Return(returnType.recursiveNonStaticFields.first().second.type))
+                yield(Instruction.Return(returnType.recursivePluralFields.first().second.type))
             }
         } else {
             // If return type is not plural, just return normally.
@@ -315,7 +317,10 @@ private inline fun createCall(
         is MethodDef.CustomMethodDef -> methodDef.lowerer()
         // Invoke according to the snuggle call type
         is MethodDef.SnuggleMethodDef -> sequence {
-            yield(snuggleCallType(methodDef))
+            if (methodDef.staticOverrideReceiverType != null) // Static override - always call this method statically
+                yield(Instruction.MethodCall.Static(methodDef))
+            else
+                yield(snuggleCallType(methodDef))
             yieldAll(getMethodResults(methodDef, desiredFields))
         }
         is MethodDef.ConstMethodDef,
@@ -333,7 +338,7 @@ private inline fun createCall(
  * element, this will need to grab most of them out of their static variables in the end.
  */
 private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<ConsList<FieldDef>>): Sequence<Instruction> {
-    return if (methodToCall.returnType.isPlural && methodToCall.returnType.recursiveNonStaticFields.size > 1) sequence {
+    return if (methodToCall.returnType.isPlural && methodToCall.returnType.recursivePluralFields.size > 1) sequence {
         var first = true
         for (fieldGroup in desiredFields) {
             val namePrefix = fieldGroup.fold("RETURN! ") {prefix, field -> prefix + "$" + field.name}
@@ -341,9 +346,9 @@ private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<Co
             // If we have desired fields, and the first element of recursive nonstatic fields isn't one of them, then
             // pop it off the stack. Can only do this for the first fieldGroup.
             if (first && fieldGroup is Cons && fieldGroup.elem === methodToCall.returnType.nonStaticFields.first { it.type.stackSlots > 0 })
-                yield(Instruction.Pop(methodToCall.returnType.recursiveNonStaticFields[0].second.type))
+                yield(Instruction.Pop(methodToCall.returnType.recursivePluralFields[0].second.type))
             // Grab whichever static fields we need off the stack
-            lastDesiredType.recursiveNonStaticFields.asSequence().drop(1).forEach { (pathToField, field) ->
+            lastDesiredType.recursivePluralFields.asSequence().drop(1).forEach { (pathToField, field) ->
                 yield(Instruction.GetStaticField(methodToCall.returnType, field.type, namePrefix + "$" + pathToField))
             }
             first = false
@@ -363,7 +368,7 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
         val startIndex = lhs.variableIndex + getPluralOffset(fieldsToFollow)
         if (rhs.type.isPlural) {
             var curIndex = startIndex + rhs.type.stackSlots
-            for ((_, field) in rhs.type.recursiveNonStaticFields.asReversed()) {
+            for ((_, field) in rhs.type.recursivePluralFields.asReversed()) {
                 curIndex -= field.type.stackSlots
                 yield(Instruction.StoreLocal(curIndex, field.type))
             }
@@ -375,7 +380,7 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
     lhs is TypedExpr.StaticFieldAccess -> sequence {
         val namePrefix = fieldsToFollow.fold(lhs.fieldName) { prefix, field -> prefix + "$" + field.name }
         if (rhs.type.isPlural) {
-            for ((pathToField, field) in rhs.type.recursiveNonStaticFields.asReversed())
+            for ((pathToField, field) in rhs.type.recursivePluralFields.asReversed())
                 yield(Instruction.PutStaticField(lhs.receiverType, field.type, namePrefix + "$" + pathToField))
         } else {
             yield(Instruction.PutStaticField(lhs.receiverType, rhs.type, lhs.fieldName))
@@ -392,7 +397,7 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
             // Emit the RHS onto the stack
             yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), typeCalc))
             // For each field, store it
-            for ((pathToField, field) in rhs.type.recursiveNonStaticFields.asReversed()) {
+            for ((pathToField, field) in rhs.type.recursivePluralFields.asReversed()) {
                 yield(Instruction.LoadLocal(maxVariable, lhs.receiver.type))
                 yield(Instruction.SwapBasic(lhs.receiver.type, field.type))
                 yield(Instruction.PutReferenceTypeField(lhs.receiver.type, field.type, namePrefix + "$" + pathToField))

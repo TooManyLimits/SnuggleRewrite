@@ -15,10 +15,12 @@ fun parseElement(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<
         lexer.consume(TokenType.PUB) -> when {
             lexer.consume(TokenType.CLASS) -> parseClass(lexer, true)
             lexer.consume(TokenType.STRUCT) -> parseStruct(lexer, true)
+            lexer.consume(TokenType.IMPL) -> parseImpl(lexer, true)
             else -> throw ParsingException("Expected type definition after \"pub\"", lexer.last().loc)
         }
         lexer.consume(TokenType.CLASS) -> parseClass(lexer, false)
         lexer.consume(TokenType.STRUCT) -> parseStruct(lexer, false)
+        lexer.consume(TokenType.IMPL) -> parseImpl(lexer, false)
         else -> parseExpr(lexer, typeGenerics, methodGenerics)
     }
 }
