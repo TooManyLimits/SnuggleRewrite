@@ -1,6 +1,7 @@
 package representation.passes.output
 
 import errors.SnuggleException
+import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
@@ -15,7 +16,7 @@ import util.ConsList
  */
 fun outputRuntime(ir: Program, staticInstances: ConsList<Any>): Pair<String, ByteArray> {
     // Create the class writer
-    val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+    val writer = getClassWriter()
     writer.visit(
         Opcodes.V17, Opcodes.ACC_PUBLIC, getRuntimeClassName(), null, "java/lang/Object",
         arrayOf(Type.getInternalName(SnuggleRuntime::class.java))) // SnuggleRuntime interface
@@ -29,7 +30,7 @@ fun outputRuntime(ir: Program, staticInstances: ConsList<Any>): Pair<String, Byt
 }
 
 // Create the runCode() implementation
-private fun addRunCode(classWriter: ClassWriter) {
+private fun addRunCode(classWriter: ClassVisitor) {
     val runCode = classWriter.visitMethod(Opcodes.ACC_PUBLIC, "runCode","()V", null,
         arrayOf(Type.getInternalName(SnuggleException::class.java))) // Throws SnuggleException
     runCode.visitCode()
@@ -43,7 +44,7 @@ private fun addRunCode(classWriter: ClassWriter) {
 }
 
 // Create the default empty constructor:
-private fun addConstructor(classWriter: ClassWriter) {
+private fun addConstructor(classWriter: ClassVisitor) {
     val constructor = classWriter.visitMethod(Opcodes.ACC_PUBLIC, "<init>","()V", null, null)
     constructor.visitCode()
     // Load this on the stack
@@ -55,7 +56,7 @@ private fun addConstructor(classWriter: ClassWriter) {
     constructor.visitEnd()
 }
 
-private fun addStaticInstanceFields(writer: ClassWriter, staticInstances: ConsList<Any>) {
+private fun addStaticInstanceFields(writer: ClassVisitor, staticInstances: ConsList<Any>) {
     staticInstances.forEachIndexed { index, instance ->
         val access = Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC
         val name = getStaticObjectName(index)

@@ -3,17 +3,52 @@ import runtime.InstanceBuilder
 fun main() {
 
     val code = """
-        impl<T> T {
-            fn print() print(this)
+        pub class Box<T> {
+            mut value: T
+            pub fn new(v: T) {
+                super()
+                this.value = v
+            }
+            pub fn get(): T this.value
+            pub fn set(v: T) this.value = v
         }
-        5i32.print()
-        "helo".print()
+        
+        pub impl<T> () -> T? {
+            fn iter(): () -> T? this
+            fn indexed(): () -> (u32, T)? {
+                let wrapped: () -> T? = this
+                let counter: Box<u32> = new(0)
+                fn() {
+                    this.counter[] = this.counter[] + 1
+                    let inner: T? = (this.wrapped)()
+                    if inner 
+                        new((this.counter[] - 1, inner[])) 
+                    else 
+                        new()
+                }
+            }
+        }
+        
+        import "list"
+        let x = new List<i32>()
+        x.push(1) x.push(4) x.push(9)
+        
+        let z: () -> (u32, i32)? = x.iter().indexed()
+        
+        let (ai, av) = z().get()
+        let (bi, bv) = z().get()
+        let (ci, cv) = z().get()
+        
+        print(ai) print(av) print("")
+        print(bi) print(bv) print("")
+        print(ci) print(cv) print("")
+        
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
-//        .debugBytecode()
+        .debugBytecode()
         .addFile("list", list)
-        .reflectObject(ExtraPrinter(" :3"))
+//        .reflectObject(ExtraPrinter(" :3"))
         .build()
 
     instance.runtime.runCode()
@@ -21,6 +56,7 @@ fun main() {
 
 
 val list = """
+    import "main"
     pub class List<T> {
         mut backing: MaybeUninit<T>[]
         mut size: u32
@@ -46,6 +82,17 @@ val list = """
                 func(this[i])
                 i = i + 1
             };
+        }
+        
+        pub fn iter(): () -> T? {
+            let ind: Box<u32> = new(0)
+            let wrapped = this
+            fn() {
+                this.ind[] = this.ind[] + 1
+                if this.ind[] <= #this.wrapped
+                    new(this.wrapped[this.ind[] - 1])
+                else new()
+            }
         }
         
         fn grow(desiredSize: u32) {

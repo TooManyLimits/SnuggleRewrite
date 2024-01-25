@@ -117,7 +117,9 @@ class Nil<T> private constructor() : ConsList<T> {
 
 data class Cons<T>(val elem: T, val rest: ConsList<T>): ConsList<T> {
     override fun equals(other: Any?): Boolean {
-        return super.equals(other)
+        if (other is Cons<*>)
+            return elem == other.elem && rest == other.rest
+        return false
     }
     override fun hashCode(): Int {
         return 31 * elem.hashCode() + rest.hashCode()

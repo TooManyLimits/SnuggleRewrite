@@ -12,7 +12,7 @@ import representation.asts.ir.Program
  */
 fun outputImporter(ir: Program): Pair<String, ByteArray> {
     // Create the class writer
-    val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+    val writer = getClassWriter()
     writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, getImporterClassName(), null, "java/lang/Object", null)
     // For each piece of top level code:
     ir.topLevelCode.forEach {

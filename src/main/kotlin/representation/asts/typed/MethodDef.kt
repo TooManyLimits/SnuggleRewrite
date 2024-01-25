@@ -1,5 +1,6 @@
 package representation.asts.typed
 
+import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
 import representation.asts.ir.Instruction
@@ -47,7 +48,7 @@ sealed interface MethodDef {
     // A MethodDef which has custom behavior for lowering itself and outputting itself to the ClassWriter
     class CustomMethodDef(override val pub: Boolean, override val static: Boolean, override val owningType: TypeDef, override val name: String, override val runtimeName: String, override val returnType: TypeDef, override val paramTypes: List<TypeDef>,
                           val lowerer: () -> Sequence<Instruction>,
-                          val outputter: (ClassWriter) -> Unit): MethodDef
+                          val outputter: (ClassVisitor) -> Unit): MethodDef
     // runtimeName field: often, SnuggleMethodDef will need to have a different name
     // at runtime than in the internal representation. These are the case for:
     // - constructors, whose names are changed to "<init>" to match java's requirement

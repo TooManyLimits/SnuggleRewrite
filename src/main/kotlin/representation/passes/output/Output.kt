@@ -1,5 +1,8 @@
 package representation.passes.output
 
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.util.CheckClassAdapter
 import representation.asts.ir.Program
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -24,6 +27,17 @@ fun output(ir: Program, staticInstances: ConsList<Any>): CompiledProgram {
     val otherTypes = ir.generatedTypes.map { outputType(it) } + importer + runtime
     // Return the compiled program
     return CompiledProgram(mapOf(*otherTypes.toTypedArray()))
+}
+
+public var DEBUG_CLASS_WRITERS = true
+fun getClassWriter(): ClassVisitor {
+    val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+    return if (DEBUG_CLASS_WRITERS) CheckClassAdapter(writer)
+    else writer
+}
+fun ClassVisitor.toByteArray(): ByteArray {
+    return if (this is ClassWriter) this.toByteArray()
+    else this.delegate.toByteArray()
 }
 
 /**

@@ -1,5 +1,6 @@
 package representation.passes.output
 
+import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.GeneratedField
@@ -10,7 +11,7 @@ import representation.asts.typed.TypeDef
 fun outputType(type: GeneratedType): Pair<String, ByteArray> = type.runtimeName to when (type) {
     is GeneratedType.GeneratedClass -> {
         // Create a class writer
-        val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+        val writer = getClassWriter()
         // Create the basic properties of the class
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, type.runtimeName, null, type.supertypeName, null)
         // Compile each field and method
@@ -21,7 +22,7 @@ fun outputType(type: GeneratedType): Pair<String, ByteArray> = type.runtimeName 
         writer.toByteArray()
     }
     is GeneratedType.GeneratedValueType -> {
-        val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+        val writer = getClassWriter()
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, type.runtimeName, null, "java/lang/Object", null)
         type.returningFields.forEach { outputField(it, writer) }
         type.fields.forEach { outputField(it, writer) }
@@ -30,7 +31,7 @@ fun outputType(type: GeneratedType): Pair<String, ByteArray> = type.runtimeName 
         writer.toByteArray()
     }
     is GeneratedType.GeneratedFuncType -> {
-        val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+        val writer = getClassWriter()
         val access = Opcodes.ACC_PUBLIC + Opcodes.ACC_INTERFACE + Opcodes.ACC_ABSTRACT // Interface flags
         writer.visit(Opcodes.V17, access, type.runtimeName, null, "java/lang/Object", null)
         type.methods.forEach { outputMethod(it, writer) }
@@ -38,7 +39,7 @@ fun outputType(type: GeneratedType): Pair<String, ByteArray> = type.runtimeName 
         writer.toByteArray()
     }
     is GeneratedType.GeneratedFuncImpl -> {
-        val writer = ClassWriter(ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES)
+        val writer = getClassWriter()
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, type.runtimeName, null, "java/lang/Object", arrayOf(type.supertypeName))
         type.fields.forEach { outputField(it, writer) }
         type.methods.forEach { outputMethod(it, writer) }
@@ -47,14 +48,14 @@ fun outputType(type: GeneratedType): Pair<String, ByteArray> = type.runtimeName 
     }
 }
 
-private fun outputField(field: GeneratedField, classWriter: ClassWriter) {
+private fun outputField(field: GeneratedField, classWriter: ClassVisitor) {
     val access = Opcodes.ACC_PUBLIC + (if (field.runtimeStatic) Opcodes.ACC_STATIC else 0)
     val desc = field.fieldDef.type.descriptor
     if (desc.size != 1) throw IllegalStateException("Attempt to output plural field? Bug in compiler, please report")
     classWriter.visitField(access, field.runtimeName, desc[0], null, null)
 }
 
-private fun outputMethod(method: GeneratedMethod, classWriter: ClassWriter) = when (method) {
+private fun outputMethod(method: GeneratedMethod, classWriter: ClassVisitor) = when (method) {
     is GeneratedMethod.GeneratedSnuggleMethod -> {
         // If the method is static, has a static override, or is part of a StructDef, then tag it with static
         var access = Opcodes.ACC_PUBLIC

@@ -11,6 +11,7 @@ import representation.passes.typing.isFallible
 import util.Cons
 import util.ConsList
 import util.caching.IdentityIncrementalCalculator
+import util.mapFirst
 
 /**
  * Lowering an expression into IR.
@@ -310,23 +311,24 @@ private inline fun createCall(
     methodDef: MethodDef, desiredFields: ConsList<ConsList<FieldDef>>,
     maxVariable: Int,
     crossinline snuggleCallType: (MethodDef.SnuggleMethodDef) -> Instruction.MethodCall
-): Sequence<Instruction> {
-    return when (methodDef) {
-        is MethodDef.BytecodeMethodDef -> sequenceOf(Instruction.Bytecodes(0) { methodDef.bytecode(it, maxVariable, desiredFields) }) //TODO: Cost
-        is MethodDef.InterfaceMethodDef -> sequenceOf(Instruction.MethodCall.Interface(methodDef))
-        is MethodDef.CustomMethodDef -> methodDef.lowerer()
+): Sequence<Instruction> = sequence {
+    when (methodDef) {
+        is MethodDef.BytecodeMethodDef -> yield(Instruction.Bytecodes(0) { methodDef.bytecode(it, maxVariable, desiredFields) }) //TODO: Cost
+        is MethodDef.InterfaceMethodDef -> yield(Instruction.MethodCall.Interface(methodDef))
+        is MethodDef.CustomMethodDef -> yieldAll(methodDef.lowerer())
         // Invoke according to the snuggle call type
-        is MethodDef.SnuggleMethodDef -> sequence {
+        is MethodDef.SnuggleMethodDef -> {
             if (methodDef.staticOverrideReceiverType != null) // Static override - always call this method statically
                 yield(Instruction.MethodCall.Static(methodDef))
             else
                 yield(snuggleCallType(methodDef))
-            yieldAll(getMethodResults(methodDef, desiredFields))
         }
         is MethodDef.ConstMethodDef,
         is MethodDef.StaticConstMethodDef -> throw IllegalStateException("Cannot lower const method call - bug in compiler, please report")
         is MethodDef.GenericMethodDef<*> -> throw IllegalStateException("Cannot lower generic method call - bug in compiler, please report")
     }
+    if (methodDef !is MethodDef.BytecodeMethodDef)
+        yieldAll(getMethodResults(methodDef, desiredFields))
 }
 
 /**
@@ -339,19 +341,47 @@ private inline fun createCall(
  */
 private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<ConsList<FieldDef>>): Sequence<Instruction> {
     return if (methodToCall.returnType.isPlural && methodToCall.returnType.recursivePluralFields.size > 1) sequence {
-        var first = true
+
+        // Grab the first recursive plural field in the return type
+        val firstField = methodToCall.returnType.recursivePluralFields[0].second
+        // Helper function to check if a field group contains the first field
+        fun containsFirstField(fieldGroup: ConsList<FieldDef>): Boolean {
+            val lastOrNull = fieldGroup.lastOrNull()
+            // If the last field desired is this firstField, return true
+            if (lastOrNull === firstField)
+                return true
+            // Otherwise, see if the last desired type contains the first field
+            val lastDesiredType = lastOrNull?.type ?: methodToCall.returnType
+            return lastDesiredType.isPlural && lastDesiredType.recursivePluralFields[0].second === firstField
+        }
+        // If the first of the recursive plural fields is desired, then don't pop it.
+        val firstFieldDesired = desiredFields.any { containsFirstField(it) }
+        if (!firstFieldDesired)
+            yield(Instruction.Pop(firstField.type))
+
+        // Now, go through the rest of the fields. Any that are desired should have a GETSTATIC emitted.
         for (fieldGroup in desiredFields) {
             val namePrefix = fieldGroup.fold("RETURN! ") {prefix, field -> prefix + "$" + field.name}
             val lastDesiredType = fieldGroup.lastOrNull()?.type ?: methodToCall.returnType
-            // If we have desired fields, and the first element of recursive nonstatic fields isn't one of them, then
-            // pop it off the stack. Can only do this for the first fieldGroup.
-            if (first && fieldGroup is Cons && fieldGroup.elem === methodToCall.returnType.nonStaticFields.first { it.type.stackSlots > 0 })
-                yield(Instruction.Pop(methodToCall.returnType.recursivePluralFields[0].second.type))
-            // Grab whichever static fields we need off the stack
-            lastDesiredType.recursivePluralFields.asSequence().drop(1).forEach { (pathToField, field) ->
-                yield(Instruction.GetStaticField(methodToCall.returnType, field.type, namePrefix + "$" + pathToField))
+            if (lastDesiredType.isPlural) {
+                // If this group contains the first field, we already dealt with that, so ignore. Note the .drop(1).
+                if (containsFirstField(fieldGroup))
+                    lastDesiredType.recursivePluralFields.asSequence().drop(1).forEach { (pathToField, field) ->
+                        yield(Instruction.GetStaticField(methodToCall.returnType, field.type, namePrefix + "$" + pathToField))
+                    }
+                else // Otherwise, don't drop 1.
+                    lastDesiredType.recursivePluralFields.forEach { (pathToField, field) ->
+                        yield(Instruction.GetStaticField(methodToCall.returnType, field.type, namePrefix + "$" + pathToField))
+                    }
+            } else {
+                // If the last type was not plural... check if the field group contains the first field:
+                if (containsFirstField(fieldGroup)) {
+                    // If it did, do nothing! The first field was already fetched.
+                } else {
+                    // Otherwise, fetch it:
+                    yield(Instruction.GetStaticField(methodToCall.returnType, lastDesiredType, namePrefix))
+                }
             }
-            first = false
         }
     } else sequenceOf()
 }

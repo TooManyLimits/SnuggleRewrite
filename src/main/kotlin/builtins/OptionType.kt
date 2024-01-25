@@ -89,19 +89,13 @@ object OptionType: BuiltinType {
                 MethodDef.BytecodeMethodDef(pub = true, static = true, thisType, "new", thisType, listOf(innerType)) {
                     it.visitInsn(Opcodes.ICONST_1)
                 },
-                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "bool", boolType, listOf()) {
-                    //Stack is [value, bool]
-                    val ifPresent = Label()
-                    val done = Label()
-                    it.visitJumpInsn(Opcodes.IFNE, ifPresent) //[value]
-                    popType(innerType, it) //Pop inner off the stack: [].
-                    it.visitInsn(Opcodes.ICONST_0) //Push false: [false]
-                    it.visitJumpInsn(Opcodes.GOTO, done)
-                    it.visitLabel(ifPresent) //[value]
-                    popType(innerType, it) //Pop inner off the stack: [].
-                    it.visitInsn(Opcodes.ICONST_1) //Push true: [true]
-                    it.visitLabel(done) //[true] or [false]
-                })
+                MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "bool", boolType, listOf(), null, { writer, _, _ ->
+                    //Stack is just the bool, we don't need to do anything
+                }) {
+                    if (it != ConsList.of(ConsList.nil<FieldDef>())) throw IllegalStateException()
+                    ConsList.of(ConsList.of(thisType.fields.find { it.name == "isPresent" }!!))
+                }
+            )
         }
     }
 

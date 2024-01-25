@@ -216,10 +216,11 @@ sealed class TypeDef {
             val constructorPromise: Promise<MethodDef> = Promise() // Self-reference constructor
             val generatedConstructor = MethodDef.CustomMethodDef(pub = false, static = false, owningType = this,
                 "new", "<init>", unitType, this.fields.map { it.type },
-            {
+            lowerer = {
                 // Lowerer. Just call the constructor with an invokespecial
                 sequenceOf(Instruction.MethodCall.Special(constructorPromise.expect()))
-            }) {
+            },
+            outputter = {
                 // Outputter. Raw output to the class writer
                 val desc = getMethodDescriptor(constructorPromise.expect())
                 val writer = it.visitMethod(Opcodes.ACC_PUBLIC, "<init>", desc, null, null)
@@ -247,7 +248,7 @@ sealed class TypeDef {
                 writer.visitInsn(Opcodes.RETURN)
                 writer.visitMaxs(0, 0)
                 writer.visitEnd()
-            }
+            })
             constructorPromise.fulfill(generatedConstructor)
             (this.methods as MutableList<MethodDef>).add(generatedConstructor)
             return generatedConstructor
