@@ -19,7 +19,7 @@ fun main() {
                 fn() {
                     let inner: T? = this()
                     if inner
-                        new(func(inner.get()))
+                        new(func(*inner))
                     else
                         new()
                 }
@@ -27,10 +27,10 @@ fun main() {
             fn indexed(): () -> (u32, T)? {
                 let counter: Box<u32> = new(0)
                 fn() {
-                    counter[] = counter[] + 1
+                    *counter = *counter + 1
                     let inner: T? = this()
                     if inner 
-                        new((counter[] - 1, inner[])) 
+                        new((*counter - 1, *inner)) 
                     else 
                         new()
                 }
@@ -41,8 +41,8 @@ fun main() {
             static fn invoke(n: i32): () -> i32? {
                 let i = new Box<i32>(0)
                 fn() {
-                    i[] = i[] + 1
-                    if (i[] > n) new() else new(i[] - 1)
+                    *i = *i + 1
+                    if (*i > n) new() else new(*i - 1)
                 }
             }
         }
@@ -94,9 +94,9 @@ val list = """
         pub fn iter(): () -> T? {
             let ind: Box<u32> = new(0)
             fn() {
-                ind[] = ind[] + 1
-                if ind[] <= #this
-                    new(this[ind[] - 1])
+                *ind = *ind + 1
+                if *ind <= #this
+                    new(this[*ind - 1])
                 else new()
             }
         }

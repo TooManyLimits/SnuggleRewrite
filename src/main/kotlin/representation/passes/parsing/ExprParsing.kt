@@ -77,6 +77,9 @@ private fun parseAssignment(lexer: Lexer, typeGenerics: List<String>, methodGene
 }
 
 private fun parseFieldAccessOrMethodCall(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    // Star, recurse with .get()
+    if (lexer.consume(TokenType.STAR))
+        return ParsedExpr.MethodCall(lexer.last().loc, parseFieldAccessOrMethodCall(lexer, typeGenerics, methodGenerics), "get", listOf(), listOf())
     var expr = parseUnit(lexer, typeGenerics, methodGenerics)
     while (lexer.consume(TokenType.DOT, TokenType.LEFT_PAREN, TokenType.LEFT_SQUARE)) when (lexer.last().type) {
         TokenType.DOT -> {
