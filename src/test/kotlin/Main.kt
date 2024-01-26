@@ -15,6 +15,16 @@ fun main() {
         
         pub impl<T> () -> T? {
             fn iter(): () -> T? this
+            fn map<R>(func: T -> R): () -> R? {
+                let wrapped: () -> T? = this
+                fn() {
+                    let inner: T? = (this.wrapped)()
+                    if inner
+                        new((this.func)(inner.get()))
+                    else
+                        new()
+                }
+            }
             fn indexed(): () -> (u32, T)? {
                 let wrapped: () -> T? = this
                 let counter: Box<u32> = new(0)
@@ -29,24 +39,25 @@ fun main() {
             }
         }
         
-        import "list"
-        let x = new List<i32>()
-        x.push(1) x.push(4) x.push(9)
+//        struct range {
+//            static fn invoke(n: i32): () -> i32? {
+//                let i = new Box<i32>(0)
+//                fn() {
+//                    this.i[] = this.i[] + 1
+//                    if (this.i[] > this.n) new() else new(this.i[] - 1)
+//                }
+//            }
+//        }
         
-        let z: () -> (u32, i32)? = x.iter().indexed()
+        struct range{static fn invoke(n:i32):()->i32?{let i=new Box<i32>(0)fn(){this.i[]=this.i[]+1if(this.i[]>this.n)new()else new(this.i[]-1)}}}
         
-        let (ai, av) = z().get()
-        let (bi, bv) = z().get()
-        let (ci, cv) = z().get()
-        
-        print(ai) print(av) print("")
-        print(bi) print(bv) print("")
-        print(ci) print(cv) print("")
+        for x in range(10).map::<i32>(fn(x) x*x)
+            print(x)
         
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
-//        .debugBytecode()
+        .debugBytecode()
         .addFile("list", list)
 //        .reflectObject(ExtraPrinter(" :3"))
         .build()

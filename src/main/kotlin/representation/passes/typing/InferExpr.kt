@@ -112,7 +112,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             typedPattern = checkPattern(expr.pattern, typedInitializer.type, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
         }
         // Fetch the bindings if this "let" succeeds
-        val patternBindings = bindings(typedPattern, getTopIndex(scope))
+        val patternBindings = bindings(typedPattern)
         // Create the new typed expr, type is always bool.
         // Use the index that's the second output of bindings().
         val typed = TypedExpr.Declaration(expr.loc, typedPattern, typedInitializer, getBasicBuiltin(BoolType, typeCache))
@@ -242,24 +242,23 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // If it's a literal boolean, fold it
         if (typedCondExpr is TypedExpr.Literal) {
             if (typedCondExpr.value is Boolean) {
-                if (typedCondExpr.value) {
-                    // Infer the true branch:
-                    val inferredTrueBranch = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-                    // If there's a false branch, return the true branch. Otherwise, return the true branch followed by unit in a block.
-                    return@run if (expr.ifFalse != null) {
-                        just(inferredTrueBranch)
-                    } else {
-                        just(TypedExpr.Block(expr.loc, listOf(
-                            inferredTrueBranch,
-                            TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
-                        ), getUnit(typeCache)))
-                    }
+                if (expr.ifFalse != null) {
+                    // There is a false branch, so return the outcome of the correct branch
+                    return@run if (typedCondExpr.value)
+                        just(inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
+                    else
+                        just(inferExpr(expr.ifFalse, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
+                }
+                // There is no false branch.
+                // If true, result in the true branch with unit appended.
+                // If false, just emit a unit.
+                return@run if (typedCondExpr.value) {
+                    just(TypedExpr.Block(expr.loc, listOf(
+                        inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr,
+                        TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+                    ), getUnit(typeCache)))
                 } else {
-                    // If there's no false branch, just return unit.
-                    if (expr.ifFalse == null)
-                        return@run just(TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache)))
-                    // Otherwise, there is a false branch, so return it inferred.
-                    return@run just(inferExpr(expr.ifFalse, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
+                    just(TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache)))
                 }
             } else throw IllegalStateException("Should have checked to boolean? Bug in compiler, please report")
         }
@@ -289,6 +288,22 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         just(TypedExpr.While(expr.loc, typedCond.expr, inferredBody, getUnit(typeCache)))
     }
 
+    // Inferring a for loop will just output a block containing a while loop and some
+    // extra sugar, it's unnecessary to have a TypedExpr.For exist when it can just be
+    // desugared into a while loop. The reason we need to wait until this phase to desugar
+    // it is because here we can do type-checking things we couldn't before, like on the
+    // pattern. Desugar is as follows:
+    //
+    // for PAT in ITER BODY
+    // ==
+    // {
+    //     let $iter = ITER.iter(); // Iterator
+    //     let mut $forTemp: Option<patType> = new() // empty option
+    //     while { $forTemp = $iter() $forTemp.bool() } {
+    //         let PAT = $forTemp.get()
+    //         BODY
+    //     }
+    // }
     is ResolvedExpr.For -> {
         // If explicit pattern, check() the iterable against the pattern.
         // Otherwise, if implicit pattern, infer() the iterable and use that for the pattern.
@@ -308,16 +323,48 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             val iteratorType = inferredIterator.type.unwrap()
             if (iteratorType !is TypeDef.Func || iteratorType.paramTypes.isNotEmpty() || iteratorType.returnType.builtin !== OptionType)
                 throw TypeCheckingException("Expected iterable method .iter(), to result in type \"() -> T?\" for some T, but instead found \"${iteratorType.name}\"", expr.loc)
-            val innerType = iteratorType.generics[0]
+            val innerType = iteratorType.returnType.generics[0]
             // Check the pattern against this
             val checkedPattern = checkPattern(expr.pattern, innerType, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
             typedPattern = checkedPattern; typedIterator = inferredIterator
         }
-        // Now that we have the pattern and iterator, infer the body, like we do for while loops.
-
-
-
-        TODO()
+        // Begin generating the sugar:
+        val iterTempName = "\$forIter"
+        val valueTempName = "\$forValue"
+        val iterTempPat = TypedPattern.BindingPattern(expr.loc, typedIterator.type, iterTempName, false, getTopIndex(scope))
+        val iterTempVar = TypedExpr.Variable(expr.loc, false, iterTempName, iterTempPat.variableIndex, iterTempPat.type)
+        val extendedScope = scope.extend(bindings(iterTempPat))
+        val valueTempType = getGenericBuiltin(OptionType, listOf(typedPattern.type), typeCache)
+        val valueTempPat = TypedPattern.BindingPattern(expr.loc, valueTempType, valueTempName, true, getTopIndex(extendedScope))
+        val valueTempVar = TypedExpr.Variable(expr.loc, true, valueTempName, valueTempPat.variableIndex, valueTempPat.type)
+        val extendedScope2 = extendedScope.extend(bindings(valueTempPat))
+        // Shift the typed pattern index accordingly to these new variables we've added
+        val newTypedPattern = shiftPatternIndex(typedPattern, getTopIndex(extendedScope2) - getTopIndex(scope))
+        val finalScope = extendedScope2.extend(bindings(newTypedPattern))
+        // Generate more helpers
+        val optionConstructor = valueTempType.methods.find { it.name == "new" && it.paramTypes.isEmpty() }!!
+        val emptyOptionExpr = TypedExpr.StaticMethodCall(expr.loc, valueTempType, "new", listOf(), optionConstructor, getTopIndex(extendedScope), valueTempType)
+        val iterInvoke = typedIterator.type.methods.find { it.name == "invoke" }!!
+        val iterCallExpr = TypedExpr.MethodCall(expr.loc, iterTempVar, "invoke", listOf(), iterInvoke, getTopIndex(extendedScope2), valueTempType)
+        val boolFunc = valueTempType.methods.find { it.name == "bool" }!!
+        val boolCallExpr = TypedExpr.MethodCall(expr.loc, valueTempVar, "bool", listOf(), boolFunc, getTopIndex(extendedScope2), getBasicBuiltin(BoolType, typeCache))
+        val getFunc = valueTempType.methods.find { it.name == "get" && it.paramTypes.isEmpty() }!!
+        val getCallExpr = TypedExpr.MethodCall(expr.loc, valueTempVar, "get", listOf(), getFunc, getTopIndex(finalScope), valueTempType.generics[0])
+        val condExpr = TypedExpr.Block(expr.loc, listOf(
+            TypedExpr.Assignment(expr.loc, valueTempVar, iterCallExpr, getTopIndex(extendedScope2), getUnit(typeCache)),
+            boolCallExpr
+        ), getBasicBuiltin(BoolType, typeCache))
+        val patDecl = TypedExpr.Declaration(expr.loc, newTypedPattern, getCallExpr, getBasicBuiltin(BoolType, typeCache))
+        val whileBody = TypedExpr.Block(expr.loc, listOf(
+            patDecl,
+            inferExpr(expr.body, finalScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+        ), getUnit(typeCache))
+        // Finally create the block.
+        just(TypedExpr.Block(expr.loc, listOf(
+            TypedExpr.Declaration(expr.loc, iterTempPat, typedIterator, getBasicBuiltin(BoolType, typeCache)),
+            TypedExpr.Declaration(expr.loc, valueTempPat, emptyOptionExpr, getBasicBuiltin(BoolType, typeCache)),
+            TypedExpr.While(expr.loc, condExpr, whileBody, getUnit(typeCache))
+        ), getUnit(typeCache)))
     }
 
     is ResolvedExpr.Literal -> {

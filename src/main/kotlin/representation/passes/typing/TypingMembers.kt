@@ -60,7 +60,12 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
     // Create the various components of the method def, specialized over the method generics.
     // Get the param patterns and their types
     val paramPatternsByGeneric = EqualityMemoized<List<TypeDef>, List<TypedPattern>> { methodGenerics ->
-        var topIndex = 0
+        var topIndex = if (!methodDef.static) {
+            val thisType = staticOverrideReceiverType ?: owningType
+            thisType.stackSlots
+        } else {
+            0
+        }
         methodDef.params.map {
             inferPattern(it, topIndex, typeCache, currentTypeGenerics, methodGenerics)
                 .also { topIndex += it.type.stackSlots }
@@ -80,7 +85,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
         }
         // Populate the bindings
         for (typedParam in paramPatternsByGeneric(methodGenerics))
-            bodyBindings = bodyBindings.extend(bindings(typedParam, getTopIndex(bodyBindings)))
+            bodyBindings = bodyBindings.extend(bindings(typedParam))
         // Type-check the method body to be the return type
         val returnType = returnTypeGetterByGeneric(methodGenerics).value
         val checkedBody = checkExpr(methodDef.body, returnType, bodyBindings, typeCache, returnType, owningType, currentTypeGenerics, methodGenerics).expr

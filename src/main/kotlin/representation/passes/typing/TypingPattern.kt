@@ -120,20 +120,24 @@ fun isFallible(pattern: TypedPattern): Boolean = when (pattern) {
 
 /**
  * Get the bindings that will be added if the pattern successfully matches.
- * Returns the bindings as well as the local variable index where it's stored.
+ * Returns the bindings.
  */
-fun bindings(pattern: TypedPattern, topIndex: Int): ConsMap<String, VariableBinding> {
-    var topIndex = topIndex // enable reassignment
+fun bindings(pattern: TypedPattern): ConsMap<String, VariableBinding> {
     // Top index is the index of the thing on top of the stack, plus its # of stack slots.
     return when (pattern) {
         is TypedPattern.EmptyPattern -> ConsMap.of()
-        is TypedPattern.BindingPattern -> ConsMap.of(pattern.name to VariableBinding(pattern.type, pattern.isMut, topIndex))
+        is TypedPattern.BindingPattern -> ConsMap.of(pattern.name to VariableBinding(pattern.type, pattern.isMut, pattern.variableIndex))
         is TypedPattern.TuplePattern -> {
-            ConsMap.join(pattern.elements.map {
-                bindings(it, topIndex).also { topIndex += it.list.sumOf { it.second.type.stackSlots } }
-            })
+            ConsMap.join(pattern.elements.map(::bindings))
         }
     }
+}
+
+// Add the given number to the variable indices of the pattern.
+fun shiftPatternIndex(pattern: TypedPattern, indexShift: Int): TypedPattern = when (pattern) {
+    is TypedPattern.EmptyPattern -> pattern
+    is TypedPattern.BindingPattern -> TypedPattern.BindingPattern(pattern.loc, pattern.type, pattern.name, pattern.isMut, pattern.variableIndex + indexShift)
+    is TypedPattern.TuplePattern -> TypedPattern.TuplePattern(pattern.loc, pattern.type, pattern.elements.map { shiftPatternIndex(it, indexShift) })
 }
 
 fun getTopIndex(scope: ConsMap<String, VariableBinding>): Int =

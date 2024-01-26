@@ -167,62 +167,54 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         // Check cond as bool
         val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val typedCondExpr = typedCond.expr
+
         // If it's a literal boolean, fold it
         if (typedCondExpr is TypedExpr.Literal) {
             if (typedCondExpr.value is Boolean) {
-                // If there is an else branch, ensure the correct branch is as expected, and return it
                 if (expr.ifFalse != null) {
-                    if (typedCondExpr.value)
-                        return@run checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+                    // There is a false branch, so return the outcome of the correct branch
+                    return@run if (typedCondExpr.value)
+                        just(checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
                     else
-                        return@run checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+                        just(checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
                 }
-                // There was no false branch. Ensure that the expected type was an Option.
-                if (expectedType.builtin != OptionType)
-                    throw TypeCheckingException("Expected type \"${expectedType.name}\", but if-expression without else outputs Option", expr.loc)
-                val innerType = expectedType.generics[0]
-                val res = if (typedCondExpr.value) {
-                    // Check the true branch and wrap in an option
-                    val newScope = scope.extend(typedCond.newVarsIfTrue)
-                    val checkedTrueBranch = checkExpr(expr.ifTrue, innerType, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-                    wrapInOption(checkedTrueBranch, scope, typeCache)
+                // There is no false branch. Ensure unit is the expected type:
+                if (!getUnit(typeCache).isSubtype(expectedType))
+                    throw IncorrectTypeException(expectedType, getUnit(typeCache), "if-expression without else branch", expr.loc)
+                // If true, result in the true branch with unit appended.
+                // If false, just emit a unit.
+                return@run if (typedCondExpr.value) {
+                    just(TypedExpr.Block(expr.loc, listOf(
+                        inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr,
+                        TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+                    ), getUnit(typeCache)))
                 } else {
-                    // Just an empty option
-                    emptyOption(innerType, scope, typeCache)
+                    just(TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache)))
                 }
-                return@run just(res)
             } else throw IllegalStateException("Should have checked to boolean? Bug in compiler, please report")
         }
-        // Can't constant fold, so let's check both branches and ouput TypedExpr.If
+        // Can't constant fold, so let's output a TypedIf:
         if (expr.ifFalse != null) {
-            val typedTrueBranch = checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-            val typedFalseBranch = checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-            just(TypedExpr.If(expr.loc, typedCondExpr, typedTrueBranch, typedFalseBranch, expectedType))
-        } else {
-            if (expectedType.builtin != OptionType)
-                throw TypeCheckingException("Expected type \"${expectedType.name}\", but if-expression without else outputs Option", expr.loc)
-            val innerType = expectedType.generics[0]
-            val typedTrueBranch = checkExpr(expr.ifTrue, innerType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-            val wrappedTrueBranch = wrapInOption(typedTrueBranch, scope, typeCache)
-            val generatedFalseBranch = emptyOption(typedTrueBranch.type, scope, typeCache)
-            just(TypedExpr.If(expr.loc, typedCondExpr, wrappedTrueBranch, generatedFalseBranch, expectedType))
+            // There is a false branch, but we don't know which
+            // Check both branches to be subtypes of expected.
+            return@run just(TypedExpr.If(expr.loc,
+                typedCondExpr,
+                checkExpr(expr.ifTrue, expectedType, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr,
+                checkExpr(expr.ifFalse, expectedType, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr,
+                expectedType
+            ))
         }
+        // There is no false branch. Ensure unit is the expected type:
+        if (!getUnit(typeCache).isSubtype(expectedType))
+            throw IncorrectTypeException(expectedType, getUnit(typeCache), "if-expression without else branch", expr.loc)
+        // True branch is block wrapping, false branch is just unit
+        val wrappedTrueBranch = TypedExpr.Block(expr.loc, listOf(
+            inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr,
+            TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+        ), getUnit(typeCache))
+        val generatedFalseBranch = TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+        just(TypedExpr.If(expr.loc, typedCondExpr, wrappedTrueBranch, generatedFalseBranch, getUnit(typeCache)))
     }
-
-    // Similar to infer(), but with checking the body instead of inferring
-    is ResolvedExpr.While -> {
-        val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-        val newScope = scope.extend(typedCond.newVarsIfTrue)
-        if (expectedType.builtin != OptionType)
-            throw TypeCheckingException("Expected type \"${expectedType.name}\", but while-expression outputs Option", expr.loc)
-        val innerType = expectedType.generics[0]
-        val typedBody = checkExpr(expr.body, innerType, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-        val wrappedBody = wrapInOption(typedBody, scope, typeCache)
-        val emptyOption = emptyOption(innerType, scope, typeCache)
-        just(TypedExpr.While(expr.loc, typedCond.expr, wrappedBody, emptyOption, expectedType))
-    }
-
-    is ResolvedExpr.For -> TODO()
 
     // Some expressions can just be inferred,
     // check their type matches, and proceed.
@@ -239,6 +231,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
                 is ResolvedExpr.FieldAccess -> "Field access \"${expr.fieldName}"
                 is ResolvedExpr.StaticFieldAccess -> "Static field access \"${expr.fieldName}"
                 is ResolvedExpr.Declaration -> "Let expression"
+                is ResolvedExpr.While -> "While loop"
+                is ResolvedExpr.For -> "For loop"
                 else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
             }, expr.loc)
         pullUpLiteral(res, expectedType)
@@ -310,7 +304,7 @@ private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType:
         paramTypesGetter = lazy { expectedType.paramTypes },
         runtimeNameGetter = lazy { "invoke" },
         lazyBody = lazy {
-            var topIndex = 0
+            var topIndex = indirect.stackSlots // this is first
             val paramPatterns = lambda.params.zip(expectedType.paramTypes).map { (pat, requiredType) ->
                 checkPattern(pat, requiredType, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
                     .also { topIndex += it.type.stackSlots }
@@ -320,8 +314,7 @@ private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType:
             var bodyBindings = ConsMap.of("this" to VariableBinding(indirect, false, 0))
             // Declare the params
             for (param in paramPatterns)
-                bodyBindings = bodyBindings.extend(bindings(param, getTopIndex(bodyBindings)))
-            // TODO: Add closure-ing
+                bodyBindings = bodyBindings.extend(bindings(param))
             // Check the body as the return type, with the given things
             val checkedBody = checkExpr(lambda.body, expectedType.returnType, bodyBindings, typeCache, expectedType.returnType, indirect, currentTypeGenerics, currentMethodGenerics).expr
             // Output a Return with the checked body
@@ -348,8 +341,7 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.Assignment -> union(findThisFieldAccesses(expr.lhs), findThisFieldAccesses(expr.rhs))
     is TypedExpr.Return -> findThisFieldAccesses(expr.rhs)
     is TypedExpr.If -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.ifTrue), findThisFieldAccesses(expr.ifFalse))
-    is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.body), findThisFieldAccesses(expr.neverRanAlternative))
-    is TypedExpr.For -> union(findThisFieldAccesses(expr.iterable), findThisFieldAccesses(expr.body))
+    is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.body))
     is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
         setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
     is TypedExpr.MethodCall -> union(listOf(findThisFieldAccesses(expr.receiver)), expr.args.asSequence().map(::findThisFieldAccesses).asIterable())
@@ -363,7 +355,7 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
 
 
 class IncorrectTypeException(expectedType: TypeDef, actualType: TypeDef, situation: String, loc: Loc)
-    : TypeCheckingException("Expected $situation to have type ${expectedType.name}, but found ${actualType.name}", loc)
+    : TypeCheckingException("Expected $situation to result in type ${expectedType.name}, but it actually was ${actualType.name}", loc)
 
 class NumberRangeException(expectedType: IntType, value: BigInteger, loc: Loc)
     : TypeCheckingException("Expected ${expectedType.baseName}, but literal $value is out of range " +
