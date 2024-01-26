@@ -67,6 +67,8 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "if" -> TokenType.IF
         "else" -> TokenType.ELSE
         "while" -> TokenType.WHILE
+        "for" -> TokenType.FOR
+        "in" -> TokenType.IN
 
         ":" -> TokenType.COLON
         "::" -> TokenType.DOUBLE_COLON
@@ -164,6 +166,8 @@ enum class TokenType {
     IF,
     ELSE,
     WHILE,
+    FOR,
+    IN,
 
     COLON,
     DOUBLE_COLON,

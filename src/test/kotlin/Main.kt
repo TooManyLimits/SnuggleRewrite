@@ -46,7 +46,7 @@ fun main() {
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
-        .debugBytecode()
+//        .debugBytecode()
         .addFile("list", list)
 //        .reflectObject(ExtraPrinter(" :3"))
         .build()

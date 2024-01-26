@@ -51,7 +51,7 @@ sealed interface TypedExpr {
     data class Return(override val loc: Loc, val rhs: TypedExpr, override val type: TypeDef): TypedExpr
 
     data class If(override val loc: Loc, val cond: TypedExpr, val ifTrue: TypedExpr, val ifFalse: TypedExpr, override val type: TypeDef): TypedExpr
-    data class While(override val loc: Loc, val cond: TypedExpr, val wrappedBody: TypedExpr, val neverRanAlternative: TypedExpr, override val type: TypeDef): TypedExpr
+    data class While(override val loc: Loc, val cond: TypedExpr, val body: TypedExpr, override val type: TypeDef): TypedExpr
     data class For(override val loc: Loc, val pattern: TypedPattern, val iterable: TypedExpr, val body: TypedExpr, override val type: TypeDef): TypedExpr
 
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr

@@ -238,58 +238,84 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Check cond as bool
         val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val typedCondExpr = typedCond.expr
+
         // If it's a literal boolean, fold it
         if (typedCondExpr is TypedExpr.Literal) {
             if (typedCondExpr.value is Boolean) {
                 if (typedCondExpr.value) {
-                    // Infer the true branch; if there's no false branch, then wrap in an Option
+                    // Infer the true branch:
                     val inferredTrueBranch = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-                    if (expr.ifFalse != null) return@run just(inferredTrueBranch)
-                    return@run just(wrapInOption(inferredTrueBranch, scope, typeCache))
+                    // If there's a false branch, return the true branch. Otherwise, return the true branch followed by unit in a block.
+                    return@run if (expr.ifFalse != null) {
+                        just(inferredTrueBranch)
+                    } else {
+                        just(TypedExpr.Block(expr.loc, listOf(
+                            inferredTrueBranch,
+                            TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+                        ), getUnit(typeCache)))
+                    }
                 } else {
-                    val newScope = scope.extend(typedCond.newVarsIfFalse)
-                    // If there is a false branch, infer it and be done
-                    if (expr.ifFalse != null)
-                        return@run inferExpr(expr.ifFalse, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-                    // Otherwise, no false branch, return an empty optional.
-                    val trueBranchType = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr.type
-                    return@run just(emptyOption(trueBranchType, scope, typeCache))
+                    // If there's no false branch, just return unit.
+                    if (expr.ifFalse == null)
+                        return@run just(TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache)))
+                    // Otherwise, there is a false branch, so return it inferred.
+                    return@run just(inferExpr(expr.ifFalse, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
                 }
             } else throw IllegalStateException("Should have checked to boolean? Bug in compiler, please report")
         }
-        // Can't constant fold, so let's output a TypedIf
+        // Can't constant fold, so let's output a TypedIf:
         val typedTrueBranch = inferExpr(expr.ifTrue, scope.extend(typedCond.newVarsIfTrue), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         just(if (expr.ifFalse != null) {
+            // If there's a false branch, check it to match the true branch, and return.
             val typedFalseBranch = checkExpr(expr.ifFalse, typedTrueBranch.type, scope.extend(typedCond.newVarsIfFalse), typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
             TypedExpr.If(expr.loc, typedCondExpr, typedTrueBranch, typedFalseBranch, typedTrueBranch.type)
         } else {
-            val wrappedTrueBranch = wrapInOption(typedTrueBranch, scope, typeCache)
-            val generatedFalseBranch = emptyOption(typedTrueBranch.type, scope, typeCache)
-            TypedExpr.If(expr.loc, typedCondExpr, wrappedTrueBranch, generatedFalseBranch, wrappedTrueBranch.type)
+            // Otherwise, generate a false branch which is just a Unit, and make the true branch into a block with a unit added.
+            val wrappedTrueBranch = TypedExpr.Block(expr.loc, listOf(
+                typedTrueBranch,
+                TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+            ), getUnit(typeCache))
+            val generatedFalseBranch = TypedExpr.RawStructConstructor(expr.loc, listOf(), getUnit(typeCache))
+            TypedExpr.If(expr.loc, typedCondExpr, wrappedTrueBranch, generatedFalseBranch, getUnit(typeCache))
         })
     }
 
     is ResolvedExpr.While -> {
+        // Check cond as bool
         val typedCond = checkExpr(expr.cond, getBasicBuiltin(BoolType, typeCache), scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
         val newScope = scope.extend(typedCond.newVarsIfTrue)
+        // Infer body and return
         val inferredBody = inferExpr(expr.body, newScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
-        val wrappedBody = wrapInOption(inferredBody, scope, typeCache)
-        val emptyOption = emptyOption(inferredBody.type, scope, typeCache)
-        just(TypedExpr.While(expr.loc, typedCond.expr, wrappedBody, emptyOption, wrappedBody.type))
+        just(TypedExpr.While(expr.loc, typedCond.expr, inferredBody, getUnit(typeCache)))
     }
 
     is ResolvedExpr.For -> {
+        // If explicit pattern, check() the iterable against the pattern.
+        // Otherwise, if implicit pattern, infer() the iterable and use that for the pattern.
+        val typedPattern: TypedPattern
+        val typedIterator: TypedExpr
+        if (isExplicitlyTyped(expr.pattern)) {
+            // Infer pattern, check expr
+            val inferredPattern = inferPattern(expr.pattern, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
+            // Check the iterable as a function () -> T?, where T is the type of the explicit pattern
+            val iteratorType = getFunc(listOf(), getGenericBuiltin(OptionType, listOf(inferredPattern.type), typeCache), typeCache)
+            val checkedIterator = checkExpr(expr.iterable, iteratorType, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            typedPattern = inferredPattern; typedIterator = checkedIterator
+        } else {
+            // Infer expr, check pattern
+            val inferredIterator = inferExpr(expr.iterable, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            // Ensure iterator resulted in some () -> T?
+            val iteratorType = inferredIterator.type.unwrap()
+            if (iteratorType !is TypeDef.Func || iteratorType.paramTypes.isNotEmpty() || iteratorType.returnType.builtin !== OptionType)
+                throw TypeCheckingException("Expected iterable method .iter(), to result in type \"() -> T?\" for some T, but instead found \"${iteratorType.name}\"", expr.loc)
+            val innerType = iteratorType.generics[0]
+            // Check the pattern against this
+            val checkedPattern = checkPattern(expr.pattern, innerType, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
+            typedPattern = checkedPattern; typedIterator = inferredIterator
+        }
+        // Now that we have the pattern and iterator, infer the body, like we do for while loops.
 
-//        if (isExplicitlyTyped(expr.pattern)) {
-//            // Pattern is explicitly typed
-//            val typedPattern = inferPattern(expr.pattern, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
-//
-//            val inferredIterable = inferExpr(expr.iterable, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-//
-//
-//        } else {
-//
-//        }
+
 
         TODO()
     }
@@ -335,13 +361,13 @@ private fun checkMutable(lvalue: TypedExpr, assignLoc: Loc): Unit = when (lvalue
 }
 
 // Wrap a given typedExpr inside an Optional
-fun wrapInOption(toBeWrapped: TypedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
-    val optionType = getGenericBuiltin(OptionType, listOf(toBeWrapped.type), typeCache)
-    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 1 }!!
-    return TypedExpr.StaticMethodCall(toBeWrapped.loc, optionType, "new", listOf(toBeWrapped), constructor, getTopIndex(scope), optionType)
-}
-fun emptyOption(genericType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
-    val optionType = getGenericBuiltin(OptionType, listOf(genericType), typeCache)
-    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 0 }!!
-    return TypedExpr.StaticMethodCall(Loc.NEVER, optionType, "new", listOf(), constructor, getTopIndex(scope), optionType)
-}
+//fun wrapInOption(toBeWrapped: TypedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
+//    val optionType = getGenericBuiltin(OptionType, listOf(toBeWrapped.type), typeCache)
+//    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 1 }!!
+//    return TypedExpr.StaticMethodCall(toBeWrapped.loc, optionType, "new", listOf(toBeWrapped), constructor, getTopIndex(scope), optionType)
+//}
+//fun emptyOption(genericType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
+//    val optionType = getGenericBuiltin(OptionType, listOf(genericType), typeCache)
+//    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 0 }!!
+//    return TypedExpr.StaticMethodCall(Loc.NEVER, optionType, "new", listOf(), constructor, getTopIndex(scope), optionType)
+//}

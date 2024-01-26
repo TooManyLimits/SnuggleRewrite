@@ -141,6 +141,7 @@ private fun parseUnit(lexer: Lexer, typeGenerics: List<String>, methodGenerics: 
         TokenType.RETURN -> ParsedExpr.Return(lexer.last().loc, parseExpr(lexer, typeGenerics, methodGenerics))
         TokenType.IF -> parseIf(lexer, typeGenerics, methodGenerics)
         TokenType.WHILE -> parseWhile(lexer, typeGenerics, methodGenerics)
+        TokenType.FOR -> parseFor(lexer, typeGenerics, methodGenerics)
 
         else -> throw ParsingException(expected = "Expression", found = lexer.last().type.toString(), loc = lexer.last().loc)
     }
@@ -240,6 +241,15 @@ private fun parseWhile(lexer: Lexer, typeGenerics: List<String>, methodGenerics:
     return ParsedExpr.While(loc, cond, body)
 }
 
+private fun parseFor(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    val loc = lexer.last().loc
+    val pattern = parsePattern(lexer, typeGenerics, methodGenerics)
+    lexer.expect(TokenType.IN, "after pattern in \"for\" loop")
+    val iterable = wrapIter(parseExpr(lexer, typeGenerics, methodGenerics))
+    val body = parseExpr(lexer, typeGenerics, methodGenerics)
+    return ParsedExpr.For(loc, pattern, iterable, body)
+}
+
 /**
  * Binary operator precedence util
  */
@@ -257,7 +267,10 @@ private fun isRightAssociative(op: TokenType): Boolean {
     return false; // the only one is exponent operator, currently
 }
 
-// Util for wrapping in .bool() call
+// Util for wrapping in method calls
 private fun wrapTruthy(expr: ParsedExpr): ParsedExpr {
     return ParsedExpr.MethodCall(expr.loc, expr, "bool", listOf(), listOf())
+}
+private fun wrapIter(expr: ParsedExpr): ParsedExpr {
+    return ParsedExpr.MethodCall(expr.loc, expr, "iter", listOf(), listOf())
 }

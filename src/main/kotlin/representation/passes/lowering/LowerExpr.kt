@@ -11,7 +11,6 @@ import representation.passes.typing.isFallible
 import util.Cons
 import util.ConsList
 import util.caching.IdentityIncrementalCalculator
-import util.mapFirst
 
 /**
  * Lowering an expression into IR.
@@ -280,8 +279,6 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
         val condLabel = Label()
         val doneLabel = Label()
         sequence {
-            // Push optional "none" on the stack
-            yieldAll(lowerExpr(expr.neverRanAlternative, desiredFields, typeCalc))
             // Cond label
             yield(Instruction.IrLabel(condLabel))
             // Yield the lowered cond + jump as its own code block
@@ -292,9 +289,9 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             yield(Instruction.CodeBlock(loweredCond.toList()))
             // Yield the lowered body + jump as its own code block
             val loweredBody = sequence {
-                yield(Instruction.Pop(expr.type))
-                yieldAll(lowerExpr(expr.wrappedBody, ConsList.of(ConsList.nil()), typeCalc))
-                yield(Instruction.Jump(condLabel))
+                yieldAll(lowerExpr(expr.body, ConsList.of(ConsList.nil()), typeCalc)) // Eval body
+                yield(Instruction.Pop(expr.body.type)) // Pop output
+                yield(Instruction.Jump(condLabel)) // Jump back to evaluate cond again
             }
             yield(Instruction.CodeBlock(loweredBody.toList()))
             // Done label

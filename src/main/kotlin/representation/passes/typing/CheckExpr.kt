@@ -348,7 +348,7 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.Assignment -> union(findThisFieldAccesses(expr.lhs), findThisFieldAccesses(expr.rhs))
     is TypedExpr.Return -> findThisFieldAccesses(expr.rhs)
     is TypedExpr.If -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.ifTrue), findThisFieldAccesses(expr.ifFalse))
-    is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.wrappedBody), findThisFieldAccesses(expr.neverRanAlternative))
+    is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.body), findThisFieldAccesses(expr.neverRanAlternative))
     is TypedExpr.For -> union(findThisFieldAccesses(expr.iterable), findThisFieldAccesses(expr.body))
     is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
         setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
