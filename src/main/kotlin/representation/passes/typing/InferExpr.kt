@@ -5,10 +5,7 @@ import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
-import representation.asts.typed.MethodDef
-import representation.asts.typed.TypeDef
-import representation.asts.typed.TypedExpr
-import representation.asts.typed.TypedPattern
+import representation.asts.typed.*
 import representation.passes.lexing.IntLiteralData
 import representation.passes.lexing.Loc
 import util.ConsList
@@ -60,10 +57,75 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     // Import has type unit
     is ResolvedExpr.Import -> just(TypedExpr.Import(expr.loc, expr.file, getUnit(typeCache)))
 
-    // Variable looks up its name in scope, errors if none is there
-    is ResolvedExpr.Variable -> {
-        val binding = scope.lookup(expr.name) ?: throw NoSuchVariableException(expr.name, expr.loc)
-        just(TypedExpr.Variable(expr.loc, binding.mutable, expr.name, binding.index, binding.type))
+    // Variable looks up its name in scope, if not found, does additional handling
+    is ResolvedExpr.Variable -> run {
+        val binding = scope.lookup(expr.name)
+        val thisBinding = scope.lookup("this")
+        val insideLambda = thisBinding?.type?.unwrap() is TypeDef.FuncImplementation
+
+        when {
+            insideLambda && expr.name == "this" -> {
+                // We're in a lambda, and looking for a field "this". Repeatedly look for fields
+                // on this, "this.this", "this.this.this", etc, until either we stop being in a lambda,
+                // or we run out of fields.
+                var curExpr: TypedExpr = TypedExpr.Variable(expr.loc, thisBinding!!.mutable, "this", thisBinding.index, thisBinding.type)
+                while (true) {
+                    // If the current expr is not a lambda, we found it! Return the current expr.
+                    if (curExpr.type.unwrap() !is TypeDef.FuncImplementation)
+                        return@run just(curExpr)
+                    // Look for a field "this" on the current expr:
+                    val thisField = curExpr.type.nonStaticFields.find { it.name == "this" }
+                    // If there is no such field, error out:
+                    if (thisField == null)
+                        throw NoSuchFieldOrVariableException(expr.name, expr.loc)
+                    // If there is such a field, set a field access as the current expr, and repeat.
+                    curExpr = TypedExpr.FieldAccess(expr.loc, curExpr, "this", thisField, getTopIndex(scope), thisField.type)
+                }
+                throw IllegalStateException("unreachable")
+            }
+            binding != null -> {
+                // The variable exists. Nice and simple, let's just return it here and now.
+                just(TypedExpr.Variable(expr.loc, binding.mutable, expr.name, binding.index, binding.type))
+            }
+            thisBinding == null -> {
+                // There is no "this" to look at. Error, the variable doesn't exist.
+                throw NoSuchVariableException(expr.name, expr.loc)
+            }
+            insideLambda -> {
+                // We're inside a lambda, the variable doesn't exist, and it isn't named "this".
+                // Check "this.name", "this.this.name", etc, until we either find it or run out of
+                // this to try.
+                var curExpr: TypedExpr = TypedExpr.Variable(expr.loc, thisBinding!!.mutable, "this", thisBinding.index, thisBinding.type)
+                while (true) {
+                    // If the current expr has an accessible field with the proper name, use it! We're done.
+                    val field = curExpr.type.allNonStaticFields.find { it.name == expr.name }
+                    if (field != null && (field.pub || (field is FieldDef.SnuggleFieldDef && field.loc.fileName == expr.loc.fileName))) {
+                        return@run just(TypedExpr.FieldAccess(expr.loc, curExpr, expr.name, field, getTopIndex(scope), field.type))
+                    }
+                    // If not, then look for a field "this" on the current expr:
+                    val thisField = curExpr.type.nonStaticFields.find { it.name == "this" }
+                    // If there is no such field, error out:
+                    if (thisField == null)
+                        throw NoSuchFieldOrVariableException(expr.name, expr.loc)
+                    // If there is such a field, set a field access as the current expr, and repeat.
+                    curExpr = TypedExpr.FieldAccess(expr.loc, curExpr, "this", thisField, getTopIndex(scope), thisField.type)
+                }
+                throw IllegalStateException("Unreachable")
+            }
+            else -> {
+                // The last possible case. We're not inside a lambda, but there is a variable named "this". Try "this.name".
+                try {
+                    val resolvedFieldAccess = ResolvedExpr.FieldAccess(expr.loc, ResolvedExpr.Variable(expr.loc, "this"), expr.name)
+                    just(inferExpr(resolvedFieldAccess, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr)
+                } catch (e: NoSuchFieldException) {
+                    throw NoSuchFieldOrVariableException(expr.name, expr.loc)
+                } catch (e: NoSuchVariableException) {
+                    throw NoSuchFieldOrVariableException(expr.name, expr.loc)
+                } catch (e: NoSuchFieldOrVariableException) {
+                    throw NoSuchFieldOrVariableException(expr.name, expr.loc)
+                }
+            }
+        }
     }
 
     // Blocks maintain their own scope, infer each element. Type of block is type of last expr inside
@@ -393,6 +455,9 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
 class NoSuchVariableException(varName: String, loc: Loc)
     : CompilationException("No variable with name \"$varName\" is in the current scope", loc)
 
+class NoSuchFieldOrVariableException(varName: String, loc: Loc)
+    : CompilationException("Unable to find \"$varName\" as either local variable or field in current class", loc)
+
 // Check whether an assignment to this lvalue is okay or not
 private fun checkMutable(lvalue: TypedExpr, assignLoc: Loc): Unit = when (lvalue) {
     is TypedExpr.Variable -> if (!lvalue.mutable)
@@ -406,15 +471,3 @@ private fun checkMutable(lvalue: TypedExpr, assignLoc: Loc): Unit = when (lvalue
     }
     else -> throw CompilationException("Illegal assignment - can only assign to variables, fields, or [] results.", assignLoc)
 }
-
-// Wrap a given typedExpr inside an Optional
-//fun wrapInOption(toBeWrapped: TypedExpr, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
-//    val optionType = getGenericBuiltin(OptionType, listOf(toBeWrapped.type), typeCache)
-//    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 1 }!!
-//    return TypedExpr.StaticMethodCall(toBeWrapped.loc, optionType, "new", listOf(toBeWrapped), constructor, getTopIndex(scope), optionType)
-//}
-//fun emptyOption(genericType: TypeDef, scope: ConsMap<String, VariableBinding>, typeCache: TypingCache): TypedExpr {
-//    val optionType = getGenericBuiltin(OptionType, listOf(genericType), typeCache)
-//    val constructor = optionType.methods.find { it.name == "new" && it.paramTypes.size == 0 }!!
-//    return TypedExpr.StaticMethodCall(Loc.NEVER, optionType, "new", listOf(), constructor, getTopIndex(scope), optionType)
-//}

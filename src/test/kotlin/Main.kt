@@ -16,41 +16,37 @@ fun main() {
         pub impl<T> () -> T? {
             fn iter(): () -> T? this
             fn map<R>(func: T -> R): () -> R? {
-                let wrapped: () -> T? = this
                 fn() {
-                    let inner: T? = (this.wrapped)()
+                    let inner: T? = this()
                     if inner
-                        new((this.func)(inner.get()))
+                        new(func(inner.get()))
                     else
                         new()
                 }
             }
             fn indexed(): () -> (u32, T)? {
-                let wrapped: () -> T? = this
                 let counter: Box<u32> = new(0)
                 fn() {
-                    this.counter[] = this.counter[] + 1
-                    let inner: T? = (this.wrapped)()
+                    counter[] = counter[] + 1
+                    let inner: T? = this()
                     if inner 
-                        new((this.counter[] - 1, inner[])) 
+                        new((counter[] - 1, inner[])) 
                     else 
                         new()
                 }
             }
         }
         
-//        struct range {
-//            static fn invoke(n: i32): () -> i32? {
-//                let i = new Box<i32>(0)
-//                fn() {
-//                    this.i[] = this.i[] + 1
-//                    if (this.i[] > this.n) new() else new(this.i[] - 1)
-//                }
-//            }
-//        }
-        
-        struct range{static fn invoke(n:i32):()->i32?{let i=new Box<i32>(0)fn(){this.i[]=this.i[]+1if(this.i[]>this.n)new()else new(this.i[]-1)}}}
-        
+        struct range {
+            static fn invoke(n: i32): () -> i32? {
+                let i = new Box<i32>(0)
+                fn() {
+                    i[] = i[] + 1
+                    if (i[] > n) new() else new(i[] - 1)
+                }
+            }
+        }
+                
         for x in range(10).map::<i32>(fn(x) x*x)
             print(x)
         
@@ -97,11 +93,10 @@ val list = """
         
         pub fn iter(): () -> T? {
             let ind: Box<u32> = new(0)
-            let wrapped = this
             fn() {
-                this.ind[] = this.ind[] + 1
-                if this.ind[] <= #this.wrapped
-                    new(this.wrapped[this.ind[] - 1])
+                ind[] = ind[] + 1
+                if ind[] <= #this
+                    new(this[ind[] - 1])
                 else new()
             }
         }
