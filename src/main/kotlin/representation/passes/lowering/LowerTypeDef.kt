@@ -10,19 +10,19 @@ import representation.asts.typed.TypeDef
 import util.ConsList
 import util.caching.EqualityIncrementalCalculator
 
-fun lowerTypeDef(typeDef: TypeDef, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Unit =
+fun lowerTypeDef(typeDef: TypeDef, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Unit =
     typeCalc.compute(typeDef.unwrap()) {
         // Generate the methods that need to be
         val generatedMethods: List<GeneratedMethod> =
-            it.methods.mapNotNull { getGeneratedMethod(it, typeCalc) }.flatten()
+            it.methods.mapNotNull { getGeneratedMethod(it, filesWithEffects, typeCalc) }.flatten()
         when (it) {
             // Generate types for snuggle-defined types like ClassDef
             is TypeDef.ClassDef -> {
-                lowerTypeDef(it.supertype, typeCalc)
+                lowerTypeDef(it.supertype, filesWithEffects, typeCalc)
                 GeneratedType.GeneratedClass(
                     it.runtimeName,
                     it.supertype.runtimeName!!,
-                    it.fields.flatMap { lowerField(it, it.static, it.name, typeCalc) }, //Flatmap generate the fields
+                    it.fields.flatMap { lowerField(it, it.static, it.name, filesWithEffects, typeCalc) }, //Flatmap generate the fields
                     generatedMethods
                 )
             }
@@ -35,10 +35,10 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: EqualityIncrementalCalculator<TypeD
                     GeneratedType.GeneratedValueType(
                         it.runtimeName!!,
                         it.recursivePluralFields.drop(1).map { (pathToField, field) ->
-                            lowerTypeDef(field.type, typeCalc)
+                            lowerTypeDef(field.type, filesWithEffects, typeCalc)
                             GeneratedField(field, true, "RETURN! $$pathToField")
                         },
-                        it.staticFields.flatMap { lowerField(it, it.static, it.name, typeCalc) },
+                        it.staticFields.flatMap { lowerField(it, it.static, it.name, filesWithEffects, typeCalc) },
                         generatedMethods
                     )
                 }
@@ -46,7 +46,7 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: EqualityIncrementalCalculator<TypeD
             is TypeDef.Func -> GeneratedType.GeneratedFuncType(it.runtimeName, generatedMethods)
             is TypeDef.FuncImplementation -> GeneratedType.GeneratedFuncImpl(
                 it.runtimeName, it.primarySupertype.runtimeName!!,
-                it.fields.flatMap { lowerField(it, it.static, it.name, typeCalc) },
+                it.fields.flatMap { lowerField(it, it.static, it.name, filesWithEffects, typeCalc) },
                 generatedMethods
             )
             // Indirections should not be here, we called .unwrap()
@@ -54,11 +54,11 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: EqualityIncrementalCalculator<TypeD
         }
     }
 
-fun getGeneratedMethod(methodDef: MethodDef, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedMethod>? = when (methodDef) {
-    is MethodDef.SnuggleMethodDef -> listOf(lowerMethod(methodDef, typeCalc))
+fun getGeneratedMethod(methodDef: MethodDef, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedMethod>? = when (methodDef) {
+    is MethodDef.SnuggleMethodDef -> listOf(lowerMethod(methodDef, filesWithEffects, typeCalc))
     is MethodDef.CustomMethodDef -> listOf(GeneratedMethod.GeneratedCustomMethod(methodDef))
     is MethodDef.InterfaceMethodDef -> listOf(GeneratedMethod.GeneratedInterfaceMethod(methodDef))
-    is MethodDef.GenericMethodDef<*> -> methodDef.specializations.freeze().values.mapNotNull { getGeneratedMethod(it, typeCalc) }.flatten()
+    is MethodDef.GenericMethodDef<*> -> methodDef.specializations.freeze().values.mapNotNull { getGeneratedMethod(it, filesWithEffects, typeCalc) }.flatten()
 
     is MethodDef.BytecodeMethodDef -> null
     is MethodDef.ConstMethodDef -> null
@@ -66,23 +66,23 @@ fun getGeneratedMethod(methodDef: MethodDef, typeCalc: EqualityIncrementalCalcul
 }
 
 
-private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): GeneratedMethod.GeneratedSnuggleMethod {
+private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): GeneratedMethod.GeneratedSnuggleMethod {
     // Lower type defs for arg types and return type
-    methodDef.paramTypes.forEach { lowerTypeDef(it, typeCalc) }
-    lowerTypeDef(methodDef.returnType, typeCalc)
+    methodDef.paramTypes.forEach { lowerTypeDef(it, filesWithEffects, typeCalc) }
+    lowerTypeDef(methodDef.returnType, filesWithEffects, typeCalc)
 
-    val loweredBody = lowerExpr(methodDef.lazyBody.value, ConsList.of(ConsList.nil()), typeCalc)
+    val loweredBody = lowerExpr(methodDef.lazyBody.value, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc)
     val codeBlock = Instruction.CodeBlock(loweredBody.toList())
     return GeneratedMethod.GeneratedSnuggleMethod(methodDef, codeBlock)
 }
 
-private fun lowerField(fieldDef: FieldDef, runtimeStatic: Boolean, runtimeNamePrefix: String, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedField> {
+private fun lowerField(fieldDef: FieldDef, runtimeStatic: Boolean, runtimeNamePrefix: String, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedField> {
     // Lower type def for the field
-    lowerTypeDef(fieldDef.type, typeCalc)
+    lowerTypeDef(fieldDef.type, filesWithEffects, typeCalc)
     return if (fieldDef.type.isPlural) {
         // If plural, lower the recursive fields
         fieldDef.type.recursivePluralFields.map { (pathToField, field) ->
-            lowerTypeDef(field.type, typeCalc)
+            lowerTypeDef(field.type, filesWithEffects, typeCalc)
             GeneratedField(field, runtimeStatic, runtimeNamePrefix + "$" + pathToField)
         }
     } else {

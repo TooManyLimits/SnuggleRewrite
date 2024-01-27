@@ -15,7 +15,7 @@ import util.caching.EqualityIncrementalCalculator
 /**
  * Lowering an expression into IR.
  *
- * desiredFields is a concept related to the implementation of fields of plural types.
+ * @param desiredFields is a concept related to the implementation of fields of plural types.
  *
  * If you have a plural type, like a tuple, stored as a local variable, the implementation
  * in the runtime is to instead have multiple local variables, one for each element
@@ -39,19 +39,27 @@ import util.caching.EqualityIncrementalCalculator
  * ["isPresent"]. (Ignoring the fields x and z).
  *
  * The length of desiredFields should always be at least 1.
+ *
+ * @param filesWithEffects tells us which files have effects when imported, and which don't.
+ * This can be used to not emit any instruction for an import of said file, useful for making
+ * files which only provide definitions not consume instructions when imported. Only used by the
+ * TypedExpr.Import expression.
+ *
  */
 
 // I hope these "sequence {}" blocks aren't slow since they're really convenient
-fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when (expr) {
-    // Just a RunImport
-    is TypedExpr.Import -> sequenceOf(Instruction.RunImport(expr.file))
+fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when (expr) {
+    // Run the import if the file has effects
+    is TypedExpr.Import -> if (filesWithEffects.contains(expr.file))
+        sequenceOf(Instruction.RunImport(expr.file))
+    else sequenceOf()
     // Sequence the operations inside the block
     is TypedExpr.Block -> sequence {
         for (i in 0 until expr.exprs.size - 1) {
-            yieldAll(lowerExpr(expr.exprs[i], ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(expr.exprs[i], ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
             yield(Instruction.Pop(expr.exprs[i].type))
         }
-        yieldAll(lowerExpr(expr.exprs.last(), desiredFields, typeCalc))
+        yieldAll(lowerExpr(expr.exprs.last(), desiredFields, filesWithEffects, typeCalc))
     }
     // What to do for a declaration depends on the type of pattern
     is TypedExpr.Declaration -> sequence {
@@ -60,18 +68,16 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             TODO()
         } else {
             // Push the initializer
-            yieldAll(lowerExpr(expr.initializer, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(expr.initializer, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
             // Apply the pattern
-            yieldAll(lowerPattern(expr.pattern, typeCalc))
-//            // Store/bind local variable
-//            yield(Instruction.StoreLocal(expr.variableIndex, expr.pattern.type))
+            yieldAll(lowerPattern(expr.pattern, filesWithEffects, typeCalc))
             // Push true
             yield(Instruction.Push(true, expr.type))
         }
     }
 
     // Extracted to special method, since it's complex
-    is TypedExpr.Assignment -> handleAssignment(expr.lhs, expr.rhs, ConsList.nil(), expr.maxVariable, typeCalc)
+    is TypedExpr.Assignment -> handleAssignment(expr.lhs, expr.rhs, ConsList.nil(), expr.maxVariable, filesWithEffects, typeCalc)
 
     // Load the local variable
     is TypedExpr.Variable -> sequence {
@@ -98,7 +104,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             // we don't need to pass the fields further down.
             // Instead, we handle them all here.
             // Compile the receiver: (which yields a reference type on the stack)
-            yieldAll(lowerExpr(expr.receiver, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(expr.receiver, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
             val numberOfGroups = desiredFields.count()
             // If there are multiple fields groups, or if any particular field group is plural with > 1 elem,
             // need to store the receiver as a local variable.
@@ -133,7 +139,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             // but is instead plural, we will pass the problem
             // down a level, by consing a new field def onto each
             // desired field group.
-            yieldAll(lowerExpr(expr.receiver, desiredFields.map { Cons(expr.fieldDef, it) }, typeCalc))
+            yieldAll(lowerExpr(expr.receiver, desiredFields.map { Cons(expr.fieldDef, it) }, filesWithEffects, typeCalc))
         } else {
             // Any type that has accessible fields should either be a reference
             // type, or plural. This is a bug!
@@ -158,7 +164,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
 
     // Compile arguments, make call
     is TypedExpr.MethodCall -> sequence {
-        lowerTypeDef(expr.methodDef.owningType, typeCalc)
+        lowerTypeDef(expr.methodDef.owningType, filesWithEffects, typeCalc)
 
         // Pre-bytecode if needed
         if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
@@ -167,21 +173,21 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
                 expr.methodDef.desiredReceiverFields!!(desiredFields)
             else ConsList.of(ConsList.nil())
 
-        yieldAll(lowerExpr(expr.receiver, receiverDesiredFields, typeCalc))
+        yieldAll(lowerExpr(expr.receiver, receiverDesiredFields, filesWithEffects, typeCalc))
         for (arg in expr.args)
-            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         if (expr.methodDef.owningType.unwrap() is TypeDef.ClassDef)
             yieldAll(createCall(expr.methodDef, desiredFields, expr.maxVariable) { Instruction.MethodCall.Virtual(it) })
         else
             yieldAll(createCall(expr.methodDef, desiredFields, expr.maxVariable) { Instruction.MethodCall.Static(it) })
     }
     is TypedExpr.StaticMethodCall -> sequence {
-        lowerTypeDef(expr.receiverType, typeCalc)
+        lowerTypeDef(expr.receiverType, filesWithEffects, typeCalc)
         // Pre-bytecode if needed
         if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
             yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
         for (arg in expr.args)
-            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         yieldAll(createCall(expr.methodDef, desiredFields, expr.maxVariable) { Instruction.MethodCall.Static(it) })
     }
     is TypedExpr.SuperMethodCall -> sequence {
@@ -192,12 +198,12 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
         yield(Instruction.LoadRefType(expr.thisVariableIndex))
         // Push args
         for (arg in expr.args)
-            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         // Create call
         yieldAll(createCall(expr.methodDef, desiredFields, expr.maxVariable) { Instruction.MethodCall.Special(it) })
     }
     is TypedExpr.ClassConstructorCall -> sequence {
-        lowerTypeDef(expr.type, typeCalc)
+        lowerTypeDef(expr.type, filesWithEffects, typeCalc)
         // Pre-bytecode if needed
         if (expr.methodDef is MethodDef.BytecodeMethodDef && expr.methodDef.preBytecode != null)
             yield(Instruction.Bytecodes(0) { expr.methodDef.preBytecode!!(it, expr.maxVariable, desiredFields) })
@@ -205,7 +211,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
         yield(Instruction.NewRefAndDup(expr.type))
         // Push args
         for (arg in expr.args)
-            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(arg, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         yieldAll(createCall(expr.methodDef, desiredFields, expr.maxVariable) { Instruction.MethodCall.Special(it) })
     }
     is TypedExpr.RawStructConstructor -> sequence {
@@ -213,12 +219,12 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
         for ((field, value) in expr.type.nonStaticFields.zip(expr.fieldValues)) {
             if (curFieldGroup is Cons && curFieldGroup.elem == field) {
                 // We desire this field group specifically, so lower it
-                yieldAll(lowerExpr(value, ConsList.of(curFieldGroup.rest), typeCalc))
+                yieldAll(lowerExpr(value, ConsList.of(curFieldGroup.rest), filesWithEffects, typeCalc))
                 // Advance to next field group
                 curFieldGroup = curFieldGroup.rest
             } else {
                 // Yield the field value
-                yieldAll(lowerExpr(value, ConsList.of(ConsList.nil()), typeCalc))
+                yieldAll(lowerExpr(value, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
                 // If we desire something specific, but this is not it, then pop the value
                 if (curFieldGroup is Cons)
                     yield(Instruction.Pop(value.type))
@@ -230,7 +236,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
 
     is TypedExpr.Return -> sequence {
         // Yield the RHS, pushing it on the stack
-        yieldAll(lowerExpr(expr.rhs, ConsList.of(ConsList.nil()), typeCalc))
+        yieldAll(lowerExpr(expr.rhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         val returnType = expr.rhs.type
         // If it's plural, decompose into static field writes and one return.
         if (returnType.isPlural) {
@@ -260,15 +266,15 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
         val doneLabel = Label()
         sequence {
             // Cond, jump if false to false branch
-            yieldAll(lowerExpr(expr.cond, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(expr.cond, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
             yield(Instruction.JumpIfFalse(ifFalseLabel))
             // True branch
-            val loweredTrueBranch = lowerExpr(expr.ifTrue, ConsList.of(ConsList.nil()), typeCalc)
+            val loweredTrueBranch = lowerExpr(expr.ifTrue, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc)
             yield(Instruction.CodeBlock(loweredTrueBranch.toList()))
             yield(Instruction.Jump(doneLabel))
             // False branch
             yield(Instruction.IrLabel(ifFalseLabel))
-            val loweredFalseBranch = lowerExpr(expr.ifFalse, ConsList.of(ConsList.nil()), typeCalc)
+            val loweredFalseBranch = lowerExpr(expr.ifFalse, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc)
             yield(Instruction.CodeBlock(loweredFalseBranch.toList()))
             // Done
             yield(Instruction.IrLabel(doneLabel))
@@ -283,13 +289,13 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, type
             yield(Instruction.IrLabel(condLabel))
             // Yield the lowered cond + jump as its own code block
             val loweredCond = sequence {
-                yieldAll(lowerExpr(expr.cond, ConsList.of(ConsList.nil()), typeCalc))
+                yieldAll(lowerExpr(expr.cond, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
                 yield(Instruction.JumpIfFalse(doneLabel))
             }
             yield(Instruction.CodeBlock(loweredCond.toList()))
             // Yield the lowered body + jump as its own code block
             val loweredBody = sequence {
-                yieldAll(lowerExpr(expr.body, ConsList.of(ConsList.nil()), typeCalc)) // Eval body
+                yieldAll(lowerExpr(expr.body, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc)) // Eval body
                 yield(Instruction.Pop(expr.body.type)) // Pop output
                 yield(Instruction.Jump(condLabel)) // Jump back to evaluate cond again
             }
@@ -387,9 +393,9 @@ private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<Co
  * fieldsToFollow starts as nil.
  * assignmentType is the type being assigned to the lvalue.
  */
-fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
+fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
     lhs is TypedExpr.Variable -> sequence {
-        yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), typeCalc))
+        yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         val startIndex = lhs.variableIndex + getPluralOffset(fieldsToFollow)
         if (rhs.type.isPlural) {
             var curIndex = startIndex + rhs.type.stackSlots
@@ -413,14 +419,14 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
     }
 
     lhs is TypedExpr.FieldAccess && lhs.receiver.type.isReferenceType -> sequence {
-        yieldAll(lowerExpr(lhs.receiver, ConsList.of(ConsList.nil()), typeCalc))
+        yieldAll(lowerExpr(lhs.receiver, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         val namePrefix = fieldsToFollow.fold(lhs.fieldName) { prefix, field -> prefix + "$" + field.name }
         //TODO: Use a "neededToStore" like above to avoid storing as local for 1-elem structs
         if (rhs.type.isPlural) {
             // Store the reference type as a local, to grab later
             yield(Instruction.StoreLocal(maxVariable, lhs.receiver.type))
             // Emit the RHS onto the stack
-            yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
             // For each field, store it
             for ((pathToField, field) in rhs.type.recursivePluralFields.asReversed()) {
                 yield(Instruction.LoadLocal(maxVariable, lhs.receiver.type))
@@ -429,13 +435,13 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
             }
         } else {
             // Just set the field directly
-            yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), typeCalc))
+            yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
             yield(Instruction.PutReferenceTypeField(lhs.receiver.type, rhs.type, namePrefix))
         }
     }
 
     // Recursive case: The LHS is a field access, but its receiver is not a reference type.
-    lhs is TypedExpr.FieldAccess -> handleAssignment(lhs.receiver, rhs, Cons(lhs.fieldDef, fieldsToFollow), maxVariable, typeCalc)
+    lhs is TypedExpr.FieldAccess -> handleAssignment(lhs.receiver, rhs, Cons(lhs.fieldDef, fieldsToFollow), maxVariable, filesWithEffects, typeCalc)
 
     else -> throw IllegalStateException("Illegal assignment case - bug in compiler, please report")
 }

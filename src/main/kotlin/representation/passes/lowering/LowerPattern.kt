@@ -10,22 +10,21 @@ import util.caching.EqualityIncrementalCalculator
  * For now, there are no fallible patterns. So do nothing.
  */
 fun testPattern(pattern: TypedPattern): Sequence<Instruction> {
-    //TODO
-    return emptySequence()
+    TODO()
 }
 
 /**
  * The scrutinee of the pattern is currently on the stack.
  */
-fun lowerPattern(pattern: TypedPattern, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> {
+fun lowerPattern(pattern: TypedPattern, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> {
     return when (pattern) {
         is TypedPattern.EmptyPattern -> {
             // Lower the involved type, pop it off the stack
-            lowerTypeDef(pattern.type, typeCalc)
+            lowerTypeDef(pattern.type, filesWithEffects, typeCalc)
             sequenceOf(Instruction.Pop(pattern.type))
         }
         is TypedPattern.BindingPattern -> {
-            lowerTypeDef(pattern.type, typeCalc)
+            lowerTypeDef(pattern.type, filesWithEffects, typeCalc)
             if (pattern.type.isPlural) sequence {
                 var curIndex = pattern.variableIndex + pattern.type.stackSlots
                 pattern.type.recursivePluralFields.asReversed().forEach { (_, fieldDef) ->
@@ -39,7 +38,7 @@ fun lowerPattern(pattern: TypedPattern, typeCalc: EqualityIncrementalCalculator<
         is TypedPattern.TuplePattern -> sequence {
             // Lower the inner patterns in reverse order
             pattern.elements.asReversed().forEach {
-                yieldAll(lowerPattern(it, typeCalc))
+                yieldAll(lowerPattern(it, filesWithEffects, typeCalc))
             }
         }
     }

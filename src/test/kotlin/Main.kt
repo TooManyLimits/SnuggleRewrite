@@ -3,6 +3,9 @@ import runtime.InstanceBuilder
 fun main() {
 
     val code = """
+        
+        import "whar"
+        
         pub class Box<T> {
             mut value: T
             pub fn new(v: T) {
@@ -69,8 +72,9 @@ fun main() {
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
-//        .debugBytecode()
+        .debugBytecode()
         .addFile("list", list)
+        .addFile("whar", "class X {}")
 //        .reflectObject(ExtraPrinter(" :3"))
         .build()
 
