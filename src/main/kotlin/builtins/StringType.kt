@@ -23,10 +23,8 @@ object StringType: BuiltinType {
     override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val stringType = getBasicBuiltin(StringType, typeCache)
         return listOf(
-            constBinary(false, stringType, "add", stringType, listOf(stringType), String::plus)
-                orBytecode {
-                    it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false)
-                }
+            constBinary(false, stringType, "add", stringType, stringType, String::plus)
+                orBytecode { it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false) }
         )
     }
 }

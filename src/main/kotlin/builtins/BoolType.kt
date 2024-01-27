@@ -25,14 +25,14 @@ object BoolType: BuiltinType {
         val boolType = getBasicBuiltin(BoolType, typeCache)
         return listOf(
             // Add/mul is equivalent to or/and. May remove
-            constBinary(static = false, boolType, "add", boolType, listOf(boolType), Boolean::or)
+            constBinary(static = false, boolType, "add", boolType, boolType, Boolean::or)
                     orBytecode { it.visitInsn(Opcodes.IOR) },
-            constBinary(static = false, boolType, "mul", boolType, listOf(boolType), Boolean::and)
+            constBinary(static = false, boolType, "mul", boolType, boolType, Boolean::and)
                     orBytecode { it.visitInsn(Opcodes.IAND) },
             // Not is XOR with 1
-            constUnary<Boolean, Boolean>(static = false, boolType, "not", boolType, listOf()) {!it}
+            constUnary<Boolean, Boolean>(static = false, boolType, "not", boolType) {!it}
                     orBytecode { it.visitInsn(Opcodes.ICONST_1); it.visitInsn(Opcodes.IXOR) },
-            constUnary<Boolean, Boolean>(static = false, boolType, "bool", boolType, listOf()) {it}
+            constUnary<Boolean, Boolean>(static = false, boolType, "bool", boolType) {it}
                     orBytecode {} // No op, a bool is already a bool
         )
     }

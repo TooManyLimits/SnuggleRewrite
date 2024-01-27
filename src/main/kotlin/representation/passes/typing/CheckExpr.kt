@@ -1,9 +1,7 @@
 package representation.passes.typing
 
-import builtins.BoolType
-import builtins.IntLiteralType
-import builtins.IntType
-import builtins.OptionType
+import builtins.*
+import builtins.helpers.Fraction
 import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
@@ -242,22 +240,40 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
 /**
  * Pull a literal upwards into having a different type
  */
-fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult {
-    return if (result.expr is TypedExpr.Literal && result.expr.type.builtin == IntLiteralType && expectedType.builtin != IntLiteralType) {
-        // If not in range, throw
-        if (expectedType.builtin is IntType && !(expectedType.builtin as IntType).fits((result.expr as TypedExpr.Literal).value as BigInteger))
-            throw NumberRangeException(expectedType.builtin as IntType, (result.expr as TypedExpr.Literal).value as BigInteger, result.expr.loc)
-        // Otherwise, return with altered type
-        if (result is TypingResult.JustExpr)
-            just(TypedExpr.Literal(result.expr.loc, (result.expr as TypedExpr.Literal).value, expectedType))
-        else
-            TypingResult.WithVars(
-                TypedExpr.Literal(result.expr.loc, (result.expr as TypedExpr.Literal).value, expectedType),
-                result.newVarsIfTrue,
-                result.newVarsIfFalse
-            )
+fun pullUpLiteral(result: TypingResult, expectedType: TypeDef): TypingResult = when (result.expr) {
+    is TypedExpr.Literal -> when (result.expr.type.builtin) {
+        IntLiteralType -> {
+            val value = (result.expr as TypedExpr.Literal).value as BigInteger
+            // If we expected an int literal, we're fine
+            when (expectedType.builtin) {
+                IntLiteralType -> result // Have IntLiteral, expected IntLiteral, it's fine
+                // Have int literal, expected float literal, just convert it
+                FloatLiteralType -> just(TypedExpr.Literal(result.expr.loc, Fraction(value, BigInteger.ONE), expectedType))
+                // Is some int type, check the bounds and convert
+                is IntType -> {
+                    if (!(expectedType.builtin as IntType).fits(value))
+                        throw NumberRangeException(expectedType.builtin as IntType, value, result.expr.loc)
+                    just(TypedExpr.Literal(result.expr.loc, value, expectedType))
+                }
+                // Float types don't care about range:
+                F32Type -> just(TypedExpr.Literal(result.expr.loc, value.toFloat(), expectedType))
+                F64Type -> just(TypedExpr.Literal(result.expr.loc, value.toDouble(), expectedType))
+                else -> throw IllegalStateException("Unexpected pull-up for int literal? Bug in compiler, please report")
+            }
+        }
+        FloatLiteralType -> {
+            // Similar structure to above
+            val value = (result.expr as TypedExpr.Literal).value as Fraction
+            when (expectedType.builtin) {
+                FloatLiteralType -> result
+                F32Type -> just(TypedExpr.Literal(result.expr.loc, value.toFloat(), expectedType))
+                F64Type -> just(TypedExpr.Literal(result.expr.loc, value.toDouble(), expectedType))
+                else -> throw IllegalStateException("Unexpected pull-up for float literal? Bug in compiler, please report")
+            }
+        }
+        else -> result
     }
-    else result
+    else -> result
 }
 
 fun getStaticExtensions(type: TypeDef, implBlocks: ConsList<ResolvedImplBlock>, typeCache: TypingCache): List<MethodDef> {

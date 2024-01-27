@@ -1,6 +1,7 @@
 package runtime;
 
 import builtins.*
+import builtins.reflected.PrintType
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.util.TraceClassVisitor
 import reflection.ReflectedBuiltinType
@@ -91,11 +92,14 @@ class InstanceBuilder(userFiles: Map<String, String>) {
         val builtins = reflectedClasses.map { ReflectedBuiltinType(it, null) }
             .append(staticObjects) // Add the static objects to the set of builtins
             .append(otherBuiltins)
+            .append(ConsList.of( // Default reflected classes
+                PrintType::class.java
+            ).map { ReflectedBuiltinType(it, null) })
             .append(ConsList.of(
                 BoolType, *INT_TYPES, *FLOAT_TYPES, // Primitive
-                IntLiteralType, // Compile time literals
+                IntLiteralType, FloatLiteralType, // Compile time literals
                 ObjectType, StringType, OptionType, ArrayType, // Essential objects
-                MaybeUninitType, PrintType, // Helper objects
+                MaybeUninitType, // Helpers
             ))
         return SnuggleInstance(
             output(

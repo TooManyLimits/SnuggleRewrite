@@ -44,6 +44,14 @@ publishing {
     }
 }
 
+//https://kotlinlang.org/docs/gradle-configure-project.html#4c2b91a9
+sourceSets.main {
+    java.srcDirs("src/main/kotlin", "src/main/java")
+}
+sourceSets.test {
+    java.srcDirs("src/test/kotlin", "src/test/java")
+}
+
 tasks.shadowJar {
     isEnableRelocation = true
     relocationPrefix = "snuggle_dependencies"

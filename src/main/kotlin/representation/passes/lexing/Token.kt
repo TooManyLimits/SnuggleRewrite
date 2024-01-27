@@ -1,5 +1,6 @@
 package representation.passes.lexing
 
+import builtins.helpers.Fraction
 import errors.CompilationException
 import java.math.BigInteger
 import java.util.regex.Pattern
@@ -110,7 +111,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
                     string.endsWith("f64") -> Token(loc, TokenType.LITERAL, string.substring(0, string.length - 3).toDouble())
                     else -> throw IllegalStateException("Unexpected")
                 }
-                string.contains('.') -> throw IllegalStateException("Exact floating point values not yet re-implemented, annotate them")
+                string.contains('.') -> Token(loc, TokenType.LITERAL, Fraction.parse(string))
                 string.contains('i') -> Token(loc, TokenType.LITERAL, IntLiteralData(BigInteger(string.substring(0, string.indexOf('i'))), true, string.substring(string.indexOf('i') + 1).toInt()))
                 string.contains('u') -> Token(loc, TokenType.LITERAL, IntLiteralData(BigInteger(string.substring(0, string.indexOf('u'))), false, string.substring(string.indexOf('u') + 1).toInt()))
                 else -> Token(loc, TokenType.LITERAL, BigInteger(string))

@@ -1,6 +1,7 @@
 package representation.passes.typing
 
 import builtins.*
+import builtins.helpers.Fraction
 import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
@@ -434,6 +435,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val type = when (expr.value) {
             is Boolean -> getBasicBuiltin(BoolType, typeCache)
             is BigInteger -> getBasicBuiltin(IntLiteralType, typeCache)
+            is Fraction -> getBasicBuiltin(FloatLiteralType, typeCache)
             is IntLiteralData -> {
                 value = expr.value.value // Unwrap value
                 getBasicBuiltin(when (expr.value.bits) {
@@ -444,6 +446,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
                     else -> throw IllegalStateException()
                 }, typeCache)
             }
+            is Float -> getBasicBuiltin(F32Type, typeCache)
+            is Double -> getBasicBuiltin(F64Type, typeCache)
             is String -> getBasicBuiltin(StringType, typeCache)
             else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
         }

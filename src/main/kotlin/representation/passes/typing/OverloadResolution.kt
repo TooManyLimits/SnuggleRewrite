@@ -252,12 +252,12 @@ private fun compareMethods(a: MethodDef, b: MethodDef): Int {
                 -1
         } else {
             if (t2.isSubtype(t1))
-                0
-            else
                 1
+            else
+                0
         }
     // Compare each arg, also negation of the return types
-    val comparedArgs = a.paramTypes.asSequence().zip(b.paramTypes.asSequence()).map {
+    val comparedArgs = a.paramTypes.zip(b.paramTypes).map {
         compareTypes(it.first, it.second)
     } + -compareTypes(a.returnType, b.returnType)
     val hasM1 = -1 in comparedArgs

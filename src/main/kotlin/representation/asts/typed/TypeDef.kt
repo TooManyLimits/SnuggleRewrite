@@ -137,6 +137,10 @@ sealed class TypeDef {
         override val methods: List<MethodDef> get() = promise.expect().methods
         override val generics: List<TypeDef> get() = promise.expect().generics
         override val builtin: BuiltinType? get() = promise.expect().builtin
+
+        override fun toString(): String {
+            return "Indirect(${promise.expect().name})"
+        }
     }
 
     class Tuple(val innerTypes: List<TypeDef>): TypeDef() {

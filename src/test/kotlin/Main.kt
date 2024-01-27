@@ -58,10 +58,18 @@ fun main() {
         let times3 = prod(3)
         print(times3(14))
         
+        print("")
+        
+        let x: f64 = 0.1
+        print(x + 0.2) //0.30000000000000004
+        
+        let y: f64 = 0.1 + 0.2
+        print(y) //0.3        
+        
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
-        .debugBytecode()
+//        .debugBytecode()
         .addFile("list", list)
 //        .reflectObject(ExtraPrinter(" :3"))
         .build()

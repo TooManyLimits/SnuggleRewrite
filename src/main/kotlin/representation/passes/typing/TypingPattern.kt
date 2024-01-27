@@ -1,5 +1,6 @@
 package representation.passes.typing
 
+import builtins.FloatLiteralType
 import builtins.IntLiteralType
 import errors.CompilationException
 import errors.TypeCheckingException
@@ -35,7 +36,7 @@ fun isExplicitlyTyped(pattern: ResolvedPattern): Boolean = when (pattern) {
  */
 fun checkPattern(pattern: ResolvedPattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedPattern {
     // If scrutinee is an unstorable type, like IntLiteral, error here
-    if (scrutineeType.builtin == IntLiteralType)
+    if (scrutineeType.builtin == IntLiteralType || scrutineeType.builtin == FloatLiteralType)
         throw CompilationException("Cannot infer type of literal - try adding more annotations", pattern.loc)
     // Switch on the type of pattern
     return when (pattern) {

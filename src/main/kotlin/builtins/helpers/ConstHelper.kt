@@ -31,8 +31,8 @@ class ConstWrapperTemp(private val static: Boolean, private val owningType: Type
     }
 }
 
-inline fun <reified A, reified B, reified C> constBinary(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, argTypes: List<TypeDef>, crossinline replacer: (A, B) -> C): ConstWrapperTemp {
-    return ConstWrapperTemp(static, owningType, name, returnType, argTypes) {
+inline fun <reified A, reified B, reified C> constBinary(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, argType: TypeDef, crossinline replacer: (A, B) -> C): ConstWrapperTemp {
+    return ConstWrapperTemp(static, owningType, name, returnType, listOf(argType)) {
         { call ->
             val receiver = call.receiver
             val arg = call.args[0]
@@ -48,14 +48,44 @@ inline fun <reified A, reified B, reified C> constBinary(static: Boolean, owning
     }
 }
 
-inline fun <reified A, reified B> constUnary(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, argTypes: List<TypeDef>, crossinline replacer: (A) -> B): ConstWrapperTemp {
-    return ConstWrapperTemp(static, owningType, name, returnType, argTypes) {
+fun <A, B, C> constBinaryWithConverter(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, argType: TypeDef, receiverConverter: (Any) -> A, argConverter: (Any) -> B, replacer: (A, B) -> C): ConstWrapperTemp {
+    return ConstWrapperTemp(static, owningType, name, returnType, listOf(argType)) {
+        { call ->
+            val receiver = call.receiver
+            val arg = call.args[0]
+            if (receiver is TypedExpr.Literal && arg is TypedExpr.Literal) {
+                val replaced = replacer(receiverConverter(receiver.value), argConverter(arg.value))
+                TypedExpr.Literal(call.loc, replaced as Any, call.type)
+            } else {
+                it(call)
+            }
+        }
+    }
+}
+
+inline fun <reified A, reified B> constUnary(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, crossinline replacer: (A) -> B): ConstWrapperTemp {
+    return ConstWrapperTemp(static, owningType, name, returnType, listOf()) {
         { call ->
             val receiver = call.receiver
             if (receiver is TypedExpr.Literal) {
                 if (receiver.value !is A)
                     throw IllegalStateException("Unexpected types to constUnary")
                 val replaced = replacer(receiver.value)
+                TypedExpr.Literal(call.loc, replaced as Any, call.type)
+            } else {
+                it(call)
+            }
+        }
+    }
+}
+
+fun <A, B> constUnaryWithConverter(static: Boolean, owningType: TypeDef, name: String, returnType: TypeDef, receiverConverter: (Any) -> A, replacer: (A) -> B): ConstWrapperTemp {
+    return ConstWrapperTemp(static, owningType, name, returnType, listOf()) {
+        { call ->
+            val receiver = call.receiver
+            val arg = call.args[0]
+            if (receiver is TypedExpr.Literal && arg is TypedExpr.Literal) {
+                val replaced = replacer(receiverConverter(receiver.value))
                 TypedExpr.Literal(call.loc, replaced as Any, call.type)
             } else {
                 it(call)
