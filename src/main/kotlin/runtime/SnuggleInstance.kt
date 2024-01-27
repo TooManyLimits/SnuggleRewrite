@@ -1,6 +1,7 @@
 package runtime;
 
 import builtins.*
+import builtins.primitive.*
 import builtins.reflected.PrintType
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.util.TraceClassVisitor

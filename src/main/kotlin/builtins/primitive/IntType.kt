@@ -1,5 +1,6 @@
-package builtins
+package builtins.primitive
 
+import builtins.BuiltinType
 import builtins.helpers.constBinary
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor

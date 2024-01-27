@@ -5,6 +5,7 @@ import builtins.helpers.Fraction
 import builtins.helpers.basicLocal
 import builtins.helpers.popType
 import builtins.helpers.swapBasic
+import builtins.primitive.*
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes

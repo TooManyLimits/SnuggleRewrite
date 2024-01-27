@@ -1,8 +1,8 @@
 package builtins.helpers
 
-import builtins.BoolType
-import builtins.FloatType
-import builtins.IntType
+import builtins.primitive.BoolType
+import builtins.primitive.FloatType
+import builtins.primitive.IntType
 import builtins.OptionType
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes

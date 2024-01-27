@@ -1,7 +1,7 @@
 package builtins
 
-import builtins.helpers.popType
 import builtins.helpers.pushDefaultValue
+import builtins.primitive.BoolType
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -108,7 +108,8 @@ object OptionType: BuiltinType {
             // 0 offset, it's an instance of the first generic
             FieldDef.BuiltinField(pub = false, static = false, mutable = false,"value", 0, generics[0]),
             // offset equal to the first's stack slots, it's a bool
-            FieldDef.BuiltinField(pub = false, static = false, mutable = false,"isPresent", generics[0].stackSlots, getBasicBuiltin(BoolType, typeCache))
+            FieldDef.BuiltinField(pub = false, static = false, mutable = false,"isPresent", generics[0].stackSlots, getBasicBuiltin(
+                BoolType, typeCache))
         )
     }
 

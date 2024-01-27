@@ -1,6 +1,7 @@
 package reflection
 
 import builtins.*
+import builtins.primitive.*
 import reflection.annotations.Unsigned
 import representation.asts.typed.TypeDef
 import representation.passes.typing.*

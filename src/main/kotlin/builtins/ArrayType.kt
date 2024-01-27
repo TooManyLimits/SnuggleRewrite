@@ -1,5 +1,9 @@
 package builtins
 
+import builtins.primitive.BoolType
+import builtins.primitive.FloatType
+import builtins.primitive.IntType
+import builtins.primitive.U32Type
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes

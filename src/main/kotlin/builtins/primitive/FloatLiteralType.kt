@@ -1,5 +1,6 @@
-package builtins
+package builtins.primitive
 
+import builtins.BuiltinType
 import builtins.helpers.Fraction
 import builtins.helpers.constBinary
 import builtins.helpers.constUnary

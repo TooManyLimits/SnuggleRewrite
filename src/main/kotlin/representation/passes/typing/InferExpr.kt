@@ -2,6 +2,7 @@ package representation.passes.typing
 
 import builtins.*
 import builtins.helpers.Fraction
+import builtins.primitive.*
 import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
@@ -410,7 +411,8 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         val iterInvoke = typedIterator.type.methods.find { it.name == "invoke" }!!
         val iterCallExpr = TypedExpr.MethodCall(expr.loc, iterTempVar, "invoke", listOf(), iterInvoke, getTopIndex(extendedScope2), valueTempType)
         val boolFunc = valueTempType.methods.find { it.name == "bool" }!!
-        val boolCallExpr = TypedExpr.MethodCall(expr.loc, valueTempVar, "bool", listOf(), boolFunc, getTopIndex(extendedScope2), getBasicBuiltin(BoolType, typeCache))
+        val boolCallExpr = TypedExpr.MethodCall(expr.loc, valueTempVar, "bool", listOf(), boolFunc, getTopIndex(extendedScope2), getBasicBuiltin(
+            BoolType, typeCache))
         val getFunc = valueTempType.methods.find { it.name == "get" && it.paramTypes.isEmpty() }!!
         val getCallExpr = TypedExpr.MethodCall(expr.loc, valueTempVar, "get", listOf(), getFunc, getTopIndex(finalScope), valueTempType.generics[0])
         val condExpr = TypedExpr.Block(expr.loc, listOf(

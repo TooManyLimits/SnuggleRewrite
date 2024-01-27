@@ -1,7 +1,7 @@
 package representation.passes.typing
 
-import builtins.*
 import builtins.helpers.Fraction
+import builtins.primitive.*
 import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException

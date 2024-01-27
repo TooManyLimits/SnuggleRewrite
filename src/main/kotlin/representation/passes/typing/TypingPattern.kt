@@ -1,7 +1,7 @@
 package representation.passes.typing
 
-import builtins.FloatLiteralType
-import builtins.IntLiteralType
+import builtins.primitive.FloatLiteralType
+import builtins.primitive.IntLiteralType
 import errors.CompilationException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedPattern
