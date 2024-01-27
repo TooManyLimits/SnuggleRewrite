@@ -11,7 +11,6 @@ import representation.asts.typed.TypedFile
 import util.ConsList.Companion.nil
 import util.ConsMap
 import util.caching.EqualityCache
-import util.caching.IdentityCache
 import java.util.*
 
 /**
@@ -38,7 +37,7 @@ fun typeAST(ast: ResolvedAST): TypedAST {
 data class TypingCache(
     val basicCache: EqualityCache<ResolvedTypeDef, EqualityCache<List<TypeDef>, TypeDef>> = EqualityCache(),
     val tupleCache: EqualityCache<List<TypeDef>, TypeDef.Tuple> = EqualityCache(),
-    val funcCache: EqualityCache<List<TypeDef>, IdentityCache<TypeDef, TypeDef.Func>> = EqualityCache(),
+    val funcCache: EqualityCache<List<TypeDef>, EqualityCache<TypeDef, TypeDef.Func>> = EqualityCache(),
 
     val implBlockCache: EqualityCache<ResolvedImplBlock, EqualityCache<List<TypeDef>, TypeDef>> = EqualityCache(),
 
@@ -59,7 +58,7 @@ data class TypingCache(
     fun putTuple(elements: List<TypeDef>, value: TypeDef.Tuple) =
         this.getTuple(elements) { value }
     fun getFunc(paramTypes: List<TypeDef>, returnType: TypeDef, func: (List<TypeDef>, TypeDef) -> TypeDef.Func) =
-        this.funcCache.get(paramTypes) {IdentityCache()}.get(returnType) {func(paramTypes, returnType)}
+        this.funcCache.get(paramTypes) { EqualityCache() }.get(returnType) {func(paramTypes, returnType)}
     fun putFunc(paramTypes: List<TypeDef>, returnType: TypeDef, value: TypeDef.Func) =
         this.getFunc(paramTypes, returnType) { _, _ -> value }
 

@@ -30,5 +30,5 @@ abstract class IncrementalCalculator<K, V, M: MutableMap<K, V?>>(mapSupplier: ()
 
 }
 
-class IdentityIncrementalCalculator<K, V>: IncrementalCalculator<K, V, IdentityHashMap<K, V?>>(::IdentityHashMap)
+//class IdentityIncrementalCalculator<K, V>: IncrementalCalculator<K, V, IdentityHashMap<K, V?>>(::IdentityHashMap)
 class EqualityIncrementalCalculator<K, V>: IncrementalCalculator<K, V, HashMap<K, V?>>(::HashMap)

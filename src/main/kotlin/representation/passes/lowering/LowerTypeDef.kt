@@ -8,9 +8,9 @@ import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import util.ConsList
-import util.caching.IdentityIncrementalCalculator
+import util.caching.EqualityIncrementalCalculator
 
-fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Unit =
+fun lowerTypeDef(typeDef: TypeDef, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Unit =
     typeCalc.compute(typeDef.unwrap()) {
         // Generate the methods that need to be
         val generatedMethods: List<GeneratedMethod> =
@@ -54,7 +54,7 @@ fun lowerTypeDef(typeDef: TypeDef, typeCalc: IdentityIncrementalCalculator<TypeD
         }
     }
 
-fun getGeneratedMethod(methodDef: MethodDef, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedMethod>? = when (methodDef) {
+fun getGeneratedMethod(methodDef: MethodDef, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedMethod>? = when (methodDef) {
     is MethodDef.SnuggleMethodDef -> listOf(lowerMethod(methodDef, typeCalc))
     is MethodDef.CustomMethodDef -> listOf(GeneratedMethod.GeneratedCustomMethod(methodDef))
     is MethodDef.InterfaceMethodDef -> listOf(GeneratedMethod.GeneratedInterfaceMethod(methodDef))
@@ -66,7 +66,7 @@ fun getGeneratedMethod(methodDef: MethodDef, typeCalc: IdentityIncrementalCalcul
 }
 
 
-private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): GeneratedMethod.GeneratedSnuggleMethod {
+private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): GeneratedMethod.GeneratedSnuggleMethod {
     // Lower type defs for arg types and return type
     methodDef.paramTypes.forEach { lowerTypeDef(it, typeCalc) }
     lowerTypeDef(methodDef.returnType, typeCalc)
@@ -76,7 +76,7 @@ private fun lowerMethod(methodDef: MethodDef.SnuggleMethodDef, typeCalc: Identit
     return GeneratedMethod.GeneratedSnuggleMethod(methodDef, codeBlock)
 }
 
-private fun lowerField(fieldDef: FieldDef, runtimeStatic: Boolean, runtimeNamePrefix: String, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedField> {
+private fun lowerField(fieldDef: FieldDef, runtimeStatic: Boolean, runtimeNamePrefix: String, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): List<GeneratedField> {
     // Lower type def for the field
     lowerTypeDef(fieldDef.type, typeCalc)
     return if (fieldDef.type.isPlural) {

@@ -9,7 +9,7 @@ import representation.asts.resolved.ResolvedFile
 import representation.asts.resolved.ResolvedImplBlock
 import representation.asts.resolved.ResolvedTypeDef
 import util.*
-import util.caching.IdentityCache
+import util.caching.EqualityCache
 import java.util.*
 
 
@@ -27,7 +27,7 @@ fun resolveAST(ast: ParsedAST, builtinTypes: ConsList<BuiltinType>): ResolvedAST
     // Begin the resolve queue.
     // Repeatedly resolve all new files that were reached during the
     // last resolution phase, until convergence
-    val alreadyResolved: IdentityCache<ParsedFile, FileResolutionResult> = IdentityCache()
+    val alreadyResolved: EqualityCache<ParsedFile, FileResolutionResult> = EqualityCache()
     val resolveQueue: Queue<ParsedFile> = LinkedList()
     resolveQueue.add(mainFile) // Start out with main file
     while (resolveQueue.isNotEmpty()) {
@@ -101,9 +101,9 @@ fun getPublicMembersAndInitIndirections(block: ParsedElement.ParsedExpr.Block, c
 }
 
 class ResolutionCache(
-    val typeDefIndirections: IdentityCache<ParsedElement.ParsedTypeDef, ResolvedTypeDef.Indirection> = IdentityCache(),
-    val implBlockIndirections: IdentityCache<ParsedElement.ParsedImplBlock, ResolvedImplBlock.Indirect> = IdentityCache(),
-    val publicMembers: IdentityCache<ParsedFile, EnvMembers> = IdentityCache(),
+    val typeDefIndirections: EqualityCache<ParsedElement.ParsedTypeDef, ResolvedTypeDef.Indirection> = EqualityCache(),
+    val implBlockIndirections: EqualityCache<ParsedElement.ParsedImplBlock, ResolvedImplBlock.Indirect> = EqualityCache(),
+    val publicMembers: EqualityCache<ParsedFile, EnvMembers> = EqualityCache(),
 )
 
 // Contains the set of types, implBlocks, and potentially

@@ -11,5 +11,5 @@ abstract class Memoized<K, V, M: MutableMap<K, V>>(cacheSupplier: () -> Cache<K,
 
 }
 
-class IdentityMemoized<K, V>(func: (K) -> V): Memoized<K, V, IdentityHashMap<K, V>>(::IdentityCache, func)
+//class IdentityMemoized<K, V>(func: (K) -> V): Memoized<K, V, IdentityHashMap<K, V>>(::IdentityCache, func)
 class EqualityMemoized<K, V>(func: (K) -> V): Memoized<K, V, HashMap<K, V>>(::EqualityCache, func)

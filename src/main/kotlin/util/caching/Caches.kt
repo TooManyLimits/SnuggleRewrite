@@ -33,5 +33,5 @@ abstract class Cache<K, V, M: MutableMap<K, V>>(mapSupplier: () -> M) {
 
 }
 
-class IdentityCache<K, V>: Cache<K, V, IdentityHashMap<K, V>>(::IdentityHashMap)
+//class IdentityCache<K, V>: Cache<K, V, IdentityHashMap<K, V>>(::IdentityHashMap)
 class EqualityCache<K, V>: Cache<K, V, HashMap<K, V>>(::HashMap)

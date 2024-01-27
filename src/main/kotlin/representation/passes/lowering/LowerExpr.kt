@@ -10,7 +10,7 @@ import representation.asts.typed.TypedExpr
 import representation.passes.typing.isFallible
 import util.Cons
 import util.ConsList
-import util.caching.IdentityIncrementalCalculator
+import util.caching.EqualityIncrementalCalculator
 
 /**
  * Lowering an expression into IR.
@@ -42,7 +42,7 @@ import util.caching.IdentityIncrementalCalculator
  */
 
 // I hope these "sequence {}" blocks aren't slow since they're really convenient
-fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when (expr) {
+fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when (expr) {
     // Just a RunImport
     is TypedExpr.Import -> sequenceOf(Instruction.RunImport(expr.file))
     // Sequence the operations inside the block
@@ -387,7 +387,7 @@ private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<Co
  * fieldsToFollow starts as nil.
  * assignmentType is the type being assigned to the lvalue.
  */
-fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
+fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
     lhs is TypedExpr.Variable -> sequence {
         yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), typeCalc))
         val startIndex = lhs.variableIndex + getPluralOffset(fieldsToFollow)

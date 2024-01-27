@@ -3,9 +3,9 @@ package representation.passes.verify_generics
 import errors.CompilationException
 import representation.asts.resolved.*
 import representation.passes.lexing.Loc
-import util.caching.IdentityIncrementalCalculator
+import util.caching.EqualityIncrementalCalculator
 
-private typealias VerifyCalc = IdentityIncrementalCalculator<ResolvedTypeDef, Unit>
+private typealias VerifyCalc = EqualityIncrementalCalculator<ResolvedTypeDef, Unit>
 
 /**
  * Verifies that generic counts are correct.

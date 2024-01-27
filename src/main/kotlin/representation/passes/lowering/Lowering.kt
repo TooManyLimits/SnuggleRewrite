@@ -6,7 +6,7 @@ import representation.asts.ir.Program
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedAST
 import util.ConsList
-import util.caching.IdentityIncrementalCalculator
+import util.caching.EqualityIncrementalCalculator
 import util.insertionSort
 
 /**
@@ -16,7 +16,7 @@ import util.insertionSort
 
 fun lower(ast: TypedAST): Program {
     // Create an incremental calculator for the types
-    val typeCalc = IdentityIncrementalCalculator<TypeDef, GeneratedType>()
+    val typeCalc = EqualityIncrementalCalculator<TypeDef, GeneratedType>()
     // Compile the top-level code into instructions
     val topLevelCode = ast.allFiles.mapValues {
         // Lower the expr and wrap it in a code block

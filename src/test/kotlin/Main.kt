@@ -12,7 +12,7 @@ fun main() {
             pub fn get(): T this.value
             pub fn set(v: T) this.value = v
         }
-        
+
         pub impl<T> () -> T? {
             fn iter(): () -> T? this
             fn map<R>(func: T -> R): () -> R? {
@@ -36,7 +36,7 @@ fun main() {
                 }
             }
         }
-        
+
         struct range {
             static fn invoke(n: i32): () -> i32? {
                 let i = new Box<i32>(0)
@@ -46,9 +46,17 @@ fun main() {
                 }
             }
         }
-                
+
         for x in range(10).map::<i32>(fn(x) x*x)
             print(x)
+            
+        impl<A, B, R> (A, B) -> R {
+          fn invoke(args: A): B -> R
+            fn(b) this(args, b)
+        }
+        let prod: (i32, i32) -> i32 = fn(a, b) a * b
+        let times3 = prod(3)
+        print(times3(14))
         
     """.trimIndent()
 

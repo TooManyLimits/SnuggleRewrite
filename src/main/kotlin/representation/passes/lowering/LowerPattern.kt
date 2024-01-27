@@ -4,7 +4,7 @@ import representation.asts.ir.GeneratedType
 import representation.asts.ir.Instruction
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedPattern
-import util.caching.IdentityIncrementalCalculator
+import util.caching.EqualityIncrementalCalculator
 
 /**
  * For now, there are no fallible patterns. So do nothing.
@@ -17,7 +17,7 @@ fun testPattern(pattern: TypedPattern): Sequence<Instruction> {
 /**
  * The scrutinee of the pattern is currently on the stack.
  */
-fun lowerPattern(pattern: TypedPattern, typeCalc: IdentityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> {
+fun lowerPattern(pattern: TypedPattern, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> {
     return when (pattern) {
         is TypedPattern.EmptyPattern -> {
             // Lower the involved type, pop it off the stack
