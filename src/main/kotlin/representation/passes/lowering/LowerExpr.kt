@@ -7,7 +7,6 @@ import representation.asts.typed.FieldDef
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
-import representation.passes.typing.isFallible
 import util.Cons
 import util.ConsList
 import util.caching.EqualityIncrementalCalculator
@@ -63,17 +62,10 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, file
     }
     // What to do for a declaration depends on the type of pattern
     is TypedExpr.Declaration -> sequence {
-        // Yield the things
-        if (isFallible(expr.pattern)) {
-            TODO()
-        } else {
-            // Push the initializer
-            yieldAll(lowerExpr(expr.initializer, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
-            // Apply the pattern
-            yieldAll(lowerPattern(expr.pattern, filesWithEffects, typeCalc))
-            // Push true
-            yield(Instruction.Push(true, expr.type))
-        }
+        // Push the initializer
+        yieldAll(lowerExpr(expr.initializer, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
+        // Apply the pattern
+        yieldAll(lowerInfalliblePattern(expr.pattern, filesWithEffects, typeCalc))
     }
 
     // Extracted to special method, since it's complex

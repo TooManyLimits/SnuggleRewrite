@@ -2,7 +2,7 @@ package representation.passes.parsing
 
 import errors.ParsingException
 import representation.asts.parsed.ParsedElement
-import representation.asts.parsed.ParsedPattern
+import representation.asts.parsed.ParsedInfalliblePattern
 import representation.passes.lexing.Lexer
 import representation.passes.lexing.TokenType
 
@@ -28,7 +28,7 @@ fun parseElement(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<
 // Helper functions:
 
 // Params are a list of patterns separated by commas, inside parentheses
-fun parseParams(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): List<ParsedPattern> {
+fun parseParams(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): List<ParsedInfalliblePattern> {
     lexer.expect(TokenType.LEFT_PAREN, "to begin params list")
     return commaSeparated(lexer, TokenType.RIGHT_PAREN) {
         val pat = parsePattern(it, typeGenerics, methodGenerics)

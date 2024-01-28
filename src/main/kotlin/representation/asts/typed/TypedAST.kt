@@ -1,5 +1,6 @@
 package representation.asts.typed
 
+import representation.asts.resolved.ResolvedType
 import representation.passes.lexing.Loc
 
 /**
@@ -45,7 +46,7 @@ sealed interface TypedExpr {
     data class Import(override val loc: Loc, val file: String, override val type: TypeDef): TypedExpr
 
     data class Block(override val loc: Loc, val exprs: List<TypedExpr>, override val type: TypeDef): TypedExpr
-    data class Declaration(override val loc: Loc, val pattern: TypedPattern, val initializer: TypedExpr, override val type: TypeDef): TypedExpr
+    data class Declaration(override val loc: Loc, val pattern: TypedInfalliblePattern, val initializer: TypedExpr, override val type: TypeDef): TypedExpr
     data class Assignment(override val loc: Loc, val lhs: TypedExpr, val rhs: TypedExpr, val maxVariable: Int, override val type: TypeDef): TypedExpr
 
     data class Return(override val loc: Loc, val rhs: TypedExpr, override val type: TypeDef): TypedExpr
@@ -65,12 +66,21 @@ sealed interface TypedExpr {
     data class RawStructConstructor(override val loc: Loc, val fieldValues: List<TypedExpr>, override val type: TypeDef): TypedExpr
 }
 
-sealed interface TypedPattern {
+sealed interface TypedInfalliblePattern {
     val loc: Loc
     val type: TypeDef
     // After typing is over, the binding pattern _always knows its type_,
     // rather than having an _optional_ type annotation.
-    data class EmptyPattern(override val loc: Loc, override val type: TypeDef): TypedPattern
-    data class BindingPattern(override val loc: Loc, override val type: TypeDef, val name: String, val isMut: Boolean, val variableIndex: Int): TypedPattern
-    data class TuplePattern(override val loc: Loc, override val type: TypeDef, val elements: List<TypedPattern>): TypedPattern
+    data class Empty(override val loc: Loc, override val type: TypeDef): TypedInfalliblePattern
+    data class Binding(override val loc: Loc, override val type: TypeDef, val name: String, val isMut: Boolean, val variableIndex: Int): TypedInfalliblePattern
+    data class Tuple(override val loc: Loc, override val type: TypeDef, val elements: List<TypedInfalliblePattern>): TypedInfalliblePattern
+}
+
+sealed interface TypedFalliblePattern {
+    val loc: Loc
+    val type: TypeDef
+
+    data class IsType(override val loc: Loc, val isMut: Boolean, val varName: String, override val type: TypeDef): TypedFalliblePattern
+    data class LiteralPattern(override val loc: Loc, val value: Any, override val type: TypeDef): TypedFalliblePattern
+    data class Tuple(override val loc: Loc, val elements: List<TypedFalliblePattern>, override val type: TypeDef): TypedFalliblePattern
 }

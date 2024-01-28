@@ -1,12 +1,12 @@
 package representation.passes.typing
 
 import representation.asts.resolved.ResolvedMethodDef
-import representation.asts.resolved.ResolvedPattern
+import representation.asts.resolved.ResolvedInfalliblePattern
 import representation.asts.resolved.ResolvedType
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedExpr
-import representation.asts.typed.TypedPattern
+import representation.asts.typed.TypedInfalliblePattern
 import util.ConsMap
 import util.caching.EqualityMemoized
 import util.extend
@@ -59,7 +59,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
 
     // Create the various components of the method def, specialized over the method generics.
     // Get the param patterns and their types
-    val paramPatternsByGeneric = EqualityMemoized<List<TypeDef>, List<TypedPattern>> { methodGenerics ->
+    val paramPatternsByGeneric = EqualityMemoized<List<TypeDef>, List<TypedInfalliblePattern>> { methodGenerics ->
         var topIndex = if (!methodDef.static) {
             val thisType = staticOverrideReceiverType ?: owningType
             thisType.stackSlots
@@ -125,10 +125,10 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
 
 // Get the signature for a given pattern. Generally involves the type of the pattern.
 // Patterns passed to here should always be explicitly typed (for instance, params to a function)
-fun getResolvedType(pattern: ResolvedPattern): ResolvedType = when (pattern) {
-    is ResolvedPattern.EmptyPattern -> pattern.typeAnnotation!!
-    is ResolvedPattern.BindingPattern -> pattern.typeAnnotation!!
-    is ResolvedPattern.TuplePattern -> ResolvedType.Tuple(pattern.loc, pattern.elements.map(::getResolvedType))
+fun getResolvedType(pattern: ResolvedInfalliblePattern): ResolvedType = when (pattern) {
+    is ResolvedInfalliblePattern.Empty -> pattern.typeAnnotation!!
+    is ResolvedInfalliblePattern.Binding -> pattern.typeAnnotation!!
+    is ResolvedInfalliblePattern.Tuple -> ResolvedType.Tuple(pattern.loc, pattern.elements.map(::getResolvedType))
 }
 
 // Essentially a uniquely identifying string. Used for overloading detection.

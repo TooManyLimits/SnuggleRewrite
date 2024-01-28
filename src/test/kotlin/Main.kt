@@ -6,13 +6,14 @@ fun main() {
         import "box"
         
         impl String {
-            fn iter(): () -> char? {
+            fn chars(): () -> char? {
                 let i = new Box<u32>(0)
                 fn() if *i >= #this new() else { *i = *i + 1 new(this[*i - 1]) }
             }
         }
+        impl<T> () -> T? { fn iter(): () -> T? this }
         
-        for c in "hello" 
+        for c in "hello".chars()
             print(c)
         
         

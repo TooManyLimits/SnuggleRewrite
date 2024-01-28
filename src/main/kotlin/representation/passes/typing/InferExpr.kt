@@ -156,11 +156,11 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         }
     }
 
-    // Declarations need to work with patterns. The resulting type is bool.
-    // If the pattern is refutable, only the ifTrue branch contains the bindings.
-    // If irrefutable, both branches contain the bindings.
+    // Declarations need to work with patterns. The resulting type is unit.
+    // Both the ifTrue and ifFalse branches contain the bindings, because
+    // patterns in let are infallible.
     is ResolvedExpr.Declaration -> {
-        val typedPattern: TypedPattern
+        val typedPattern: TypedInfalliblePattern
         val typedInitializer: TypedExpr
         // Choose how to initialize these, based on whether
         // the pattern is explicitly typed or not.
@@ -175,18 +175,14 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             // Check the pattern against the inferred type:
             typedPattern = checkPattern(expr.pattern, typedInitializer.type, getTopIndex(scope), typeCache, currentTypeGenerics, currentMethodGenerics)
         }
-        // Fetch the bindings if this "let" succeeds
+        // Fetch the bindings
         val patternBindings = bindings(typedPattern)
-        // Create the new typed expr, type is always bool.
+        // Create the new typed expr, type is always unit.
         // Use the index that's the second output of bindings().
-        val typed = TypedExpr.Declaration(expr.loc, typedPattern, typedInitializer, getBasicBuiltin(BoolType, typeCache))
+        val typed = TypedExpr.Declaration(expr.loc, typedPattern, typedInitializer, getUnit(typeCache))
 
-        // If it's fallible, only output the results if true.
-        // Otherwise, always output the results.
-        if (isFallible(typedPattern))
-            TypingResult.WithVars(typed, patternBindings, ConsMap.of())
-        else
-            TypingResult.WithVars(typed, patternBindings, patternBindings)
+        // Output with vars!
+        TypingResult.WithVars(typed, patternBindings, patternBindings)
     }
 
     is ResolvedExpr.Assignment -> {
@@ -371,7 +367,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
     is ResolvedExpr.For -> {
         // If explicit pattern, check() the iterable against the pattern.
         // Otherwise, if implicit pattern, infer() the iterable and use that for the pattern.
-        val typedPattern: TypedPattern
+        val typedPattern: TypedInfalliblePattern
         val typedIterator: TypedExpr
         if (isExplicitlyTyped(expr.pattern)) {
             // Infer pattern, check expr
@@ -395,11 +391,11 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
         // Begin generating the sugar:
         val iterTempName = "\$forIter"
         val valueTempName = "\$forValue"
-        val iterTempPat = TypedPattern.BindingPattern(expr.loc, typedIterator.type, iterTempName, false, getTopIndex(scope))
+        val iterTempPat = TypedInfalliblePattern.Binding(expr.loc, typedIterator.type, iterTempName, false, getTopIndex(scope))
         val iterTempVar = TypedExpr.Variable(expr.loc, false, iterTempName, iterTempPat.variableIndex, iterTempPat.type)
         val extendedScope = scope.extend(bindings(iterTempPat))
         val valueTempType = getGenericBuiltin(OptionType, listOf(typedPattern.type), typeCache)
-        val valueTempPat = TypedPattern.BindingPattern(expr.loc, valueTempType, valueTempName, true, getTopIndex(extendedScope))
+        val valueTempPat = TypedInfalliblePattern.Binding(expr.loc, valueTempType, valueTempName, true, getTopIndex(extendedScope))
         val valueTempVar = TypedExpr.Variable(expr.loc, true, valueTempName, valueTempPat.variableIndex, valueTempPat.type)
         val extendedScope2 = extendedScope.extend(bindings(valueTempPat))
         // Shift the typed pattern index accordingly to these new variables we've added
@@ -419,15 +415,15 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             TypedExpr.Assignment(expr.loc, valueTempVar, iterCallExpr, getTopIndex(extendedScope2), getUnit(typeCache)),
             boolCallExpr
         ), getBasicBuiltin(BoolType, typeCache))
-        val patDecl = TypedExpr.Declaration(expr.loc, newTypedPattern, getCallExpr, getBasicBuiltin(BoolType, typeCache))
+        val patDecl = TypedExpr.Declaration(expr.loc, newTypedPattern, getCallExpr, getUnit(typeCache))
         val whileBody = TypedExpr.Block(expr.loc, listOf(
             patDecl,
             inferExpr(expr.body, finalScope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
         ), getUnit(typeCache))
         // Finally create the block.
         just(TypedExpr.Block(expr.loc, listOf(
-            TypedExpr.Declaration(expr.loc, iterTempPat, typedIterator, getBasicBuiltin(BoolType, typeCache)),
-            TypedExpr.Declaration(expr.loc, valueTempPat, emptyOptionExpr, getBasicBuiltin(BoolType, typeCache)),
+            TypedExpr.Declaration(expr.loc, iterTempPat, typedIterator, getUnit(typeCache)),
+            TypedExpr.Declaration(expr.loc, valueTempPat, emptyOptionExpr, getUnit(typeCache)),
             TypedExpr.While(expr.loc, condExpr, whileBody, getUnit(typeCache))
         ), getUnit(typeCache)))
     }

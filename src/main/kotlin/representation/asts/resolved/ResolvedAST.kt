@@ -97,7 +97,7 @@ sealed class ResolvedTypeDef {
 }
 
 class ResolvedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ResolvedType)
-class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedPattern>, val returnType: ResolvedType, val body: ResolvedExpr)
+class ResolvedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ResolvedInfalliblePattern>, val returnType: ResolvedType, val body: ResolvedExpr)
 
 sealed class ResolvedImplBlock {
 
@@ -120,7 +120,7 @@ sealed interface ResolvedExpr {
     data class Import(override val loc: Loc, val file: String): ResolvedExpr
 
     data class Block(override val loc: Loc, val exprs: List<ResolvedExpr>): ResolvedExpr
-    data class Declaration(override val loc: Loc, val pattern: ResolvedPattern, val initializer: ResolvedExpr): ResolvedExpr
+    data class Declaration(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val initializer: ResolvedExpr): ResolvedExpr
     // Lhs is one of: FieldAccess, StaticFieldAccess, Variable
     data class Assignment(override val loc: Loc, val lhs: ResolvedExpr, val rhs: ResolvedExpr): ResolvedExpr
 
@@ -128,12 +128,12 @@ sealed interface ResolvedExpr {
 
     data class If(override val loc: Loc, val cond: ResolvedExpr, val ifTrue: ResolvedExpr, val ifFalse: ResolvedExpr?): ResolvedExpr
     data class While(override val loc: Loc, val cond: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
-    data class For(override val loc: Loc, val pattern: ResolvedPattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
+    data class For(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
 
     data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     data class Variable(override val loc: Loc, val name: String): ResolvedExpr
     data class Tuple(override val loc: Loc, val elements: List<ResolvedExpr>): ResolvedExpr
-    data class Lambda(override val loc: Loc, val params: List<ResolvedPattern>, val body: ResolvedExpr): ResolvedExpr
+    data class Lambda(override val loc: Loc, val params: List<ResolvedInfalliblePattern>, val body: ResolvedExpr): ResolvedExpr
 
     data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
     data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
@@ -149,13 +149,22 @@ sealed interface ResolvedExpr {
 
 }
 
-sealed interface ResolvedPattern {
+sealed interface ResolvedInfalliblePattern {
     val loc: Loc
 
-    data class EmptyPattern(override val loc: Loc, val typeAnnotation: ResolvedType?): ResolvedPattern
-    data class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ResolvedType?): ResolvedPattern
-    data class TuplePattern(override val loc: Loc, val elements: List<ResolvedPattern>): ResolvedPattern
+    data class Empty(override val loc: Loc, val typeAnnotation: ResolvedType?): ResolvedInfalliblePattern
+    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ResolvedType?): ResolvedInfalliblePattern
+    data class Tuple(override val loc: Loc, val elements: List<ResolvedInfalliblePattern>): ResolvedInfalliblePattern
 }
+
+sealed interface ResolvedFalliblePattern {
+    val loc: Loc
+
+    data class IsType(override val loc: Loc, val isMut: Boolean, val varName: String, val type: ResolvedType): ResolvedFalliblePattern
+    data class LiteralPattern(override val loc: Loc, val value: Any): ResolvedFalliblePattern
+    data class Tuple(override val loc: Loc, val elements: List<ResolvedFalliblePattern>): ResolvedFalliblePattern
+}
+
 
 sealed interface ResolvedType {
     val loc: Loc

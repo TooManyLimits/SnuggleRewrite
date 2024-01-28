@@ -43,20 +43,20 @@ sealed interface ParsedElement {
         class Import(override val loc: Loc, val path: String): ParsedExpr
 
         class Block(override val loc: Loc, val pub: Boolean, val elements: List<ParsedElement>): ParsedExpr
-        class Declaration(override val loc: Loc, val lhs: ParsedPattern, val initializer: ParsedExpr): ParsedExpr
+        class Declaration(override val loc: Loc, val lhs: ParsedInfalliblePattern, val initializer: ParsedExpr): ParsedExpr
         // Lhs is one of: FieldAccess or Variable
         class Assignment(override val loc: Loc, val lhs: ParsedExpr, val rhs: ParsedExpr): ParsedExpr
         class Return(override val loc: Loc, val rhs: ParsedExpr): ParsedExpr
 
         class If(override val loc: Loc, val cond: ParsedExpr, val ifTrue: ParsedExpr, val ifFalse: ParsedExpr?): ParsedExpr
         class While(override val loc: Loc, val cond: ParsedExpr, val body: ParsedExpr): ParsedExpr
-        class For(override val loc: Loc, val pattern: ParsedPattern, val iterable: ParsedExpr, val body: ParsedExpr): ParsedExpr
+        class For(override val loc: Loc, val pattern: ParsedInfalliblePattern, val iterable: ParsedExpr, val body: ParsedExpr): ParsedExpr
 
         class Literal(override val loc: Loc, val value: Any): ParsedExpr
         class Super(override val loc: Loc): ParsedExpr
         class Variable(override val loc: Loc, val name: String): ParsedExpr
         class Tuple(override val loc: Loc, val elements: List<ParsedExpr>): ParsedExpr
-        class Lambda(override val loc: Loc, val params: List<ParsedPattern>, val body: ParsedExpr): ParsedExpr
+        class Lambda(override val loc: Loc, val params: List<ParsedInfalliblePattern>, val body: ParsedExpr): ParsedExpr
 
         class FieldAccess(override val loc: Loc, val receiver: ParsedExpr, val fieldName: String): ParsedExpr
         class MethodCall(override val loc: Loc, val receiver: ParsedExpr, val methodName: String, val genericArgs: List<ParsedType>, val args: List<ParsedExpr>): ParsedExpr
@@ -71,18 +71,30 @@ sealed interface ParsedElement {
 
 // Helper data structures
 class ParsedFieldDef(val loc: Loc, val pub: Boolean, val static: Boolean, val mutable: Boolean, val name: String, val annotatedType: ParsedType)
-class ParsedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ParsedPattern>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
-sealed interface ParsedPattern {
+class ParsedMethodDef(val loc: Loc, val pub: Boolean, val static: Boolean, val numGenerics: Int, val name: String, val params: List<ParsedInfalliblePattern>, val returnType: ParsedType, val body: ParsedElement.ParsedExpr)
+
+// Infallible patterns, used in `let`
+sealed interface ParsedInfalliblePattern {
 
     val loc: Loc
 
-    class EmptyPattern(override val loc: Loc, val typeAnnotation: ParsedType?) : ParsedPattern // _
+    class Empty(override val loc: Loc, val typeAnnotation: ParsedType?) : ParsedInfalliblePattern // _
 //    class LiteralPattern(override val loc: Loc, val value: Any): ParsedPattern //true, "hi", 5
 //    class AndPattern(override val loc: Loc, val pats: List<ParsedPattern>): ParsedPattern //pat1 & pat2 & pat3
-    class BindingPattern(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedPattern
-    class TuplePattern(override val loc: Loc, val elements: List<ParsedPattern>): ParsedPattern // (mut a, b: i32)
+    class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ParsedType?): ParsedInfalliblePattern
+    class Tuple(override val loc: Loc, val elements: List<ParsedInfalliblePattern>): ParsedInfalliblePattern // (mut a, b: i32)
 
 }
+
+// Fallible patterns, used in `is`
+sealed interface ParsedFalliblePattern {
+    val loc: Loc
+
+    class IsType(override val loc: Loc, val isMut: Boolean, val varName: String?, val typeName: String): ParsedFalliblePattern
+    class LiteralPattern(override val loc: Loc, val value: Any): ParsedFalliblePattern
+    class Tuple(override val loc: Loc, val elements: List<ParsedFalliblePattern>): ParsedFalliblePattern
+}
+
 
 sealed interface ParsedType {
 

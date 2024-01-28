@@ -69,12 +69,12 @@ private fun verifyExpr(expr: ResolvedExpr, calc: VerifyCalc): Unit = when (expr)
     }
 }
 
-private fun verifyPattern(pattern: ResolvedPattern, calc: VerifyCalc): Unit = when (pattern) {
-    is ResolvedPattern.EmptyPattern ->
+private fun verifyPattern(pattern: ResolvedInfalliblePattern, calc: VerifyCalc): Unit = when (pattern) {
+    is ResolvedInfalliblePattern.Empty ->
         pattern.typeAnnotation?.let { verifyType(it, calc) } ?: Unit
-    is ResolvedPattern.BindingPattern ->
+    is ResolvedInfalliblePattern.Binding ->
         pattern.typeAnnotation?.let { verifyType(it, calc) } ?: Unit
-    is ResolvedPattern.TuplePattern ->
+    is ResolvedInfalliblePattern.Tuple ->
         pattern.elements.forEach { verifyPattern(it, calc) }
 }
 

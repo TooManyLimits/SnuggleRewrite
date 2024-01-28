@@ -1,23 +1,23 @@
 package representation.passes.name_resolving
 
-import representation.asts.parsed.ParsedPattern
+import representation.asts.parsed.ParsedInfalliblePattern
 import representation.asts.parsed.ParsedType
-import representation.asts.resolved.ResolvedPattern
+import representation.asts.resolved.ResolvedInfalliblePattern
 import representation.asts.resolved.ResolvedType
 import util.lookup
 
-fun resolvePattern(pattern: ParsedPattern, currentMappings: EnvMembers): ResolvedPattern = when (pattern) {
-    is ParsedPattern.EmptyPattern -> {
+fun resolvePattern(pattern: ParsedInfalliblePattern, currentMappings: EnvMembers): ResolvedInfalliblePattern = when (pattern) {
+    is ParsedInfalliblePattern.Empty -> {
         val resolvedType = pattern.typeAnnotation?.let { resolveType(it, currentMappings) }
-        ResolvedPattern.EmptyPattern(pattern.loc, resolvedType)
+        ResolvedInfalliblePattern.Empty(pattern.loc, resolvedType)
     }
-    is ParsedPattern.BindingPattern -> {
+    is ParsedInfalliblePattern.Binding -> {
         val resolvedType = pattern.typeAnnotation?.let { resolveType(it, currentMappings) }
-        ResolvedPattern.BindingPattern(pattern.loc, pattern.name, pattern.isMut, resolvedType)
+        ResolvedInfalliblePattern.Binding(pattern.loc, pattern.name, pattern.isMut, resolvedType)
     }
-    is ParsedPattern.TuplePattern -> {
+    is ParsedInfalliblePattern.Tuple -> {
         val resolvedElements = pattern.elements.map { resolvePattern(it, currentMappings) }
-        ResolvedPattern.TuplePattern(pattern.loc, resolvedElements)
+        ResolvedInfalliblePattern.Tuple(pattern.loc, resolvedElements)
     }
 }
 
