@@ -451,6 +451,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             is Float -> getBasicBuiltin(F32Type, typeCache)
             is Double -> getBasicBuiltin(F64Type, typeCache)
             is String -> getBasicBuiltin(StringType, typeCache)
+            is Char -> getBasicBuiltin(CharType, typeCache)
             else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
         }
         just(TypedExpr.Literal(expr.loc, value, type))

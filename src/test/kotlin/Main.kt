@@ -3,84 +3,41 @@ import runtime.InstanceBuilder
 fun main() {
 
     val code = """
+        import "box"
         
-        import "whar"
-        
-        pub class Box<T> {
-            mut value: T
-            pub fn new(v: T) {
-                super()
-                this.value = v
-            }
-            pub fn get(): T this.value
-            pub fn set(v: T) this.value = v
-        }
-
-        pub impl<T> () -> T? {
-            fn iter(): () -> T? this
-            fn map<R>(func: T -> R): () -> R? {
-                fn() {
-                    let inner: T? = this()
-                    if inner
-                        new(func(*inner))
-                    else
-                        new()
-                }
-            }
-            fn indexed(): () -> (u32, T)? {
-                let counter: Box<u32> = new(0)
-                fn() {
-                    *counter = *counter + 1
-                    let inner: T? = this()
-                    if inner 
-                        new((*counter - 1, *inner)) 
-                    else 
-                        new()
-                }
+        impl String {
+            fn iter(): () -> char? {
+                let i = new Box<u32>(0)
+                fn() if *i >= #this new() else { *i = *i + 1 new(this[*i - 1]) }
             }
         }
-
-        struct range {
-            static fn invoke(n: i32): () -> i32? {
-                let i = new Box<i32>(0)
-                fn() {
-                    *i = *i + 1
-                    if (*i > n) new() else new(*i - 1)
-                }
-            }
-        }
-
-        for x in range(10).map::<i32>(fn(x) x*x)
-            print(x)
-            
-        impl<A, B, R> (A, B) -> R {
-          fn invoke(args: A): B -> R
-            fn(b) this(args, b)
-        }
-        let prod: (i32, i32) -> i32 = fn(a, b) a * b
-        let times3 = prod(3)
-        print(times3(14))
         
-        print("")
+        for c in "hello" 
+            print(c)
         
-        let x: f64 = 0.1
-        print(x + 0.2) //0.30000000000000004
-        
-        let y: f64 = 0.1 + 0.2
-        print(y) //0.3        
         
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))
         .debugBytecode()
         .addFile("list", list)
-        .addFile("whar", "class X {}")
+        .addFile("box", box)
 //        .reflectObject(ExtraPrinter(" :3"))
         .build()
 
     instance.runtime.runCode()
 }
 
+val box = """
+    pub class Box<T> {
+        mut v: T
+        pub fn new(v: T) { super()
+            this.v = v
+        }
+        pub fn get(): T v
+        pub fn set(e: T) v = e
+    }
+""".trimIndent()
 
 val list = """
     import "main"

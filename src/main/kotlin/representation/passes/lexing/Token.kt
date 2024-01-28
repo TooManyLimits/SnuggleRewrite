@@ -116,6 +116,17 @@ fun tokenOf(loc: Loc, string: String): Token? {
                 string.contains('u') -> Token(loc, TokenType.LITERAL, IntLiteralData(BigInteger(string.substring(0, string.indexOf('u'))), false, string.substring(string.indexOf('u') + 1).toInt()))
                 else -> Token(loc, TokenType.LITERAL, BigInteger(string))
             }
+            //Chars
+            (string[0] == '\'') -> when {
+                string.length == 1 || !string.endsWith('\'') -> throw LexingException("Encountered unmatched quote", loc)
+                else -> {
+                    val c = string[1]
+                    if (c == '\\')
+                        return Token(loc, TokenType.LITERAL, handleEscape(string, 1, loc).first)
+                    else
+                        return Token(loc, TokenType.LITERAL, c)
+                }
+            }
             //Strings
             (string[0] == '"') -> when {
                 string.length == 1 || !string.endsWith('"') -> throw LexingException("Encountered unmatched quote", loc)

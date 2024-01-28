@@ -97,7 +97,7 @@ class InstanceBuilder(userFiles: Map<String, String>) {
                 PrintType::class.java
             ).map { ReflectedBuiltinType(it, null) })
             .append(ConsList.of(
-                BoolType, *INT_TYPES, *FLOAT_TYPES, // Primitive
+                BoolType, *INT_TYPES, *FLOAT_TYPES, CharType, // Primitive
                 IntLiteralType, FloatLiteralType, // Compile time literals
                 ObjectType, StringType, OptionType, ArrayType, // Essential objects
                 MaybeUninitType, // Helpers

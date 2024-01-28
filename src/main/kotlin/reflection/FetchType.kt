@@ -56,7 +56,7 @@ fun fetchType(type: AnnotatedType, typeCache: TypingCache): TypeDef {
         }
         "float" -> getBasicBuiltin(F32Type, typeCache)
         "double" -> getBasicBuiltin(F64Type, typeCache)
-        "char" -> TODO()
+        "char" -> getBasicBuiltin(CharType, typeCache)
         "void" -> getUnit(typeCache)
         // Builtin classes
         "java.lang.String" -> getBasicBuiltin(StringType, typeCache)

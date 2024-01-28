@@ -1,6 +1,9 @@
 package builtins
 
 import builtins.helpers.constBinary
+import builtins.helpers.constUnary
+import builtins.primitive.CharType
+import builtins.primitive.U32Type
 import org.objectweb.asm.Opcodes
 import representation.asts.typed.MethodDef
 import representation.asts.typed.TypeDef
@@ -22,9 +25,15 @@ object StringType: BuiltinType {
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {
         val stringType = getBasicBuiltin(StringType, typeCache)
+        val u32Type = getBasicBuiltin(U32Type, typeCache)
+        val charType = getBasicBuiltin(CharType, typeCache)
         return listOf(
             constBinary(false, stringType, "add", stringType, stringType, String::plus)
-                orBytecode { it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false) }
+                orBytecode { it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false) },
+            constUnary(false, stringType, "size", u32Type, String::length)
+                orBytecode { it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "length", "()I", false) },
+            constBinary(false, stringType, "get", charType, u32Type, String::get)
+                orBytecode { it.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "charAt", "(I)C", false) }
         )
     }
 }

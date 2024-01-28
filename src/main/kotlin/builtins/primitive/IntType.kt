@@ -80,13 +80,13 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
         )
     }
 
-    private inline fun doThenConvert(crossinline func: (MethodVisitor) -> Unit): (MethodVisitor) -> Unit = { writer ->
+    protected inline fun doThenConvert(crossinline func: (MethodVisitor) -> Unit): (MethodVisitor) -> Unit = { writer ->
         func(writer)
         convert(writer)
     }
 
     // Shorten result, and convert to unsigned if needed
-    private fun convert(writer: MethodVisitor) {
+    protected fun convert(writer: MethodVisitor) {
         when (bits) {
             8 -> {
                 writer.visitInsn(Opcodes.I2B)
@@ -105,7 +105,7 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
         }
     }
 
-    private fun intCompare(intCompareOp: Int): (MethodVisitor) -> Unit = { writer ->
+    protected fun intCompare(intCompareOp: Int): (MethodVisitor) -> Unit = { writer ->
         val pushTrue = Label()
         val end = Label()
         if (!signed && intCompareOp != Opcodes.IF_ICMPEQ) {

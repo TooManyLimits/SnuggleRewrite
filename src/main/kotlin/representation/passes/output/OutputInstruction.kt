@@ -117,6 +117,9 @@ private fun outputPush(inst: Instruction.Push, writer: MethodVisitor) {
             else -> throw IllegalStateException()
         }
     }
+    // Same with char
+    if (value is Char)
+        value = BigInteger.valueOf(value.code.toLong())
 
     // Separate case for each literal object type
     return when (value) {
