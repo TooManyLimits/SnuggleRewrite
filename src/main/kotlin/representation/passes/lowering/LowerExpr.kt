@@ -65,7 +65,7 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, file
         // Push the initializer
         yieldAll(lowerExpr(expr.initializer, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         // Apply the pattern
-        yieldAll(lowerInfalliblePattern(expr.pattern, filesWithEffects, typeCalc))
+        yieldAll(storeInfalliblePattern(expr.pattern, filesWithEffects, typeCalc))
     }
 
     // Extracted to special method, since it's complex
@@ -297,7 +297,12 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, file
         }
     }
 
-    is TypedExpr.Is -> TODO()
+    is TypedExpr.Is -> sequence {
+        // Lower the LHS
+        yieldAll(lowerExpr(expr.lhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
+        // Test the pattern
+        yieldAll(testFalliblePattern(expr.pattern, filesWithEffects, typeCalc))
+    }
 
 }
 

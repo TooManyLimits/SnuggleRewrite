@@ -200,7 +200,7 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
     is ParsedElement.ParsedExpr.Is -> {
         val pattern = resolveFalliblePattern(expr.pattern, currentMappings)
         resolveExpr(expr.lhs, startingMappings, currentMappings, ast, cache)
-            .mapExpr { ResolvedExpr.Is(expr.loc, expr.negated, it, pattern) }
+            .mapExpr { ResolvedExpr.Is(expr.loc, it, pattern) }
     }
 
     is ParsedElement.ParsedExpr.Literal -> just(ResolvedExpr.Literal(expr.loc, expr.value))

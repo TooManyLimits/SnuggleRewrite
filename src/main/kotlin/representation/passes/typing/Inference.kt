@@ -31,6 +31,14 @@ fun matchTypes(resolvedTypePattern: ResolvedType, concreteTypeScrutinee: TypeDef
         is ResolvedType.Func -> resolvedTypePattern.paramTypes + resolvedTypePattern.returnType
         else -> throw IllegalStateException()
     }
+
+    // If type heads don't match, can return early
+    if (resolvedTypePattern is ResolvedType.Basic && concreteTypeScrutinee is FromTypeHead) {
+        if (resolvedTypePattern.base != concreteTypeScrutinee.typeHead)
+            return null
+    }
+
+    // Type heads match, compare generics
     if (
         resolvedTypePattern is ResolvedType.Basic && concreteTypeScrutinee is FromTypeHead ||
         resolvedTypePattern is ResolvedType.Tuple && concreteTypeScrutinee is TypeDef.Tuple ||

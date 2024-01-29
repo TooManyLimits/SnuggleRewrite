@@ -71,6 +71,11 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
         val maxVariable = scope.sumOf { it.second.type.stackSlots }
         val call = TypedExpr.MethodCall(expr.loc, typedReceiver.expr, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
 
+        // Special case booleans. See infer() version for details.
+        val isBooleanCall = typedReceiver.expr.type.builtin == BoolType
+        val isBoolNot = isBooleanCall && expr.methodName == "not"
+        val isBoolBool = isBooleanCall && expr.methodName == "bool"
+
         // Repeatedly replace const method calls until done
         var resultExpr: TypedExpr = call
         while (resultExpr is TypedExpr.MethodCall && resultExpr.methodDef is MethodDef.ConstMethodDef) {
@@ -78,7 +83,13 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
             // apply it like a macro, replacing the expression with a new one.
             resultExpr = (resultExpr.methodDef as MethodDef.ConstMethodDef).replacer(resultExpr)
         }
-        pullUpLiteral(TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfTrue, typedReceiver.newVarsIfFalse), expectedType)
+
+        // Special cased booleans. See infer() version.
+        pullUpLiteral(when {
+            isBoolBool -> TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfTrue, typedReceiver.newVarsIfFalse)
+            isBoolNot -> TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfFalse, typedReceiver.newVarsIfTrue)
+            else -> just(resultExpr)
+        }, expectedType)
     }
 
     is ResolvedExpr.StaticMethodCall -> {

@@ -75,6 +75,12 @@ sealed interface Instruction {
     data class JumpIfFalse(val label: Label): Instruction
     data class JumpIfTrue(val label: Label): Instruction
 
+    // Test that the top 2 elements of the stack, both of type type, are equal, and push a boolean.
+    data class TestEquality(val type: TypeDef): Instruction
+    // Checks for instanceof with the top element on the stack. Assumes the given type is a reference type.
+    data class InstanceOf(val type: TypeDef): Instruction
+
+
     // Push the given value onto the stack
     data class Push(val valueToPush: Any, val type: TypeDef): Instruction
     // Pop the given type from the top of the stack

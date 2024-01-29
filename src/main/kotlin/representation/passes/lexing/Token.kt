@@ -1,7 +1,11 @@
 package representation.passes.lexing
 
 import builtins.helpers.Fraction
+import builtins.primitive.*
 import errors.CompilationException
+import representation.asts.typed.TypeDef
+import representation.passes.typing.TypingCache
+import representation.passes.typing.getBasicBuiltin
 import java.math.BigInteger
 import java.util.regex.Pattern
 
@@ -65,6 +69,8 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "let" -> TokenType.LET
         "mut" -> TokenType.MUT
         "=" -> TokenType.ASSIGN
+        "is" -> TokenType.IS
+        "!is" -> TokenType.NOT_IS
 
         "return" -> TokenType.RETURN
         "if" -> TokenType.IF
@@ -72,9 +78,6 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "while" -> TokenType.WHILE
         "for" -> TokenType.FOR
         "in" -> TokenType.IN
-
-        "is" -> TokenType.IS
-        "!is" -> TokenType.NOT_IS
 
         ":" -> TokenType.COLON
         "::" -> TokenType.DOUBLE_COLON
@@ -93,11 +96,14 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "<" -> TokenType.LESS
         ">" -> TokenType.GREATER
 
+        "!" -> TokenType.BANG
+        "#" -> TokenType.HASHTAG
+
         "+" -> TokenType.PLUS
         "-" -> TokenType.MINUS
         "*" -> TokenType.STAR
         "/" -> TokenType.SLASH
-        "#" -> TokenType.HASHTAG
+
         "==" -> TokenType.EQUALS
         "!=" -> TokenType.NOT_EQUALS
         ">=" -> TokenType.GREATER_EQUAL
@@ -160,10 +166,12 @@ fun tokenOf(loc: Loc, string: String): Token? {
 }
 
 enum class TokenType {
+    // "values"
     LITERAL,
     STRING_LITERAL,
     IDENTIFIER,
 
+    // Type declarations and program structure
     PUB,
     STATIC,
     IMPORT,
@@ -172,20 +180,26 @@ enum class TokenType {
     STRUCT,
     FN,
 
+    // Object things
     NEW,
     SUPER,
 
+    // Declarations and variables
     LET,
     MUT,
     ASSIGN,
+    IS,
+    NOT_IS,
 
+    // Control flow
     RETURN,
     IF,
     ELSE,
     WHILE,
     FOR,
-    IN,
+    IN, // Also used as binary operator (TODO)
 
+    // Punctuation (not operator)
     COLON,
     DOUBLE_COLON,
     SEMICOLON,
@@ -203,22 +217,37 @@ enum class TokenType {
     LESS,
     GREATER,
 
+    // Unary (except minus)
+    BANG,
+    HASHTAG,
+
+    // Binary
     PLUS,
     MINUS,
     STAR,
     SLASH,
-    HASHTAG,
+
+    // Comparison
     EQUALS,
     NOT_EQUALS,
     GREATER_EQUAL,
     LESS_EQUAL,
 
-    IS,
-    NOT_IS,
-
 }
 
-data class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: Int)
+class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: Int) {
+
+    fun getBuiltin(typeCache: TypingCache): TypeDef {
+        return getBasicBuiltin(when (bits) {
+            8 -> if (signed) I8Type else U8Type
+            16 -> if (signed) I16Type else U16Type
+            32 -> if (signed) I32Type else U32Type
+            64 -> if (signed) I64Type else U64Type
+            else -> throw IllegalStateException()
+        }, typeCache)
+    }
+
+}
 
 
 // Parse an escape character

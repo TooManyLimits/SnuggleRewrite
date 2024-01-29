@@ -13,7 +13,32 @@ import representation.passes.lexing.TokenType
 fun parseExpr(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     if (lexer.consume(TokenType.SEMICOLON))
         return ParsedExpr.Tuple(lexer.last().loc, listOf())
-    return parseBinary(lexer, typeGenerics, methodGenerics, 0)
+    return parseLogicalOr(lexer, typeGenerics, methodGenerics)
+}
+
+private fun parseLogicalOr(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    val lhs = parseLogicalAnd(lexer, typeGenerics, methodGenerics)
+    //TODO
+    return lhs
+}
+
+private fun parseLogicalAnd(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    val lhs = parseIs(lexer, typeGenerics, methodGenerics)
+    //TODO
+    return lhs
+}
+
+private fun parseIs(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    var lhs = parseBinary(lexer, typeGenerics, methodGenerics, 0)
+    while (lexer.consume(TokenType.IS, TokenType.NOT_IS)) {
+        val inverted = lexer.last().type == TokenType.NOT_IS
+        val loc = lexer.last().loc
+        val pattern = parseFalliblePattern(lexer, typeGenerics, methodGenerics)
+        lhs = ParsedExpr.Is(loc, lhs, pattern)
+        if (inverted)
+            lhs = ParsedExpr.MethodCall(loc, lhs, "not", listOf(), listOf())
+    }
+    return lhs
 }
 
 private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>, precedence: Int): ParsedExpr {
@@ -47,11 +72,12 @@ private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, methodGenerics
 }
 
 private fun parseUnary(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
-    if (lexer.consume(TokenType.MINUS, TokenType.HASHTAG)) {
+    if (lexer.consume(TokenType.BANG, TokenType.HASHTAG, TokenType.MINUS)) {
         val tok = lexer.last()
         val methodName = when(tok.type) {
-            TokenType.MINUS -> "neg"
+            TokenType.BANG -> "not"
             TokenType.HASHTAG -> "size"
+            TokenType.MINUS -> "neg"
             else -> throw IllegalStateException("Unexpected unary operator ${tok.type}. Bug in compiler, please report")
         }
         val operand = parseUnary(lexer, typeGenerics, methodGenerics)

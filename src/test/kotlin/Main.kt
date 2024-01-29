@@ -15,6 +15,16 @@ fun main() {
         
         for c in "hello".chars()
             print(c)
+            
+        let x: Object = "hi"
+        
+        // for c in x.chars() print(c) // Error, x is Object, no chars() method
+        
+        if x !is String {
+            // for c in x.chars() print(c) // Error, x is not a String here
+        } else {
+            for c in x.chars() print(c)
+        }
         
     """.trimIndent()
 

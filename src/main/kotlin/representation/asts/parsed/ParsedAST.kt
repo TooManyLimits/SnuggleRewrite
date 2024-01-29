@@ -52,8 +52,7 @@ sealed interface ParsedElement {
         class While(override val loc: Loc, val cond: ParsedExpr, val body: ParsedExpr): ParsedExpr
         class For(override val loc: Loc, val pattern: ParsedInfalliblePattern, val iterable: ParsedExpr, val body: ParsedExpr): ParsedExpr
 
-        // negated: is vs !is
-        class Is(override val loc: Loc, val negated: Boolean, val lhs: ParsedExpr, val pattern: ParsedFalliblePattern): ParsedExpr
+        class Is(override val loc: Loc, val lhs: ParsedExpr, val pattern: ParsedFalliblePattern): ParsedExpr
 
         class Literal(override val loc: Loc, val value: Any): ParsedExpr
         class Super(override val loc: Loc): ParsedExpr

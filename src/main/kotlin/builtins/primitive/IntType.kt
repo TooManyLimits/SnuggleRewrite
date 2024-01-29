@@ -68,15 +68,15 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
                         }},
             // Comparisons
             constBinary<BigInteger, BigInteger, Boolean>(false, intType, "gt", boolType, intType) {a, b -> a > b}
-                    orBytecode intCompare(Opcodes.IF_ICMPGT),
+                    orBytecode bytecodeCompareInt(Opcodes.IF_ICMPGT),
             constBinary<BigInteger, BigInteger, Boolean>(false, intType, "lt", boolType, intType) {a, b -> a < b}
-                    orBytecode intCompare(Opcodes.IF_ICMPLT),
+                    orBytecode bytecodeCompareInt(Opcodes.IF_ICMPLT),
             constBinary<BigInteger, BigInteger, Boolean>(false, intType, "ge", boolType, intType) {a, b -> a >= b}
-                    orBytecode intCompare(Opcodes.IF_ICMPGE),
+                    orBytecode bytecodeCompareInt(Opcodes.IF_ICMPGE),
             constBinary<BigInteger, BigInteger, Boolean>(false, intType, "le", boolType, intType) {a, b -> a <= b}
-                    orBytecode intCompare(Opcodes.IF_ICMPLE),
+                    orBytecode bytecodeCompareInt(Opcodes.IF_ICMPLE),
             constBinary<BigInteger, BigInteger, Boolean>(false, intType, "eq", boolType, intType) {a, b -> a == b}
-                    orBytecode intCompare(Opcodes.IF_ICMPEQ)
+                    orBytecode bytecodeCompareInt(Opcodes.IF_ICMPEQ)
         )
     }
 
@@ -105,7 +105,7 @@ open class IntType(val signed: Boolean, val bits: Int): BuiltinType {
         }
     }
 
-    protected fun intCompare(intCompareOp: Int): (MethodVisitor) -> Unit = { writer ->
+    fun bytecodeCompareInt(intCompareOp: Int): (MethodVisitor) -> Unit = { writer ->
         val pushTrue = Label()
         val end = Label()
         if (!signed && intCompareOp != Opcodes.IF_ICMPEQ) {

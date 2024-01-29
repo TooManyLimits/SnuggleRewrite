@@ -2,7 +2,6 @@ package builtins.primitive
 
 import java.lang.Character
 
-import builtins.BuiltinType
 import builtins.helpers.constBinary
 import builtins.helpers.constUnary
 import org.objectweb.asm.Opcodes
@@ -55,11 +54,11 @@ object CharType: IntType(signed = false, bits = 16) {
                     orBytecode doThenConvert { it.visitInsn(Opcodes.ISUB) },
 
             // Comparison
-            constBinary<Char, Char, Boolean>(false, charType, "gt", boolType, charType) {a, b -> a > b} orBytecode intCompare(Opcodes.IF_ICMPGT),
-            constBinary<Char, Char, Boolean>(false, charType, "lt", boolType, charType) {a, b -> a < b} orBytecode intCompare(Opcodes.IF_ICMPLT),
-            constBinary<Char, Char, Boolean>(false, charType, "ge", boolType, charType) {a, b -> a >= b} orBytecode intCompare(Opcodes.IF_ICMPGE),
-            constBinary<Char, Char, Boolean>(false, charType, "le", boolType, charType) {a, b -> a <= b} orBytecode intCompare(Opcodes.IF_ICMPLE),
-            constBinary<Char, Char, Boolean>(false, charType, "eq", boolType, charType) {a, b -> a == b} orBytecode intCompare(Opcodes.IF_ICMPEQ),
+            constBinary<Char, Char, Boolean>(false, charType, "gt", boolType, charType) {a, b -> a > b} orBytecode bytecodeCompareInt(Opcodes.IF_ICMPGT),
+            constBinary<Char, Char, Boolean>(false, charType, "lt", boolType, charType) {a, b -> a < b} orBytecode bytecodeCompareInt(Opcodes.IF_ICMPLT),
+            constBinary<Char, Char, Boolean>(false, charType, "ge", boolType, charType) {a, b -> a >= b} orBytecode bytecodeCompareInt(Opcodes.IF_ICMPGE),
+            constBinary<Char, Char, Boolean>(false, charType, "le", boolType, charType) {a, b -> a <= b} orBytecode bytecodeCompareInt(Opcodes.IF_ICMPLE),
+            constBinary<Char, Char, Boolean>(false, charType, "eq", boolType, charType) {a, b -> a == b} orBytecode bytecodeCompareInt(Opcodes.IF_ICMPEQ),
 
             // TODO remove - just to convert char -> u16 temporarily, until casting is added
             constUnary<Char, BigInteger>(false, charType, "u16", u16Type) {c -> BigInteger.valueOf(c.code.toLong())}

@@ -52,8 +52,8 @@ open class FloatType(val bits: Int): BuiltinType {
 
         fun cmpHelper(name: String, floatFunc: (Float, Float) -> Boolean, doubleFunc: (Double, Double) -> Boolean, ifOp: Int): MethodDef {
             return when (this) {
-                F32Type -> constBinaryWithConverter(false, myType, name, boolType, myType, floatConverter, floatConverter, floatFunc) orBytecode bytecodeCompare(ifOp)
-                F64Type -> constBinaryWithConverter(false, myType, name, boolType, myType, doubleConverter, doubleConverter, doubleFunc) orBytecode bytecodeCompare(ifOp)
+                F32Type -> constBinaryWithConverter(false, myType, name, boolType, myType, floatConverter, floatConverter, floatFunc) orBytecode bytecodeCompareFloat(ifOp)
+                F64Type -> constBinaryWithConverter(false, myType, name, boolType, myType, doubleConverter, doubleConverter, doubleFunc) orBytecode bytecodeCompareFloat(ifOp)
                 else -> throw IllegalStateException()
             }
         }
@@ -79,11 +79,11 @@ open class FloatType(val bits: Int): BuiltinType {
     //ifOp should be the "opposite" of what you actually want:
     //for the less than operator, we want GE.
     //for the less-equal operator, we want GT. Etc
-    private fun bytecodeCompare(opcode: Int): (MethodVisitor) -> Unit {
+    fun bytecodeCompareFloat(ifOpcode: Int): (MethodVisitor) -> Unit {
         return { v ->
             val pushFalse = Label()
             val end = Label()
-            val floatComparisonOp = when (opcode) {
+            val floatComparisonOp = when (ifOpcode) {
                 Opcodes.IFLT, Opcodes.IFLE, Opcodes.IFNE -> if (bits == 32) Opcodes.FCMPG else Opcodes.DCMPG
                 Opcodes.IFGT, Opcodes.IFGE -> if (bits == 32) Opcodes.FCMPL else Opcodes.DCMPL
                 else -> throw IllegalStateException("Unexpected compare op: bug in compiler, please report!")
@@ -92,7 +92,7 @@ open class FloatType(val bits: Int): BuiltinType {
             //Perform the float comparison op. Because of the above switch statement,
             //in the case of NaN, something which will cause a jump to "pushFalse" is pushed.
             v.visitInsn(floatComparisonOp)
-            v.visitJumpInsn(opcode, pushFalse)
+            v.visitJumpInsn(ifOpcode, pushFalse)
             v.visitInsn(Opcodes.ICONST_1)
             v.visitJumpInsn(Opcodes.GOTO, end)
             v.visitLabel(pushFalse)

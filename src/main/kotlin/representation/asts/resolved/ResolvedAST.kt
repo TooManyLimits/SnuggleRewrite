@@ -130,7 +130,7 @@ sealed interface ResolvedExpr {
     class While(override val loc: Loc, val cond: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
     class For(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
 
-    class Is(override val loc: Loc, val negated: Boolean, val lhs: ResolvedExpr, val pattern: ResolvedFalliblePattern): ResolvedExpr
+    class Is(override val loc: Loc, val lhs: ResolvedExpr, val pattern: ResolvedFalliblePattern): ResolvedExpr
 
     class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     class Variable(override val loc: Loc, val name: String): ResolvedExpr

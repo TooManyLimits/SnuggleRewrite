@@ -1,7 +1,8 @@
 package representation.passes.typing
 
-import builtins.primitive.FloatLiteralType
-import builtins.primitive.IntLiteralType
+import builtins.StringType
+import builtins.helpers.Fraction
+import builtins.primitive.*
 import errors.CompilationException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedFalliblePattern
@@ -9,7 +10,9 @@ import representation.asts.resolved.ResolvedInfalliblePattern
 import representation.asts.typed.TypeDef
 import representation.asts.typed.TypedFalliblePattern
 import representation.asts.typed.TypedInfalliblePattern
+import representation.passes.lexing.IntLiteralData
 import util.ConsMap
+import java.math.BigInteger
 
 data class VariableBinding(val type: TypeDef, val mutable: Boolean, val index: Int)
 
@@ -108,15 +111,64 @@ fun inferInfalliblePattern(pattern: ResolvedInfalliblePattern, topIndex: Int, ty
 
 fun checkFalliblePattern(pattern: ResolvedFalliblePattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedFalliblePattern = when (pattern) {
     is ResolvedFalliblePattern.LiteralPattern -> {
-        TODO()
+        when (pattern.value) {
+            is Boolean -> {
+                if (scrutineeType.builtin != BoolType) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(BoolType, typeCache).name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(BoolType, typeCache))
+            }
+            is String -> {
+                if (scrutineeType.builtin != StringType) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(StringType, typeCache).name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(StringType, typeCache))
+            }
+            is Char -> {
+                if (scrutineeType.builtin != CharType) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(CharType, typeCache).name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(CharType, typeCache))
+            }
+            is Float -> {
+                if (scrutineeType.builtin != F32Type) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(F32Type, typeCache).name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(F32Type, typeCache))
+            }
+            is Double -> {
+                if (scrutineeType.builtin != F64Type) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(F64Type, typeCache).name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(F64Type, typeCache))
+            }
+            is IntLiteralData -> {
+                val builtin = pattern.value.getBuiltin(typeCache)
+                if (!scrutineeType.isSubtype(builtin)) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${builtin.name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value.value, builtin)
+            }
+            is BigInteger -> {
+                if (scrutineeType.builtin is IntType && scrutineeType.builtin != CharType) {
+                    // Scrutinee type is an integer type, let's make sure that it fits:
+                    if (!(scrutineeType.builtin as IntType).fits(pattern.value))
+                        throw NumberRangeException(scrutineeType.builtin as IntType, pattern.value, pattern.loc)
+                    TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, scrutineeType)
+                } else if (scrutineeType.builtin is FloatType) {
+                    TypedFalliblePattern.LiteralPattern(pattern.loc, Fraction(pattern.value, BigInteger.ONE), scrutineeType)
+                } else throw TypeCheckingException("Literal pattern is an int literal, but scrutinee is of type ${scrutineeType.name}. Does not match!", pattern.loc)
+            }
+            is Fraction -> {
+                if (scrutineeType.builtin is FloatType) {
+                    TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, scrutineeType)
+                } else throw TypeCheckingException("Literal pattern is a float literal, but scrutinee is of type ${scrutineeType.name}. Does not match!", pattern.loc)
+            }
+            else -> throw IllegalStateException("Unrecognized literal type: ${pattern.value.javaClass.name}")
+        }
     }
     is ResolvedFalliblePattern.IsType -> {
-        TODO()
+        // Get the TypeDef which this "is" is checking
+        val typeDef = getTypeDef(pattern.type, typeCache, currentTypeGenerics, currentMethodGenerics)
+        // Ensure that the scrutinee is either a supertype or subtype of this.
+        // For example, if scrutinee is Object, then typeDef == String is okay, and vice versa. (Will sometimes succeed, will always succeed)
+        // But i32 and String is not okay. (Can never succeed)
+        if (!typeDef.isSubtype(scrutineeType) && !scrutineeType.isSubtype(typeDef))
+            throw TypeCheckingException("Pattern will never succeed - ${typeDef.name} is not a subtype of ${scrutineeType.name}", pattern.loc)
+        // Result in the silly little checker
+        TypedFalliblePattern.IsType(pattern.loc, pattern.isMut, pattern.varName, topIndex, typeDef)
     }
     is ResolvedFalliblePattern.Tuple -> {
-//        val checkedElements = pattern.elements
-//        TypedFalliblePattern.Tuple(pattern.loc, pattern.elements.map {  })
-        TODO()
+        val checkedElements = pattern.elements.map { checkFalliblePattern(it, scrutineeType, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics) }
+        TypedFalliblePattern.Tuple(pattern.loc, checkedElements)
     }
 }
 
@@ -135,6 +187,24 @@ fun bindings(pattern: TypedInfalliblePattern): ConsMap<String, VariableBinding> 
     }
 }
 
+fun bindingsIfTrue(pattern: TypedFalliblePattern): ConsMap<String, VariableBinding> {
+    // Top index is the index of the thing on top of the stack, plus its # of stack slots.
+    return when (pattern) {
+        is TypedFalliblePattern.LiteralPattern -> ConsMap.of()
+        is TypedFalliblePattern.IsType -> {
+            // If it has a varName, then it creates a binding.
+            if (pattern.varName != null)
+                ConsMap.of(pattern.varName to VariableBinding(pattern.typeToCheck, pattern.isMut, pattern.variableIndex))
+            else
+                ConsMap.of()
+        }
+        is TypedFalliblePattern.Tuple -> {
+            ConsMap.join(pattern.elements.map(::bindingsIfTrue))
+        }
+    }
+}
+
+
 // Add the given number to the variable indices of the pattern.
 fun shiftPatternIndex(pattern: TypedInfalliblePattern, indexShift: Int): TypedInfalliblePattern = when (pattern) {
     is TypedInfalliblePattern.Empty -> pattern
@@ -144,3 +214,5 @@ fun shiftPatternIndex(pattern: TypedInfalliblePattern, indexShift: Int): TypedIn
 
 fun getTopIndex(scope: ConsMap<String, VariableBinding>): Int =
     scope.firstOrNull()?.second?.let { it.index + it.type.stackSlots } ?: 0
+
+

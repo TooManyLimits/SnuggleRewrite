@@ -11,6 +11,7 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import representation.asts.ir.Instruction
 import java.math.BigInteger
+import java.lang.String
 
 fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (inst) {
 
@@ -52,6 +53,17 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.Jump -> writer.visitJumpInsn(Opcodes.GOTO, inst.label)
     is Instruction.JumpIfFalse -> writer.visitJumpInsn(Opcodes.IFEQ, inst.label)
     is Instruction.JumpIfTrue -> writer.visitJumpInsn(Opcodes.IFNE, inst.label)
+
+    // Check if top 2 elements of stack are equal. They have the given type (should be primitive)
+    is Instruction.TestEquality -> when(inst.type.builtin) {
+        is IntType -> (inst.type.builtin as IntType).bytecodeCompareInt(Opcodes.IFEQ)(writer)
+        is FloatType -> (inst.type.builtin as FloatType).bytecodeCompareFloat(Opcodes.IFNE)(writer) // Yes, it is supposed to be NE here. The code is scuffed
+        StringType -> writer.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false)
+        BoolType -> I32Type.bytecodeCompareInt(Opcodes.IFEQ)(writer)
+        else -> throw IllegalStateException("Unrecognized literal builtin: ${inst.type.name}")
+    }
+    // Perform an instanceof on the top stack element, turning it into a bool. Assumed to be ref type.
+    is Instruction.InstanceOf -> writer.visitTypeInsn(Opcodes.INSTANCEOF, inst.type.runtimeName)
 
     // Helper function for push, it has lots of logic
     is Instruction.Push -> outputPush(inst, writer)

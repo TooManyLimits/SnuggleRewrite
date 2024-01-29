@@ -7,6 +7,7 @@ import errors.CompilationException
 import errors.ParsingException
 import errors.TypeCheckingException
 import representation.asts.resolved.ResolvedExpr
+import representation.asts.resolved.ResolvedFalliblePattern
 import representation.asts.typed.*
 import representation.passes.lexing.IntLiteralData
 import representation.passes.lexing.Loc
@@ -217,6 +218,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             // Infer the type of the receiver.
             // Literals are allowed because literals can still have const methods on them.
             val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics, allowLiteral = true)
+
             // Gather the set of non-static methods on the receiver
             val methods = typedReceiver.expr.type.allNonStaticMethods + getNonStaticExtensions(typedReceiver.expr.type, expr.implBlocks, typeCache)
             // Choose the best method from among them
@@ -227,6 +229,16 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             val call = TypedExpr.MethodCall(
                 expr.loc, typedReceiver.expr, expr.methodName, best.checkedArgs, best.method, maxVariable, best.method.returnType)
 
+            // Special case: If this is a bool, and we're doing .not(), then swap the receiver's outputs.
+            // This is how we deal with the "is" and "!is" expressions.
+            // The if-true bindings introduced by the "is" should be carried through as the "if-false" bindings
+            // instead, if we call .not().
+            // Likewise, if we are just calling .bool() on a boolean, the bindings should be carried through without
+            // swapping.
+            val isBooleanCall = typedReceiver.expr.type.builtin == BoolType
+            val isBoolNot = isBooleanCall && expr.methodName == "not"
+            val isBoolBool = isBooleanCall && expr.methodName == "bool"
+
             // Repeatedly replace const method calls until done
             var resultExpr: TypedExpr = call
             while (resultExpr is TypedExpr.MethodCall && resultExpr.methodDef is MethodDef.ConstMethodDef) {
@@ -235,7 +247,14 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
                 resultExpr = (resultExpr.methodDef as MethodDef.ConstMethodDef).replacer(resultExpr)
             }
 
-            TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfTrue, typedReceiver.newVarsIfFalse)
+            // Return with bindings based on the receiver and the call.
+            // SPECIAL CASE BOOLEANS. This is slightly annoying but... can't think of a
+            // super-clean way to do it right now.
+            when {
+                isBoolBool -> TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfTrue, typedReceiver.newVarsIfFalse)
+                isBoolNot -> TypingResult.WithVars(resultExpr, typedReceiver.newVarsIfFalse, typedReceiver.newVarsIfTrue)
+                else -> just(resultExpr)
+            }
         }
 
         is ResolvedExpr.StaticMethodCall -> {
@@ -435,33 +454,30 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
 
         is ResolvedExpr.Is -> {
             val inferredLhs = inferExpr(expr.lhs, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
-            val checkedPattern = TODO()
 
-            val bindingsIfMatched = bindings(checkedPattern)
-            val bindingsIfTrue = if (expr.negated) ConsMap.of() else bindingsIfMatched
-            val bindingsIfFalse = if (expr.negated) bindingsIfMatched else ConsMap.of()
+            //Add a "smart cast" binding into the scope here if necessary/possible
+            val modifiedPattern = if (inferredLhs.expr is TypedExpr.Variable && expr.pattern is ResolvedFalliblePattern.IsType && expr.pattern.varName == null) {
+                ResolvedFalliblePattern.IsType(expr.pattern.loc, false, (inferredLhs.expr as TypedExpr.Variable).name, expr.pattern.type)
+            } else expr.pattern
 
+            val topIndex = getTopIndex(scope)
+            val checkedPattern = checkFalliblePattern(modifiedPattern, inferredLhs.expr.type, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
+            val bindingsIfTrue = bindingsIfTrue(checkedPattern)
             TypingResult.WithVars(
-                TypedExpr.Is(expr.loc, expr.negated, inferredLhs.expr, checkedPattern, getBasicBuiltin(BoolType, typeCache)),
-                bindingsIfTrue, bindingsIfFalse
+                TypedExpr.Is(expr.loc, inferredLhs.expr, checkedPattern, getBasicBuiltin(BoolType, typeCache)),
+                bindingsIfTrue, ConsMap.of()
             )
         }
 
         is ResolvedExpr.Literal -> {
-            var value = expr.value
+            var resValue = expr.value
             val type = when (expr.value) {
                 is Boolean -> getBasicBuiltin(BoolType, typeCache)
                 is BigInteger -> getBasicBuiltin(IntLiteralType, typeCache)
                 is Fraction -> getBasicBuiltin(FloatLiteralType, typeCache)
                 is IntLiteralData -> {
-                    value = expr.value.value // Unwrap value
-                    getBasicBuiltin(when (expr.value.bits) {
-                        8 -> if (expr.value.signed) I8Type else U8Type
-                        16 -> if (expr.value.signed) I16Type else U16Type
-                        32 -> if (expr.value.signed) I32Type else U32Type
-                        64 -> if (expr.value.signed) I64Type else U64Type
-                        else -> throw IllegalStateException()
-                    }, typeCache)
+                    resValue = expr.value.value // Steal the BigInteger from inside
+                    expr.value.getBuiltin(typeCache)
                 }
                 is Float -> getBasicBuiltin(F32Type, typeCache)
                 is Double -> getBasicBuiltin(F64Type, typeCache)
@@ -469,7 +485,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
                 is Char -> getBasicBuiltin(CharType, typeCache)
                 else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
             }
-            just(TypedExpr.Literal(expr.loc, value, type))
+            just(TypedExpr.Literal(expr.loc, resValue, type))
         }
     }
 
