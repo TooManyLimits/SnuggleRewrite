@@ -1,3 +1,5 @@
+package snuggle.toomanylimits
+
 import snuggle.toomanylimits.runtime.InstanceBuilder
 
 fun main() {
@@ -32,7 +34,7 @@ fun main() {
         .debugBytecode()
         .addFile("list", list)
         .addFile("box", box)
-//        .reflectObject(snuggle.toomanylimits.ExtraPrinter(" :3"))
+//        .reflectObject(ExtraPrinter(" :3"))
         .build()
 
     instance.runtime.runCode()
