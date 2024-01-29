@@ -296,6 +296,9 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, file
             yield(Instruction.IrLabel(doneLabel))
         }
     }
+
+    is TypedExpr.Is -> TODO()
+
 }
 
 private fun getPluralOffset(fieldsToFollow: ConsList<FieldDef>): Int = fieldsToFollow.sumOf { it.pluralOffset!! }

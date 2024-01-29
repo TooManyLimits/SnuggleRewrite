@@ -162,12 +162,12 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
         }
     }
     is ParsedElement.ParsedExpr.Lambda -> {
-        val params = expr.params.map { resolvePattern(it, currentMappings) }
+        val params = expr.params.map { resolveInfalliblePattern(it, currentMappings) }
         resolveExpr(expr.body, startingMappings, currentMappings, ast, cache)
             .mapExpr { ResolvedExpr.Lambda(expr.loc, params, it) }
     }
     is ParsedElement.ParsedExpr.Declaration -> {
-        val pattern = resolvePattern(expr.lhs, currentMappings)
+        val pattern = resolveInfalliblePattern(expr.lhs, currentMappings)
         resolveExpr(expr.initializer, startingMappings, currentMappings, ast, cache)
             .mapExpr { ResolvedExpr.Declaration(expr.loc, pattern, it) }
     }
@@ -191,11 +191,18 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
         }
     }
     is ParsedElement.ParsedExpr.For -> {
-        val pattern = resolvePattern(expr.pattern, currentMappings)
+        val pattern = resolveInfalliblePattern(expr.pattern, currentMappings)
         join(listOf(expr.iterable, expr.body).map { resolveExpr(it, startingMappings, currentMappings, ast, cache) }) {
             ResolvedExpr.For(expr.loc, pattern, it[0], it[1])
         }
     }
+
+    is ParsedElement.ParsedExpr.Is -> {
+        val pattern = resolveFalliblePattern(expr.pattern, currentMappings)
+        resolveExpr(expr.lhs, startingMappings, currentMappings, ast, cache)
+            .mapExpr { ResolvedExpr.Is(expr.loc, expr.negated, it, pattern) }
+    }
+
     is ParsedElement.ParsedExpr.Literal -> just(ResolvedExpr.Literal(expr.loc, expr.value))
     is ParsedElement.ParsedExpr.Variable -> just(ResolvedExpr.Variable(expr.loc, expr.name))
     is ParsedElement.ParsedExpr.Parenthesized -> resolveExpr(expr.inner, startingMappings, currentMappings, ast, cache)

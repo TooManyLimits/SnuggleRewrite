@@ -67,7 +67,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
             0
         }
         methodDef.params.map {
-            inferPattern(it, topIndex, typeCache, currentTypeGenerics, methodGenerics)
+            inferInfalliblePattern(it, topIndex, typeCache, currentTypeGenerics, methodGenerics)
                 .also { topIndex += it.type.stackSlots }
         }
     }

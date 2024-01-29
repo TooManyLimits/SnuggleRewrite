@@ -25,7 +25,7 @@ private fun verifyExpr(expr: ResolvedExpr, calc: VerifyCalc): Unit = when (expr)
     is ResolvedExpr.Import -> {}
     is ResolvedExpr.Block -> expr.exprs.forEach { verifyExpr(it, calc) }
     is ResolvedExpr.Declaration -> {
-        verifyPattern(expr.pattern, calc)
+        verifyInfalliblePattern(expr.pattern, calc)
         verifyExpr(expr.initializer, calc)
     }
     is ResolvedExpr.Assignment -> verifyExprs(calc, expr.lhs, expr.rhs)
@@ -36,11 +36,15 @@ private fun verifyExpr(expr: ResolvedExpr, calc: VerifyCalc): Unit = when (expr)
     }
     is ResolvedExpr.While -> verifyExprs(calc, expr.cond, expr.body)
     is ResolvedExpr.For -> verifyExprs(calc, expr.iterable, expr.body)
+    is ResolvedExpr.Is -> {
+        verifyFalliblePattern(expr.pattern, calc)
+        verifyExpr(expr.lhs, calc)
+    }
     is ResolvedExpr.Literal -> {}
     is ResolvedExpr.Variable -> {}
     is ResolvedExpr.Tuple -> expr.elements.forEach { verifyExpr(it, calc) }
     is ResolvedExpr.Lambda -> {
-        expr.params.forEach { verifyPattern(it, calc) }
+        expr.params.forEach { verifyInfalliblePattern(it, calc) }
         verifyExpr(expr.body, calc)
     }
     is ResolvedExpr.FieldAccess -> verifyExpr(expr.receiver, calc)
@@ -69,13 +73,19 @@ private fun verifyExpr(expr: ResolvedExpr, calc: VerifyCalc): Unit = when (expr)
     }
 }
 
-private fun verifyPattern(pattern: ResolvedInfalliblePattern, calc: VerifyCalc): Unit = when (pattern) {
+private fun verifyInfalliblePattern(pattern: ResolvedInfalliblePattern, calc: VerifyCalc): Unit = when (pattern) {
     is ResolvedInfalliblePattern.Empty ->
         pattern.typeAnnotation?.let { verifyType(it, calc) } ?: Unit
     is ResolvedInfalliblePattern.Binding ->
         pattern.typeAnnotation?.let { verifyType(it, calc) } ?: Unit
     is ResolvedInfalliblePattern.Tuple ->
-        pattern.elements.forEach { verifyPattern(it, calc) }
+        pattern.elements.forEach { verifyInfalliblePattern(it, calc) }
+}
+
+private fun verifyFalliblePattern(pattern: ResolvedFalliblePattern, calc: VerifyCalc): Unit = when (pattern) {
+    is ResolvedFalliblePattern.LiteralPattern -> {}
+    is ResolvedFalliblePattern.Tuple -> pattern.elements.forEach { verifyFalliblePattern(it, calc) }
+    is ResolvedFalliblePattern.IsType -> verifyType(pattern.type, calc)
 }
 
 private fun verifyType(type: ResolvedType, calc: VerifyCalc): Unit = when (type) {
@@ -99,7 +109,7 @@ private fun verifyTypeDef(typeDef: ResolvedTypeDef, calc: VerifyCalc): Unit = wh
         verifyType(it.superType, calc)
         it.fields.forEach { verifyType(it.annotatedType, calc) }
         it.methods.forEach {
-            it.params.forEach { verifyPattern(it, calc) }
+            it.params.forEach { verifyInfalliblePattern(it, calc) }
             verifyType(it.returnType, calc)
             verifyExpr(it.body, calc)
         }
@@ -108,7 +118,7 @@ private fun verifyTypeDef(typeDef: ResolvedTypeDef, calc: VerifyCalc): Unit = wh
     is ResolvedTypeDef.Struct -> calc.compute(typeDef) {
         it.fields.forEach { verifyType(it.annotatedType, calc) }
         it.methods.forEach {
-            it.params.forEach { verifyPattern(it, calc) }
+            it.params.forEach { verifyInfalliblePattern(it, calc) }
             verifyType(it.returnType, calc)
             verifyExpr(it.body, calc)
         }

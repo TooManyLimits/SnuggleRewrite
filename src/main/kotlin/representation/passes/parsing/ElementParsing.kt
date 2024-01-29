@@ -31,7 +31,7 @@ fun parseElement(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<
 fun parseParams(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): List<ParsedInfalliblePattern> {
     lexer.expect(TokenType.LEFT_PAREN, "to begin params list")
     return commaSeparated(lexer, TokenType.RIGHT_PAREN) {
-        val pat = parsePattern(it, typeGenerics, methodGenerics)
+        val pat = parseInfalliblePattern(it, typeGenerics, methodGenerics)
         if (!isExplicitlyTyped(pat))
             throw ParsingException("Function parameters must be explicitly typed", pat.loc)
         pat

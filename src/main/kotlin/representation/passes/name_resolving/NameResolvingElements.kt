@@ -80,7 +80,7 @@ private fun resolveMethodDef(
     ast: ParsedAST,
     cache: ResolutionCache
 ): Pair<ResolvedMethodDef, Set<ParsedFile>> {
-    val resolvedParams = methodDef.params.map { resolvePattern(it, currentMappings) }
+    val resolvedParams = methodDef.params.map { resolveInfalliblePattern(it, currentMappings) }
     val resolvedReturnType = resolveType(methodDef.returnType, currentMappings)
     val resolvedBody = resolveExpr(methodDef.body, startingMappings, currentMappings, ast, cache)
     return ResolvedMethodDef(

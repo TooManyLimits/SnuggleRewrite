@@ -52,6 +52,9 @@ sealed interface ParsedElement {
         class While(override val loc: Loc, val cond: ParsedExpr, val body: ParsedExpr): ParsedExpr
         class For(override val loc: Loc, val pattern: ParsedInfalliblePattern, val iterable: ParsedExpr, val body: ParsedExpr): ParsedExpr
 
+        // negated: is vs !is
+        class Is(override val loc: Loc, val negated: Boolean, val lhs: ParsedExpr, val pattern: ParsedFalliblePattern): ParsedExpr
+
         class Literal(override val loc: Loc, val value: Any): ParsedExpr
         class Super(override val loc: Loc): ParsedExpr
         class Variable(override val loc: Loc, val name: String): ParsedExpr
@@ -90,7 +93,7 @@ sealed interface ParsedInfalliblePattern {
 sealed interface ParsedFalliblePattern {
     val loc: Loc
 
-    class IsType(override val loc: Loc, val isMut: Boolean, val varName: String?, val typeName: String): ParsedFalliblePattern
+    class IsType(override val loc: Loc, val isMut: Boolean, val varName: String?, val type: ParsedType): ParsedFalliblePattern
     class LiteralPattern(override val loc: Loc, val value: Any): ParsedFalliblePattern
     class Tuple(override val loc: Loc, val elements: List<ParsedFalliblePattern>): ParsedFalliblePattern
 }

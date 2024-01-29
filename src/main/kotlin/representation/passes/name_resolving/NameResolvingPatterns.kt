@@ -1,12 +1,18 @@
 package representation.passes.name_resolving
 
+import representation.asts.parsed.ParsedFalliblePattern
 import representation.asts.parsed.ParsedInfalliblePattern
 import representation.asts.parsed.ParsedType
+import representation.asts.resolved.ResolvedFalliblePattern
 import representation.asts.resolved.ResolvedInfalliblePattern
 import representation.asts.resolved.ResolvedType
 import util.lookup
 
-fun resolvePattern(pattern: ParsedInfalliblePattern, currentMappings: EnvMembers): ResolvedInfalliblePattern = when (pattern) {
+fun resolveInfalliblePattern(pattern: ParsedInfalliblePattern, currentMappings: EnvMembers): ResolvedInfalliblePattern = when (pattern) {
+    is ParsedInfalliblePattern.Tuple -> {
+        val resolvedElements = pattern.elements.map { resolveInfalliblePattern(it, currentMappings) }
+        ResolvedInfalliblePattern.Tuple(pattern.loc, resolvedElements)
+    }
     is ParsedInfalliblePattern.Empty -> {
         val resolvedType = pattern.typeAnnotation?.let { resolveType(it, currentMappings) }
         ResolvedInfalliblePattern.Empty(pattern.loc, resolvedType)
@@ -15,11 +21,20 @@ fun resolvePattern(pattern: ParsedInfalliblePattern, currentMappings: EnvMembers
         val resolvedType = pattern.typeAnnotation?.let { resolveType(it, currentMappings) }
         ResolvedInfalliblePattern.Binding(pattern.loc, pattern.name, pattern.isMut, resolvedType)
     }
-    is ParsedInfalliblePattern.Tuple -> {
-        val resolvedElements = pattern.elements.map { resolvePattern(it, currentMappings) }
-        ResolvedInfalliblePattern.Tuple(pattern.loc, resolvedElements)
+}
+
+fun resolveFalliblePattern(pattern: ParsedFalliblePattern, currentMappings: EnvMembers): ResolvedFalliblePattern = when (pattern) {
+    is ParsedFalliblePattern.Tuple -> {
+        val resolvedElements = pattern.elements.map { resolveFalliblePattern(it, currentMappings) }
+        ResolvedFalliblePattern.Tuple(pattern.loc, resolvedElements)
+    }
+    is ParsedFalliblePattern.LiteralPattern -> ResolvedFalliblePattern.LiteralPattern(pattern.loc, pattern.value)
+    is ParsedFalliblePattern.IsType -> {
+        val resolvedType = resolveType(pattern.type, currentMappings)
+        ResolvedFalliblePattern.IsType(pattern.loc, pattern.isMut, pattern.varName, resolvedType)
     }
 }
+
 
 // Returns the resolved type, as well as a set of types that were reached while resolving this type
 fun resolveType(type: ParsedType, currentMappings: EnvMembers): ResolvedType = when (type) {

@@ -189,7 +189,7 @@ private fun parseParenOrTuple(lexer: Lexer, typeGenerics: List<String>, methodGe
 private fun parseLambda(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     val fnTok = lexer.last()
     lexer.expect(TokenType.LEFT_PAREN, "for lambda params")
-    val params = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parsePattern(it, typeGenerics, methodGenerics) }
+    val params = commaSeparated(lexer, TokenType.RIGHT_PAREN) { parseInfalliblePattern(it, typeGenerics, methodGenerics) }
     val body = parseExpr(lexer, typeGenerics, methodGenerics)
     return ParsedExpr.Lambda(fnTok.loc, params, body)
 }
@@ -222,7 +222,7 @@ private fun parseConstructor(lexer: Lexer, typeGenerics: List<String>, methodGen
 
 private fun parseDeclaration(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     val let = lexer.last()
-    val pat = parsePattern(lexer, typeGenerics, methodGenerics)
+    val pat = parseInfalliblePattern(lexer, typeGenerics, methodGenerics)
     lexer.expect(TokenType.ASSIGN)
     val initializer = parseExpr(lexer, typeGenerics, methodGenerics)
     return ParsedExpr.Declaration(let.loc, pat, initializer)
@@ -246,7 +246,7 @@ private fun parseWhile(lexer: Lexer, typeGenerics: List<String>, methodGenerics:
 
 private fun parseFor(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
     val loc = lexer.last().loc
-    val pattern = parsePattern(lexer, typeGenerics, methodGenerics)
+    val pattern = parseInfalliblePattern(lexer, typeGenerics, methodGenerics)
     lexer.expect(TokenType.IN, "after pattern in \"for\" loop")
     val iterable = wrapIter(parseExpr(lexer, typeGenerics, methodGenerics))
     val body = parseExpr(lexer, typeGenerics, methodGenerics)

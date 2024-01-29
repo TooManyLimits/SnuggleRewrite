@@ -16,7 +16,6 @@ fun main() {
         for c in "hello".chars()
             print(c)
         
-        
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))

@@ -54,6 +54,8 @@ sealed interface TypedExpr {
     data class If(override val loc: Loc, val cond: TypedExpr, val ifTrue: TypedExpr, val ifFalse: TypedExpr, override val type: TypeDef): TypedExpr
     data class While(override val loc: Loc, val cond: TypedExpr, val body: TypedExpr, override val type: TypeDef): TypedExpr
 
+    data class Is(override val loc: Loc, val negated: Boolean, val lhs: TypedExpr, val pattern: TypedFalliblePattern, override val type: TypeDef): TypedExpr
+
     data class Literal(override val loc: Loc, val value: Any, override val type: TypeDef): TypedExpr
     data class Variable(override val loc: Loc, val mutable: Boolean, val name: String, val variableIndex: Int, override val type: TypeDef): TypedExpr
 
@@ -80,7 +82,7 @@ sealed interface TypedFalliblePattern {
     val loc: Loc
     val type: TypeDef
 
-    data class IsType(override val loc: Loc, val isMut: Boolean, val varName: String, override val type: TypeDef): TypedFalliblePattern
+    data class IsType(override val loc: Loc, val isMut: Boolean, val varName: String, val variableIndex: Int, override val type: TypeDef): TypedFalliblePattern
     data class LiteralPattern(override val loc: Loc, val value: Any, override val type: TypeDef): TypedFalliblePattern
     data class Tuple(override val loc: Loc, val elements: List<TypedFalliblePattern>, override val type: TypeDef): TypedFalliblePattern
 }

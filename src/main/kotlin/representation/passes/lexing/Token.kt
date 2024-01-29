@@ -16,6 +16,8 @@ val TOKEN_REGEX: Pattern = Pattern.compile(
     "//.*" + "|" +
     //Multi line comments
     "/\\*(\\*(?!/)|[^*])*\\*/" + "|" + //https://stackoverflow.com/questions/16160190/regular-expression-to-find-c-style-block-comments
+    //Special 3-character operators
+    "!is" + "|" +
     //Unique 2-character operators and ASSIGN variants, ^^, &&, ||, ^^=
     "(?:&&|\\|\\||\\^\\^)=?" + "|" +
     //Assign variants for bit shifts, <<= and >>=
@@ -70,6 +72,9 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "while" -> TokenType.WHILE
         "for" -> TokenType.FOR
         "in" -> TokenType.IN
+
+        "is" -> TokenType.IS
+        "!is" -> TokenType.NOT_IS
 
         ":" -> TokenType.COLON
         "::" -> TokenType.DOUBLE_COLON
@@ -207,6 +212,10 @@ enum class TokenType {
     NOT_EQUALS,
     GREATER_EQUAL,
     LESS_EQUAL,
+
+    IS,
+    NOT_IS,
+
 }
 
 data class IntLiteralData(val value: BigInteger, val signed: Boolean, val bits: Int)

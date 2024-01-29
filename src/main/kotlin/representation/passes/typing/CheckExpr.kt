@@ -60,8 +60,9 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
 
     is ResolvedExpr.MethodCall -> {
         // Largely the same as the infer() version, just passes the "expectedType" parameter
-        // Infer the type of the receiver
-        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        // Infer the type of the receiver.
+        // Literals are allowed because literals can still have const methods on them.
+        val typedReceiver = inferExpr(expr.receiver, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics, allowLiteral = true)
         // Gather the set of non-static methods on the receiver
         val methods = typedReceiver.expr.type.allNonStaticMethods + getNonStaticExtensions(typedReceiver.expr.type, expr.implBlocks, typeCache)
         // Choose the best method from among them
@@ -219,7 +220,8 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
     // e.g. Import, Literal, Variable, Declaration.
     // Usually, inferring and checking work similarly.
     else -> {
-        val res = inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics)
+        // Literals are allowed here because we pull them up afterward!
+        val res = inferExpr(expr, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics, allowLiteral = true)
         if (!res.expr.type.isSubtype(expectedType))
             throw IncorrectTypeException(expectedType, res.expr.type, when(expr) {
                 is ResolvedExpr.Import -> "Import expression"
@@ -231,6 +233,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
                 is ResolvedExpr.Declaration -> "Let expression"
                 is ResolvedExpr.While -> "While loop"
                 is ResolvedExpr.For -> "For loop"
+                is ResolvedExpr.Is -> "Is-expression"
                 else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
             }, expr.loc)
         pullUpLiteral(res, expectedType)
@@ -322,7 +325,7 @@ private fun typeCheckLambdaExpression(lambda: ResolvedExpr.Lambda, expectedType:
         lazyBody = lazy {
             var topIndex = indirect.stackSlots // this is first
             val paramPatterns = lambda.params.zip(expectedType.paramTypes).map { (pat, requiredType) ->
-                checkPattern(pat, requiredType, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
+                checkInfalliblePattern(pat, requiredType, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
                     .also { topIndex += it.type.stackSlots }
             }
 
@@ -358,6 +361,7 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.Return -> findThisFieldAccesses(expr.rhs)
     is TypedExpr.If -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.ifTrue), findThisFieldAccesses(expr.ifFalse))
     is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.body))
+    is TypedExpr.Is -> findThisFieldAccesses(expr.lhs)
     is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
         setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
     is TypedExpr.MethodCall -> union(listOf(findThisFieldAccesses(expr.receiver)), expr.args.asSequence().map(::findThisFieldAccesses).asIterable())

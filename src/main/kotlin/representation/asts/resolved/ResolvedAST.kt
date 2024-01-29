@@ -117,34 +117,36 @@ sealed class ResolvedImplBlock {
 sealed interface ResolvedExpr {
     val loc: Loc
 
-    data class Import(override val loc: Loc, val file: String): ResolvedExpr
+    class Import(override val loc: Loc, val file: String): ResolvedExpr
 
-    data class Block(override val loc: Loc, val exprs: List<ResolvedExpr>): ResolvedExpr
-    data class Declaration(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val initializer: ResolvedExpr): ResolvedExpr
+    class Block(override val loc: Loc, val exprs: List<ResolvedExpr>): ResolvedExpr
+    class Declaration(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val initializer: ResolvedExpr): ResolvedExpr
     // Lhs is one of: FieldAccess, StaticFieldAccess, Variable
-    data class Assignment(override val loc: Loc, val lhs: ResolvedExpr, val rhs: ResolvedExpr): ResolvedExpr
+    class Assignment(override val loc: Loc, val lhs: ResolvedExpr, val rhs: ResolvedExpr): ResolvedExpr
 
-    data class Return(override val loc: Loc, val rhs: ResolvedExpr): ResolvedExpr
+    class Return(override val loc: Loc, val rhs: ResolvedExpr): ResolvedExpr
 
-    data class If(override val loc: Loc, val cond: ResolvedExpr, val ifTrue: ResolvedExpr, val ifFalse: ResolvedExpr?): ResolvedExpr
-    data class While(override val loc: Loc, val cond: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
-    data class For(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
+    class If(override val loc: Loc, val cond: ResolvedExpr, val ifTrue: ResolvedExpr, val ifFalse: ResolvedExpr?): ResolvedExpr
+    class While(override val loc: Loc, val cond: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
+    class For(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
 
-    data class Literal(override val loc: Loc, val value: Any): ResolvedExpr
-    data class Variable(override val loc: Loc, val name: String): ResolvedExpr
-    data class Tuple(override val loc: Loc, val elements: List<ResolvedExpr>): ResolvedExpr
-    data class Lambda(override val loc: Loc, val params: List<ResolvedInfalliblePattern>, val body: ResolvedExpr): ResolvedExpr
+    class Is(override val loc: Loc, val negated: Boolean, val lhs: ResolvedExpr, val pattern: ResolvedFalliblePattern): ResolvedExpr
 
-    data class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
-    data class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
+    class Literal(override val loc: Loc, val value: Any): ResolvedExpr
+    class Variable(override val loc: Loc, val name: String): ResolvedExpr
+    class Tuple(override val loc: Loc, val elements: List<ResolvedExpr>): ResolvedExpr
+    class Lambda(override val loc: Loc, val params: List<ResolvedInfalliblePattern>, val body: ResolvedExpr): ResolvedExpr
+
+    class FieldAccess(override val loc: Loc, val receiver: ResolvedExpr, val fieldName: String): ResolvedExpr
+    class StaticFieldAccess(override val loc: Loc, val receiverType: ResolvedType, val fieldName: String): ResolvedExpr
 
     // Method calls carry with them a list of ImplBlock, which were in scope when the method call was made.
     // Methods from these ImplBlock will be added to the pool of potentially callable methods.
-    data class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
-    data class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
-    data class SuperMethodCall(override val loc: Loc, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
-    data class ConstructorCall(override val loc: Loc, val type: ResolvedType?, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
-    data class RawStructConstructor(override val loc: Loc, val type: ResolvedType?, val fieldValues: List<ResolvedExpr>): ResolvedExpr
+    class MethodCall(override val loc: Loc, val receiver: ResolvedExpr, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    class StaticMethodCall(override val loc: Loc, val receiverType: ResolvedType, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    class SuperMethodCall(override val loc: Loc, val methodName: String, val genericArgs: List<ResolvedType>, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    class ConstructorCall(override val loc: Loc, val type: ResolvedType?, val args: List<ResolvedExpr>, val implBlocks: ConsList<ResolvedImplBlock>): ResolvedExpr
+    class RawStructConstructor(override val loc: Loc, val type: ResolvedType?, val fieldValues: List<ResolvedExpr>): ResolvedExpr
 
 
 }
@@ -152,17 +154,17 @@ sealed interface ResolvedExpr {
 sealed interface ResolvedInfalliblePattern {
     val loc: Loc
 
-    data class Empty(override val loc: Loc, val typeAnnotation: ResolvedType?): ResolvedInfalliblePattern
-    data class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ResolvedType?): ResolvedInfalliblePattern
-    data class Tuple(override val loc: Loc, val elements: List<ResolvedInfalliblePattern>): ResolvedInfalliblePattern
+    class Empty(override val loc: Loc, val typeAnnotation: ResolvedType?): ResolvedInfalliblePattern
+    class Binding(override val loc: Loc, val name: String, val isMut: Boolean, val typeAnnotation: ResolvedType?): ResolvedInfalliblePattern
+    class Tuple(override val loc: Loc, val elements: List<ResolvedInfalliblePattern>): ResolvedInfalliblePattern
 }
 
 sealed interface ResolvedFalliblePattern {
     val loc: Loc
 
-    data class IsType(override val loc: Loc, val isMut: Boolean, val varName: String, val type: ResolvedType): ResolvedFalliblePattern
-    data class LiteralPattern(override val loc: Loc, val value: Any): ResolvedFalliblePattern
-    data class Tuple(override val loc: Loc, val elements: List<ResolvedFalliblePattern>): ResolvedFalliblePattern
+    class IsType(override val loc: Loc, val isMut: Boolean, val varName: String?, val type: ResolvedType): ResolvedFalliblePattern
+    class LiteralPattern(override val loc: Loc, val value: Any): ResolvedFalliblePattern
+    class Tuple(override val loc: Loc, val elements: List<ResolvedFalliblePattern>): ResolvedFalliblePattern
 }
 
 
@@ -170,9 +172,9 @@ sealed interface ResolvedType {
     val loc: Loc
 
     //Note: Now a DIRECT REFERENCE to a ResolvedTypeDef, rather than a mere String. This is the *primary reason for this AST pass*.
-    data class Basic(override val loc: Loc, val base: ResolvedTypeDef, val generics: List<ResolvedType>): ResolvedType
-    data class Tuple(override val loc: Loc, val elements: List<ResolvedType>): ResolvedType
-    data class Func(override val loc: Loc, val paramTypes: List<ResolvedType>, val returnType: ResolvedType): ResolvedType
-    data class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
-    data class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
+    class Basic(override val loc: Loc, val base: ResolvedTypeDef, val generics: List<ResolvedType>): ResolvedType
+    class Tuple(override val loc: Loc, val elements: List<ResolvedType>): ResolvedType
+    class Func(override val loc: Loc, val paramTypes: List<ResolvedType>, val returnType: ResolvedType): ResolvedType
+    class TypeGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
+    class MethodGeneric(override val loc: Loc, val name: String, val index: Int): ResolvedType
 }

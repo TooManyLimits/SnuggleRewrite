@@ -4,8 +4,10 @@ import builtins.primitive.FloatLiteralType
 import builtins.primitive.IntLiteralType
 import errors.CompilationException
 import errors.TypeCheckingException
+import representation.asts.resolved.ResolvedFalliblePattern
 import representation.asts.resolved.ResolvedInfalliblePattern
 import representation.asts.typed.TypeDef
+import representation.asts.typed.TypedFalliblePattern
 import representation.asts.typed.TypedInfalliblePattern
 import util.ConsMap
 
@@ -34,52 +36,46 @@ fun isExplicitlyTyped(pattern: ResolvedInfalliblePattern): Boolean = when (patte
  * Create a typed pattern by checking this pattern against the inferred
  * scrutinee type, and ensuring it matches.
  */
-fun checkPattern(pattern: ResolvedInfalliblePattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedInfalliblePattern {
-    // If scrutinee is an unstorable type, like IntLiteral, error here
-    if (scrutineeType.builtin == IntLiteralType || scrutineeType.builtin == FloatLiteralType)
-        throw CompilationException("Cannot infer type of literal - try adding more annotations", pattern.loc)
-    // Switch on the type of pattern
-    return when (pattern) {
-        // Largely the same between EmptyPattern and BindingPattern
-        is ResolvedInfalliblePattern.Empty -> {
-            if (pattern.typeAnnotation != null) {
-                val explicitAnnotation = getTypeDef(pattern.typeAnnotation, typeCache, currentTypeGenerics, currentMethodGenerics)
-                if (!scrutineeType.isSubtype(explicitAnnotation))
-                    throw TypeCheckingException("RHS of type ${scrutineeType.name} does not match pattern of type ${explicitAnnotation.name}", pattern.loc)
-                TypedInfalliblePattern.Empty(pattern.loc, explicitAnnotation)
-            } else {
-                TypedInfalliblePattern.Empty(pattern.loc, scrutineeType)
-            }
+fun checkInfalliblePattern(pattern: ResolvedInfalliblePattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedInfalliblePattern = when (pattern) {
+    // Largely the same between EmptyPattern and BindingPattern
+    is ResolvedInfalliblePattern.Empty -> {
+        if (pattern.typeAnnotation != null) {
+            val explicitAnnotation = getTypeDef(pattern.typeAnnotation, typeCache, currentTypeGenerics, currentMethodGenerics)
+            if (!scrutineeType.isSubtype(explicitAnnotation))
+                throw TypeCheckingException("RHS of type ${scrutineeType.name} does not match pattern of type ${explicitAnnotation.name}", pattern.loc)
+            TypedInfalliblePattern.Empty(pattern.loc, explicitAnnotation)
+        } else {
+            TypedInfalliblePattern.Empty(pattern.loc, scrutineeType)
         }
-        is ResolvedInfalliblePattern.Binding -> {
-            if (pattern.typeAnnotation != null) {
-                // Check that the scrutinee is a subtype of the type annotation, if this has one
-                val explicitAnnotation = getTypeDef(pattern.typeAnnotation, typeCache, currentTypeGenerics, currentMethodGenerics)
-                if (!scrutineeType.isSubtype(explicitAnnotation))
-                    throw TypeCheckingException("Scrutinee of type ${scrutineeType.name} does not match pattern of type ${explicitAnnotation.name}", pattern.loc)
-                TypedInfalliblePattern.Binding(pattern.loc, explicitAnnotation, pattern.name, pattern.isMut, topIndex)
-            } else {
-                // Otherwise, just assume it matches
-                TypedInfalliblePattern.Binding(pattern.loc, scrutineeType, pattern.name, pattern.isMut, topIndex)
-            }
+    }
+    is ResolvedInfalliblePattern.Binding -> {
+        if (pattern.typeAnnotation != null) {
+            // Check that the scrutinee is a subtype of the type annotation, if this has one
+            val explicitAnnotation = getTypeDef(pattern.typeAnnotation, typeCache, currentTypeGenerics, currentMethodGenerics)
+            if (!scrutineeType.isSubtype(explicitAnnotation))
+                throw TypeCheckingException("Scrutinee of type ${scrutineeType.name} does not match pattern of type ${explicitAnnotation.name}", pattern.loc)
+            TypedInfalliblePattern.Binding(pattern.loc, explicitAnnotation, pattern.name, pattern.isMut, topIndex)
+        } else {
+            // Otherwise, just assume it matches
+            TypedInfalliblePattern.Binding(pattern.loc, scrutineeType, pattern.name, pattern.isMut, topIndex)
         }
-        is ResolvedInfalliblePattern.Tuple -> {
-            val scrutineeType = scrutineeType.unwrap()
-            // Need to recursively check the inner patterns here. First, ensure scrutinee is valid:
-            if (scrutineeType !is TypeDef.Tuple)
-                throw TypeCheckingException("Scrutinee of type ${scrutineeType.name} is not a tuple", pattern.loc)
-            if (scrutineeType.innerTypes.size != pattern.elements.size)
-                throw TypeCheckingException("Scrutinee tuple has ${scrutineeType.innerTypes.size} elements, but pattern has ${pattern.elements.size} elements", pattern.loc)
-            // Now, recursively check the inner elements with the inner types of the tuple:
-            var topIndex = topIndex // enable reassignment
-            val checkedElements = pattern.elements.zip(scrutineeType.innerTypes).map {
-                checkPattern(it.first, it.second, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
-                    .also { topIndex += it.type.stackSlots }
-            }
-            // And return.
-            val patternType = getTuple(checkedElements.map { it.type }, typeCache)
-            TypedInfalliblePattern.Tuple(pattern.loc, patternType, checkedElements)
+    }
+    is ResolvedInfalliblePattern.Tuple -> {
+        val scrutineeType = scrutineeType.unwrap()
+        // Need to recursively check the inner patterns here. First, ensure scrutinee is valid:
+        if (scrutineeType !is TypeDef.Tuple)
+            throw TypeCheckingException("Scrutinee of type ${scrutineeType.name} is not a tuple", pattern.loc)
+        if (scrutineeType.innerTypes.size != pattern.elements.size)
+            throw TypeCheckingException("Scrutinee tuple has ${scrutineeType.innerTypes.size} elements, but pattern has ${pattern.elements.size} elements", pattern.loc)
+        // Now, recursively check the inner elements with the inner types of the tuple:
+        var topIndex = topIndex // enable reassignment
+        val checkedElements = pattern.elements.zip(scrutineeType.innerTypes).map {
+            checkInfalliblePattern(it.first, it.second, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
+                .also { topIndex += it.type.stackSlots }
         }
+        // And return.
+        val patternType = getTuple(checkedElements.map { it.type }, typeCache)
+        TypedInfalliblePattern.Tuple(pattern.loc, patternType, checkedElements)
     }
 }
 
@@ -87,7 +83,7 @@ fun checkPattern(pattern: ResolvedInfalliblePattern, scrutineeType: TypeDef, top
  * Attempt to create a typed pattern out of only the import-resolved
  * pattern. Only possible when the pattern is explicitly typed.
  */
-fun inferPattern(pattern: ResolvedInfalliblePattern, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedInfalliblePattern = when (pattern) {
+fun inferInfalliblePattern(pattern: ResolvedInfalliblePattern, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedInfalliblePattern = when (pattern) {
     is ResolvedInfalliblePattern.Empty -> {
         val annotatedType = pattern.typeAnnotation ?: throw IllegalStateException("Bug in compiler - attempt to infer pattern that isn't explicitly typed? Please report!")
         val type = getTypeDef(annotatedType, typeCache, currentTypeGenerics, currentMethodGenerics)
@@ -102,11 +98,25 @@ fun inferPattern(pattern: ResolvedInfalliblePattern, topIndex: Int, typeCache: T
         var topIndex = topIndex // enable reassignment
         // Resolve inner ones, combine
         val inferredElements = pattern.elements.map {
-            inferPattern(it, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
+            inferInfalliblePattern(it, topIndex, typeCache, currentTypeGenerics, currentMethodGenerics)
                 .also { topIndex += it.type.stackSlots }
         }
         val type = getTuple(inferredElements.map { it.type }, typeCache)
         TypedInfalliblePattern.Tuple(pattern.loc, type, inferredElements)
+    }
+}
+
+fun checkFalliblePattern(pattern: ResolvedFalliblePattern, scrutineeType: TypeDef, topIndex: Int, typeCache: TypingCache, currentTypeGenerics: List<TypeDef>, currentMethodGenerics: List<TypeDef>): TypedFalliblePattern = when (pattern) {
+    is ResolvedFalliblePattern.LiteralPattern -> {
+        TODO()
+    }
+    is ResolvedFalliblePattern.IsType -> {
+        TODO()
+    }
+    is ResolvedFalliblePattern.Tuple -> {
+//        val checkedElements = pattern.elements
+//        TypedFalliblePattern.Tuple(pattern.loc, pattern.elements.map {  })
+        TODO()
     }
 }
 
