@@ -245,6 +245,7 @@ fun checkExpr(expr: ResolvedExpr, expectedType: TypeDef, scope: ConsMap<String, 
                 is ResolvedExpr.While -> "While loop"
                 is ResolvedExpr.For -> "For loop"
                 is ResolvedExpr.Is -> "Is-expression"
+                is ResolvedExpr.As -> "Cast"
                 else -> throw IllegalStateException("Failed to create error message - unexpected expression type ${res.expr.javaClass.simpleName}")
             }, expr.loc)
         pullUpLiteral(res, expectedType)
@@ -373,6 +374,7 @@ fun findThisFieldAccesses(expr: TypedExpr): Set<FieldDef> = when (expr) {
     is TypedExpr.If -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.ifTrue), findThisFieldAccesses(expr.ifFalse))
     is TypedExpr.While -> union(findThisFieldAccesses(expr.cond), findThisFieldAccesses(expr.body))
     is TypedExpr.Is -> findThisFieldAccesses(expr.lhs)
+    is TypedExpr.As -> findThisFieldAccesses(expr.lhs)
     is TypedExpr.FieldAccess -> if (expr.receiver is TypedExpr.Variable && expr.receiver.name == "this")
         setOf(expr.fieldDef) else findThisFieldAccesses(expr.receiver)
     is TypedExpr.MethodCall -> union(listOf(findThisFieldAccesses(expr.receiver)), expr.args.asSequence().map(::findThisFieldAccesses).asIterable())

@@ -43,7 +43,7 @@ private fun parseIs(lexer: Lexer, typeGenerics: List<String>, methodGenerics: Li
 
 private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>, precedence: Int): ParsedExpr {
     if (precedence >= TOKS_BY_PRECEDENCE.size)
-        return parseUnary(lexer, typeGenerics, methodGenerics)
+        return parseAs(lexer, typeGenerics, methodGenerics)
     var lhs = parseBinary(lexer, typeGenerics, methodGenerics, precedence + 1)
     while (lexer.consume(*TOKS_BY_PRECEDENCE[precedence])) {
         val tok = lexer.last()
@@ -67,6 +67,17 @@ private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, methodGenerics
             // Append the `.not()` if tok was NOT_EQUALS
             lhs = ParsedExpr.MethodCall(loc, lhs, "not", listOf(), listOf())
         }
+    }
+    return lhs
+}
+
+private fun parseAs(lexer: Lexer, typeGenerics: List<String>, methodGenerics: List<String>): ParsedExpr {
+    var lhs = parseUnary(lexer, typeGenerics, methodGenerics)
+    while (lexer.consume(TokenType.AS, TokenType.AS_BANG)) {
+        val forced = lexer.last().type == TokenType.AS_BANG
+        val loc = lexer.last().loc
+        val type = parseType(lexer, typeGenerics, methodGenerics)
+        lhs = ParsedExpr.As(loc, forced, lhs, type)
     }
     return lhs
 }

@@ -53,6 +53,7 @@ sealed interface ParsedElement {
         class For(override val loc: Loc, val pattern: ParsedInfalliblePattern, val iterable: ParsedExpr, val body: ParsedExpr): ParsedExpr
 
         class Is(override val loc: Loc, val lhs: ParsedExpr, val pattern: ParsedFalliblePattern): ParsedExpr
+        class As(override val loc: Loc, val forced: Boolean, val lhs: ParsedExpr, val type: ParsedType): ParsedExpr
 
         class Literal(override val loc: Loc, val value: Any): ParsedExpr
         class Super(override val loc: Loc): ParsedExpr

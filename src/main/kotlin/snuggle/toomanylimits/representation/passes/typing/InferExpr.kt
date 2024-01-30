@@ -469,6 +469,32 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
             )
         }
 
+        is ResolvedExpr.As -> {
+            val inferredLhs = inferExpr(expr.lhs, scope, typeCache, returnType, currentType, currentTypeGenerics, currentMethodGenerics).expr
+            val type = getTypeDef(expr.type, typeCache, currentTypeGenerics, currentMethodGenerics)
+
+            // Ensure the types match up
+            fun isJvmPrimitive(type: TypeDef) = type.builtin is IntType || type.builtin is FloatType || type.builtin === BoolType
+            when {
+                // Internally, primitive values can be cast to one another
+                isJvmPrimitive(inferredLhs.type) && isJvmPrimitive(type) -> {
+                    just(TypedExpr.As(expr.loc, expr.forced, inferredLhs, type))
+                }
+                // A reference type can be cast to a supertype or subtype
+                type.isReferenceType && (type.isSubtype(inferredLhs.type) || inferredLhs.type.isSubtype(type)) -> {
+                    just(TypedExpr.As(expr.loc, expr.forced, inferredLhs, type))
+                }
+                // Types are the same, always succeeds, just emit the lhs
+                type == inferredLhs.type -> {
+                    just(inferredLhs)
+                }
+                // Otherwise, fail.
+                else -> {
+                    throw TypeCheckingException("Cast from type \"${inferredLhs.type.name}\" to \"${type.name}\" can never succeed!", expr.loc)
+                }
+            }
+        }
+
         is ResolvedExpr.Literal -> {
             var resValue = expr.value
             val type = when (expr.value) {

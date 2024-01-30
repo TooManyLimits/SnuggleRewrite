@@ -131,6 +131,7 @@ sealed interface ResolvedExpr {
     class For(override val loc: Loc, val pattern: ResolvedInfalliblePattern, val iterable: ResolvedExpr, val body: ResolvedExpr): ResolvedExpr
 
     class Is(override val loc: Loc, val lhs: ResolvedExpr, val pattern: ResolvedFalliblePattern): ResolvedExpr
+    class As(override val loc: Loc, val forced: Boolean, val lhs: ResolvedExpr, val type: ResolvedType): ResolvedExpr
 
     class Literal(override val loc: Loc, val value: Any): ResolvedExpr
     class Variable(override val loc: Loc, val name: String): ResolvedExpr

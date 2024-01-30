@@ -40,6 +40,10 @@ private fun verifyExpr(expr: ResolvedExpr, calc: VerifyCalc): Unit = when (expr)
         verifyFalliblePattern(expr.pattern, calc)
         verifyExpr(expr.lhs, calc)
     }
+    is ResolvedExpr.As -> {
+        verifyType(expr.type, calc)
+        verifyExpr(expr.lhs, calc)
+    }
     is ResolvedExpr.Literal -> {}
     is ResolvedExpr.Variable -> {}
     is ResolvedExpr.Tuple -> expr.elements.forEach { verifyExpr(it, calc) }

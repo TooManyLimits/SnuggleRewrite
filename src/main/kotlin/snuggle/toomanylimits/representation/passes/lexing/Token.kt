@@ -21,7 +21,7 @@ val TOKEN_REGEX: Pattern = Pattern.compile(
     //Multi line comments
     "/\\*(\\*(?!/)|[^*])*\\*/" + "|" + //https://stackoverflow.com/questions/16160190/regular-expression-to-find-c-style-block-comments
     //Special 3-character operators
-    "!is" + "|" +
+    "!is|as!" + "|" +
     //Unique 2-character operators and ASSIGN variants, ^^, &&, ||, ^^=
     "(?:&&|\\|\\||\\^\\^)=?" + "|" +
     //Assign variants for bit shifts, <<= and >>=
@@ -71,6 +71,8 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "=" -> TokenType.ASSIGN
         "is" -> TokenType.IS
         "!is" -> TokenType.NOT_IS
+        "as" -> TokenType.AS
+        "as!" -> TokenType.AS_BANG
 
         "return" -> TokenType.RETURN
         "if" -> TokenType.IF
@@ -190,6 +192,8 @@ enum class TokenType {
     ASSIGN,
     IS,
     NOT_IS,
+    AS,
+    AS_BANG,
 
     // Control flow
     RETURN,

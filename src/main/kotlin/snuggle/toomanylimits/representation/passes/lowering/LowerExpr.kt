@@ -1,6 +1,9 @@
 package snuggle.toomanylimits.representation.passes.lowering
 
 import org.objectweb.asm.Label
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+import snuggle.toomanylimits.builtins.primitive.*
 import snuggle.toomanylimits.representation.asts.ir.GeneratedType
 import snuggle.toomanylimits.representation.asts.ir.Instruction
 import snuggle.toomanylimits.representation.asts.typed.FieldDef
@@ -304,6 +307,13 @@ fun lowerExpr(expr: TypedExpr, desiredFields: ConsList<ConsList<FieldDef>>, file
         yieldAll(testFalliblePattern(expr.pattern, filesWithEffects, typeCalc))
     }
 
+    is TypedExpr.As -> sequence {
+        // Lower the LHS
+        yieldAll(lowerExpr(expr.lhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
+        // Do the cast
+        yieldAll(handleCast(expr.forced, expr.lhs.type, expr.type))
+    }
+
 }
 
 private fun getPluralOffset(fieldsToFollow: ConsList<FieldDef>): Int = fieldsToFollow.sumOf { it.pluralOffset!! }
@@ -393,7 +403,7 @@ private fun getMethodResults(methodToCall: MethodDef, desiredFields: ConsList<Co
  * fieldsToFollow starts as nil.
  * assignmentType is the type being assigned to the lvalue.
  */
-fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
+private fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<FieldDef>, maxVariable: Int, filesWithEffects: Set<String>, typeCalc: EqualityIncrementalCalculator<TypeDef, GeneratedType>): Sequence<Instruction> = when {
     lhs is TypedExpr.Variable -> sequence {
         yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         val startIndex = lhs.variableIndex + getPluralOffset(fieldsToFollow)
@@ -445,3 +455,271 @@ fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: ConsList<Fi
 
     else -> throw IllegalStateException("Illegal assignment case - bug in compiler, please report")
 }
+
+// The value to be cast starts on the top of the stack.
+private fun handleCast(forced: Boolean, from: TypeDef, to: TypeDef): Sequence<Instruction> {
+    // Helper
+    fun isJvmPrimitive(type: TypeDef) = type.builtin is IntType || type.builtin is FloatType || type.builtin === BoolType
+
+    return sequence {
+        // If this cast is checked, then check it:
+        if (!forced) {
+            TODO("Checked casts not yet implemented, use \"as!\" instead of \"as\" for unchecked casts.")
+        }
+        
+        yieldAll(when {
+            isJvmPrimitive(from) && isJvmPrimitive(to) -> {
+                // Convert BoolType to BoolIntType to reduce the amount of logic needed
+                val from = if (from.builtin === BoolType) U1Type else from.builtin
+                val to = if (to.builtin === BoolType) U1Type else to.builtin
+
+                fun bytecode(func: (MethodVisitor) -> Unit) = sequenceOf(Instruction.Bytecodes(1, func))
+                fun bitmask(writer: MethodVisitor, mask: Long) {
+                    if (mask == 0xFFFFL)
+                        writer.visitInsn(Opcodes.I2C)
+                    else {
+                        when (mask) {
+                            1L -> writer.visitInsn(Opcodes.ICONST_1)
+                            0xFFL -> writer.visitIntInsn(Opcodes.SIPUSH, 0xFF)
+                            0xFFFFFFFFL -> writer.visitLdcInsn(0xFFFFFFFFL)
+                            else -> throw IllegalStateException()
+                        }
+                        if (mask == 0xFFFFFFFFL)
+                            writer.visitInsn(Opcodes.LAND)
+                        else
+                            writer.visitInsn(Opcodes.IAND)
+                    }
+                }
+
+                when (from) {
+                    U1Type -> when (to) {
+                        U1Type, I8Type, U8Type, I16Type, U16Type, CharType, I32Type, U32Type -> sequenceOf()
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    I8Type -> when (to) {
+                        U1Type -> bytecode { bitmask(it, 1) }
+                        U8Type -> bytecode { bitmask(it, 0xFF) }
+                        I8Type, I16Type, I32Type, U32Type -> sequenceOf()
+                        U16Type, CharType -> bytecode { bitmask(it, 0xFFFF) }
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    U8Type -> when (to) {
+                        U1Type -> bytecode { bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.I2B) }
+                        U8Type, I16Type, U16Type, CharType, I32Type, U32Type -> sequenceOf()
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    I16Type -> when (to) {
+                        U1Type -> bytecode { bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { bitmask(it, 0xFF) }
+                        I16Type, I32Type, U32Type -> sequenceOf()
+                        U16Type, CharType -> bytecode { bitmask(it, 0xFFFF) }
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    U16Type, CharType -> when (to) {
+                        U1Type -> bytecode { bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType, I32Type, U32Type -> sequenceOf()
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    I32Type -> when (to) {
+                        U1Type -> bytecode { bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType -> bytecode { bitmask(it, 0xFFFF) }
+                        U32Type -> sequenceOf()
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    U32Type -> when (to) {
+                        U1Type -> bytecode { bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType -> bytecode { bitmask(it, 0xFFFF) }
+                        I64Type, U64Type -> bytecode { it.visitInsn(Opcodes.I2L); bitmask(it, 0xFFFFFFFFL) }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.I2L); bitmask(it, 0xFFFFFFFFL); it.visitInsn(Opcodes.L2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.I2L); bitmask(it, 0xFFFFFFFFL); it.visitInsn(Opcodes.L2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    I64Type -> when (to) {
+                        U1Type -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.L2I); it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.L2I); it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 0xFFFF) }
+                        I32Type, U32Type -> bytecode { it.visitInsn(Opcodes.L2I); }
+                        I64Type, U64Type -> sequenceOf()
+                        F32Type -> bytecode { it.visitInsn(Opcodes.L2F) }
+                        F64Type -> bytecode { it.visitInsn(Opcodes.L2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    U64Type -> when (to) {
+                        U1Type -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.L2I); it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.L2I); it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 0xFFFF) }
+                        I32Type, U32Type -> bytecode { it.visitInsn(Opcodes.L2I); }
+                        I64Type, U64Type -> sequenceOf()
+                        F32Type -> bytecode {
+                            // start: [long]
+                            it.visitInsn(Opcodes.DUP2) // [long, long]
+                            it.visitLdcInsn(0x7fffffffffffffffL) // [long, long, mask]
+                            it.visitInsn(Opcodes.LAND) // [long, masked long]
+                            it.visitInsn(Opcodes.L2F) // [long, float]
+                            it.visitInsn(Opcodes.DUP_X2) // [float, long, float]
+                            it.visitInsn(Opcodes.POP) // [float, long]
+                            val ifNonNegative = Label()
+                            it.visitInsn(Opcodes.LCONST_0) // [float, long, 0L]
+                            it.visitInsn(Opcodes.LCMP) // [float, int]
+                            it.visitJumpInsn(Opcodes.IFGE, ifNonNegative) // jump if int non-negative. [float]
+                            it.visitLdcInsn(9223372036854775808f) // 2^63 as a float. [float, 0x1.0p63f]
+                            it.visitInsn(Opcodes.FADD) // [float]
+                            it.visitLabel(ifNonNegative) // non-negative [float]
+                        }
+                        F64Type -> bytecode {
+                            // start: [long]
+                            it.visitInsn(Opcodes.DUP2) // [long, long]
+                            it.visitLdcInsn(0x7fffffffffffffffL) // [long, long, mask]
+                            it.visitInsn(Opcodes.LAND) // [long, masked long]
+                            it.visitInsn(Opcodes.L2D) // [long, double]
+                            it.visitInsn(Opcodes.DUP2_X2) // [double, long, double]
+                            it.visitInsn(Opcodes.POP2) // [double, long]
+                            val ifNonNegative = Label()
+                            it.visitInsn(Opcodes.LCONST_0) // [double, long, 0L]
+                            it.visitInsn(Opcodes.LCMP) // [double, int]
+                            it.visitJumpInsn(Opcodes.IFGE, ifNonNegative) // jump if int non-negative. [double]
+                            it.visitLdcInsn(9223372036854775808.0) // 2^63 as a double. [double, 0x1.0p63d]
+                            it.visitInsn(Opcodes.DADD) // [double]
+                            it.visitLabel(ifNonNegative) // non-negative [double]
+                        }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    // Plan for converting float -> ulong:
+                    // long fromDouble(double v) {
+                    //   if (v <= 0) return 0;
+                    //   long oddBit = (long) (v % 2)
+                    //   return (((long) (v / 2)) << 1) | oddBit;
+                    // }
+                    F32Type -> when (to) {
+                        U1Type -> bytecode { it.visitInsn(Opcodes.F2I); bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.F2I); it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { it.visitInsn(Opcodes.F2I); bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.F2I); it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType -> bytecode { it.visitInsn(Opcodes.F2I); bitmask(it, 0xFFFF) }
+                        I32Type -> bytecode { it.visitInsn(Opcodes.F2I) }
+                        U32Type -> bytecode { it.visitInsn(Opcodes.F2L); it.visitInsn(Opcodes.L2I) }
+                        I64Type -> bytecode { it.visitInsn(Opcodes.F2L) }
+                        U64Type -> bytecode {
+                            // [v]
+                            it.visitInsn(Opcodes.DUP) // [v, v]
+                            it.visitInsn(Opcodes.FCONST_0) // [v, v, 0]
+                            it.visitInsn(Opcodes.FCMPL) // [v, (v <= 0 or v is NaN) ? (-1 or 0) : 1]
+                            val continuing = Label()
+                            it.visitJumpInsn(Opcodes.IFGT, continuing) // If it's 1, continue along
+                            it.visitInsn(Opcodes.POP) // []
+                            it.visitInsn(Opcodes.FCONST_0) // [0]
+                            it.visitInsn(Opcodes.FRETURN) // Gone
+                            it.visitLabel(continuing) // [v], v is strictly positive
+                            it.visitInsn(Opcodes.DUP) // [v, v]
+                            it.visitInsn(Opcodes.FCONST_2) // [v, v, 2]
+                            it.visitInsn(Opcodes.FREM) // [v, v % 2]
+                            it.visitInsn(Opcodes.F2L) // [v, (long) (v % 2)]
+                            it.visitInsn(Opcodes.DUP2_X1) // [(long) (v % 2), v, (long) v % 2]
+                            it.visitInsn(Opcodes.POP2) // [(long) (v % 2), v]
+                            it.visitInsn(Opcodes.FCONST_2) // [(long) (v % 2), v, 2]
+                            it.visitInsn(Opcodes.FDIV) // [(long) (v % 2), v / 2]
+                            it.visitInsn(Opcodes.F2L) // [(long) (v % 2), (long) (v / 2)]
+                            it.visitInsn(Opcodes.ICONST_1) // [(long) (v % 2), (long) (v / 2), 1]
+                            it.visitInsn(Opcodes.LSHL) // [(long) (v % 2), ((long) (v / 2)) << 1]
+                            it.visitInsn(Opcodes.LOR) // [(long) (v % 2) | (((long) (v / 2)) << 1)]
+                            // Done!
+                        }
+                        F32Type -> sequenceOf()
+                        F64Type -> bytecode { it.visitInsn(Opcodes.F2D) }
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    F64Type -> when (to) {
+                        U1Type -> bytecode { it.visitInsn(Opcodes.D2I); bitmask(it, 1) }
+                        I8Type -> bytecode { it.visitInsn(Opcodes.D2I); it.visitInsn(Opcodes.I2B) }
+                        U8Type -> bytecode { it.visitInsn(Opcodes.D2I); bitmask(it, 0xFF) }
+                        I16Type -> bytecode { it.visitInsn(Opcodes.D2I); it.visitInsn(Opcodes.I2S) }
+                        U16Type, CharType -> bytecode { it.visitInsn(Opcodes.D2I); bitmask(it, 0xFFFF) }
+                        I32Type -> bytecode { it.visitInsn(Opcodes.D2I) }
+                        U32Type -> bytecode { it.visitInsn(Opcodes.D2L); it.visitInsn(Opcodes.L2I) }
+                        I64Type -> bytecode { it.visitInsn(Opcodes.D2L) }
+                        U64Type -> bytecode {
+                            // [v]
+                            it.visitInsn(Opcodes.DUP2) // [v, v]
+                            it.visitInsn(Opcodes.DCONST_0) // [v, v, 0]
+                            it.visitInsn(Opcodes.DCMPL) // [v, (v <= 0 or v is NaN) ? (-1 or 0) : 1]
+                            val continuing = Label()
+                            it.visitJumpInsn(Opcodes.IFGT, continuing) // If it's 1, continue along
+                            it.visitInsn(Opcodes.POP) // []
+                            it.visitInsn(Opcodes.DCONST_0) // [0]
+                            it.visitInsn(Opcodes.DRETURN) // Gone
+                            it.visitLabel(continuing) // [v], v is strictly positive
+                            it.visitInsn(Opcodes.DUP2) // [v, v]
+                            it.visitLdcInsn(2.0) // [v, v, 2]
+                            it.visitInsn(Opcodes.DREM) // [v, v % 2]
+                            it.visitInsn(Opcodes.D2L) // [v, (long) (v % 2)]
+                            it.visitInsn(Opcodes.DUP2_X2) // [(long) (v % 2), v, (long) v % 2]
+                            it.visitInsn(Opcodes.POP2) // [(long) (v % 2), v]
+                            it.visitLdcInsn(2.0) // [(long) (v % 2), v, 2]
+                            it.visitInsn(Opcodes.DDIV) // [(long) (v % 2), v / 2]
+                            it.visitInsn(Opcodes.D2L) // [(long) (v % 2), (long) (v / 2)]
+                            it.visitInsn(Opcodes.ICONST_1) // [(long) (v % 2), (long) (v / 2), 1]
+                            it.visitInsn(Opcodes.LSHL) // [(long) (v % 2), ((long) (v / 2)) << 1]
+                            it.visitInsn(Opcodes.LOR) // [(long) (v % 2) | (((long) (v / 2)) << 1)]
+                            // Done!
+                        }
+                        F32Type -> bytecode { it.visitInsn(Opcodes.D2F) }
+                        F64Type -> sequenceOf()
+                        else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                    }
+                    else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+                }
+            }
+            from.isReferenceType && to.isReferenceType -> when {
+                from.isSubtype(to) -> sequenceOf()
+                to.isSubtype(from) -> sequenceOf(Instruction.Bytecodes(1) {
+                    it.visitTypeInsn(Opcodes.CHECKCAST, to.runtimeName)
+                })
+                else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+            }
+            else -> throw IllegalStateException("Unexpected casting type, bug in compiler, please report")
+        })
+
+    }
+
+
+}
+
+// Used privately in this file to help with logic for casting.
+// A lot of its methods will not work (they assume 8, 16, 32, 64 bits)
+// but that is okay.
+private object U1Type: IntType(signed = false, bits = 1)
+
+

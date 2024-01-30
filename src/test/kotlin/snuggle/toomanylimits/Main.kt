@@ -16,7 +16,7 @@ fun main() {
         impl<T> () -> T? { fn iter(): () -> T? this }
         
         for c in "hello".chars()
-            print(c)
+            print(c as! u16)
             
         let x: Object = "hi"
         
@@ -25,8 +25,10 @@ fun main() {
         if x !is String {
             // for c in x.chars() print(c) // Error, x is not a String here
         } else {
-            for c in x.chars() print(c)
+            for c in x.chars() print(c as! u16)
         }
+        
+        for c in (x as! String).chars() print(c as! u16)
         
     """.trimIndent()
 

@@ -203,6 +203,12 @@ fun resolveExpr(expr: ParsedElement.ParsedExpr, startingMappings: EnvMembers, cu
             .mapExpr { ResolvedExpr.Is(expr.loc, it, pattern) }
     }
 
+    is ParsedElement.ParsedExpr.As -> {
+        val type = resolveType(expr.type, currentMappings)
+        resolveExpr(expr.lhs, startingMappings, currentMappings, ast, cache)
+            .mapExpr { ResolvedExpr.As(expr.loc, expr.forced, it, type) }
+    }
+
     is ParsedElement.ParsedExpr.Literal -> just(ResolvedExpr.Literal(expr.loc, expr.value))
     is ParsedElement.ParsedExpr.Variable -> just(ResolvedExpr.Variable(expr.loc, expr.name))
     is ParsedElement.ParsedExpr.Parenthesized -> resolveExpr(expr.inner, startingMappings, currentMappings, ast, cache)
