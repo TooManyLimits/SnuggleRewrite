@@ -43,12 +43,6 @@ fun main() {
             print(add(5)(6)) // 11
         }
         
-        class X: i32 {
-            
-        }
-        
-        print(new X())
-        
     """.trimIndent()
 
     val instance = InstanceBuilder(mutableMapOf("main" to code))

@@ -36,6 +36,7 @@ object OptionType: BuiltinType {
         if (generics[0].isReferenceType) 1 else generics[0].stackSlots + 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = !generics[0].isReferenceType
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {

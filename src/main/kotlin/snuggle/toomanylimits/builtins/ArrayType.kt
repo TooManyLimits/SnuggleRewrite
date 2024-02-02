@@ -37,7 +37,14 @@ object ArrayType: BuiltinType {
     }
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = generics[0].isPlural
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = !generics[0].isPlural
+    override fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
+
+    override fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypingCache): TypeDef? {
+        if (generics[0].isPlural)
+            return null
+        return getBasicBuiltin(ObjectType, typeCache)
+    }
 
     override fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> {
         val u32 = getBasicBuiltin(U32Type, typeCache)

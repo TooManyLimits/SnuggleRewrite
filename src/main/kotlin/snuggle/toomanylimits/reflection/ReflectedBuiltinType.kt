@@ -51,6 +51,7 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
+    override fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean = !Modifier.isFinal(reflectedClass.modifiers) // Extensible if class is not final
     override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true //TODO Configurable
     override fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypingCache): TypeDef
         = fetchType(reflectedClass.annotatedSuperclass, typeCache)

@@ -70,6 +70,9 @@ interface BuiltinType {
     // may be some variance in how this is interpreted.
     fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean
 
+    // Whether this type can be inherited/extended from.
+    fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean
+
     // Whether the type uses a static constructor style. If true, constructors
     // should be of the form "static fn new() -> Type", returning an instance,
     // if false they should be "fn new() -> Unit", initializing an existing instance.
@@ -88,6 +91,6 @@ interface BuiltinType {
     // Get all supertypes of this type (used for type-checking purposes)
     // Default is just the primary supertype.
     fun getAllSupertypes(generics: List<TypeDef>, typeCache: TypingCache): List<TypeDef> =
-        getPrimarySupertype(generics, typeCache)?.let { listOf(it) } ?: listOf()
+        listOfNotNull(getPrimarySupertype(generics, typeCache))
 
 }

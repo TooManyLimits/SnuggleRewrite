@@ -25,6 +25,7 @@ open class FloatType(val bits: Int): BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = if (bits == 64) 2 else 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
     override fun getMethods(generics: List<TypeDef>, typeCache: TypingCache): List<MethodDef> {

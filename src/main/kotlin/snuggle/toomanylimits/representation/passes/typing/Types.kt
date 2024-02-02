@@ -1,10 +1,13 @@
 package snuggle.toomanylimits.representation.passes.typing
 
 import snuggle.toomanylimits.builtins.BuiltinType
+import snuggle.toomanylimits.errors.CompilationException
+import snuggle.toomanylimits.errors.TypeCheckingException
 import snuggle.toomanylimits.representation.asts.resolved.ResolvedType
 import snuggle.toomanylimits.representation.asts.resolved.ResolvedTypeDef
 import snuggle.toomanylimits.representation.asts.typed.FieldDef
 import snuggle.toomanylimits.representation.asts.typed.TypeDef
+import snuggle.toomanylimits.representation.passes.lexing.Loc
 
 /**
  * File handles dealing with TypeDefs, instantiating them, and the TypingCache
@@ -74,6 +77,10 @@ private fun instantiateTypeDef(base: ResolvedTypeDef, generics: List<TypeDef>, t
         // Other types need more work replacing generics.
         is ResolvedTypeDef.Class -> indirect(base, generics, typeCache) { indirection ->
             val supertype = getTypeDef(base.superType, typeCache, generics, listOf())
+            // Ensure that the supertype is extensible:
+            if (!supertype.extensible) {
+                throw InvalidSuperclassException(supertype, base.superType.loc)
+            }
             TypeDef.ClassDef(
                 base.loc, base.name, supertype, generics,
                 // Note: This is where the currentTypeGenerics start out! The generics
@@ -140,3 +147,6 @@ fun getReflectedBuiltin(jClass: Class<*>, cache: TypingCache): TypeDef =
             ?: throw IllegalStateException("Attempt to get builtin for java class \"${jClass.name}\", but none was registered?"),
         cache
     )
+
+class InvalidSuperclassException(attemptedSupertype: TypeDef, loc: Loc)
+    : CompilationException("Type \"${attemptedSupertype.name}\" cannot be used as a superclass!", loc)

@@ -21,6 +21,7 @@ object FloatLiteralType: BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = 999999999
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
     // Supertypes are the various int types and float types

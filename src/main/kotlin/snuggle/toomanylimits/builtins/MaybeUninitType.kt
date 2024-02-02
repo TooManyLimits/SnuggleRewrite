@@ -26,6 +26,7 @@ object MaybeUninitType: BuiltinType {
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = generics[0].stackSlots
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
+    override fun extensible(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
 
     override fun getFields(generics: List<TypeDef>, typeCache: TypingCache): List<FieldDef> {

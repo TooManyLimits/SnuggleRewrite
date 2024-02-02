@@ -19,24 +19,25 @@ import java.util.concurrent.atomic.AtomicInteger
 // A type definition, instantiated. No more generics left to fill.
 sealed class TypeDef {
 
-    abstract val name: String
-    abstract val runtimeName: String?
-    abstract val descriptor: List<String>
+    abstract val name: String // The name of this type at compile time. Used in error reporting.
+    abstract val runtimeName: String? // The name of this type at runtime. Types which don't have generated classes at runtime, like i32, are null.
+    abstract val descriptor: List<String> // The descriptor of this type. If plural, has multiple elements.
 
-    abstract val stackSlots: Int
-    abstract val isPlural: Boolean
-    abstract val isReferenceType: Boolean
+    abstract val stackSlots: Int // The number of stack slots this takes up. 1 for reference types and small primitives, 2 for longs/doubles, potentially more or less for plurals.
+    abstract val isPlural: Boolean // Whether this type is plural, like a struct or tuple. If true, it cannot be a reference type.
+    abstract val isReferenceType: Boolean // Whether this type is a reference type. If true, it cannot be plural.
+    abstract val extensible: Boolean // Whether this type is extensible. If true, then this must be a reference type.
 
     // If true, constructors are "static fn new() -> Type". Otherwise, "fn new() -> Unit"
     abstract val hasStaticConstructor: Boolean
 
-    abstract val primarySupertype: TypeDef?
-    abstract val supertypes: List<TypeDef>
+    abstract val primarySupertype: TypeDef? // The "primary" supertype of this type, used for inheritance.
+    abstract val supertypes: List<TypeDef> // The set of all supertypes for this type, used for type checking.
 
-    abstract val fields: List<FieldDef>
-    abstract val methods: List<MethodDef>
+    abstract val fields: List<FieldDef> // The fields of this type.
+    abstract val methods: List<MethodDef> // The methods of this type.
 
-    // The generics from which this type def was made
+    // The generics with which this type def was instantiated. For tuples and functions, it's the types used in their creation.
     abstract val generics: List<TypeDef>
 
     // Helpers caching common values.
@@ -130,6 +131,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = promise.expect().stackSlots
         override val isPlural: Boolean get() = promise.expect().isPlural
         override val isReferenceType: Boolean get() = promise.expect().isReferenceType
+        override val extensible: Boolean get() = promise.expect().extensible
         override val hasStaticConstructor: Boolean get() = promise.expect().hasStaticConstructor
         override val primarySupertype: TypeDef? get() = promise.expect().primarySupertype
         override val supertypes: List<TypeDef> get() = promise.expect().supertypes
@@ -150,6 +152,7 @@ sealed class TypeDef {
         override val stackSlots: Int = innerTypes.sumOf { it.stackSlots }
         override val isPlural: Boolean get() = true
         override val isReferenceType: Boolean get() = false
+        override val extensible: Boolean get() = false
         override val hasStaticConstructor: Boolean get() = true
         override val primarySupertype: TypeDef? get() = null
         override val supertypes: List<TypeDef> get() = listOf()
@@ -172,6 +175,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = 1
         override val isPlural: Boolean get() = false
         override val isReferenceType: Boolean get() = true
+        override val extensible: Boolean get() = false
         override val hasStaticConstructor: Boolean get() = false
         override val primarySupertype: TypeDef = getBasicBuiltin(ObjectType, typeCache)
         override val supertypes: List<TypeDef> get() = listOf(primarySupertype)
@@ -196,6 +200,7 @@ sealed class TypeDef {
         override val stackSlots: Int = 1
         override val isPlural: Boolean = false
         override val isReferenceType: Boolean = true
+        override val extensible: Boolean get() = false
         override val hasStaticConstructor: Boolean = false
         override val primarySupertype: TypeDef = functionToImplement
         override val supertypes: List<TypeDef> = listOf(primarySupertype)
@@ -268,6 +273,7 @@ sealed class TypeDef {
         override val stackSlots: Int = builtin.stackSlots(generics, typeCache)
         override val isPlural: Boolean = builtin.isPlural(generics, typeCache)
         override val isReferenceType: Boolean = builtin.isReferenceType(generics, typeCache)
+        override val extensible: Boolean = builtin.extensible(generics, typeCache)
         override val hasStaticConstructor: Boolean = builtin.hasStaticConstructor(generics, typeCache)
         override val primarySupertype: TypeDef? = builtin.getPrimarySupertype(generics, typeCache)
         override val supertypes: List<TypeDef> = builtin.getAllSupertypes(generics, typeCache)
@@ -287,6 +293,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = 1
         override val isPlural: Boolean get() = false
         override val isReferenceType: Boolean get() = true
+        override val extensible: Boolean get() = true
         override val hasStaticConstructor: Boolean get() = false
         override val primarySupertype: TypeDef get() = supertype
         override val supertypes: List<TypeDef> = listOf(primarySupertype)
@@ -304,6 +311,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = fields.filter { !it.static }.sumOf { it.type.stackSlots }
         override val isPlural: Boolean get() = true
         override val isReferenceType: Boolean get() = false
+        override val extensible: Boolean get() = false
         override val hasStaticConstructor: Boolean get() = true
         override val primarySupertype: TypeDef? get() = null
         override val supertypes: List<TypeDef> = listOf()
@@ -320,6 +328,7 @@ sealed class TypeDef {
         override val stackSlots: Int get() = 0
         override val isPlural: Boolean get() = true
         override val isReferenceType: Boolean get() = false
+        override val extensible: Boolean get() = false
         override val hasStaticConstructor: Boolean get() = true
         override val primarySupertype: TypeDef? get() = null
         override val supertypes: List<TypeDef> get() = listOf()
