@@ -4,6 +4,7 @@ import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
+import snuggle.toomanylimits.builtins.helpers.bitmask
 import snuggle.toomanylimits.builtins.primitive.*
 import snuggle.toomanylimits.representation.asts.typed.FieldDef
 import snuggle.toomanylimits.representation.asts.typed.MethodDef
@@ -94,6 +95,9 @@ object ArrayType: BuiltinType {
             },
             MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "get", innerType, listOf(u32)) {
                 it.visitInsn(opcodes.loadFromArray)
+                // Mask the value if necessary (unsigned ints)
+                if (innerType.builtin == U16Type || innerType.builtin == U8Type)
+                    bitmask(it, (innerType.builtin as IntType).maxValue.longValueExact())
             },
             MethodDef.BytecodeMethodDef(pub = true, static = false, thisType, "set", unit, listOf(u32, innerType)) {
                 it.visitInsn(opcodes.storeInArray)
@@ -194,12 +198,18 @@ object ArrayType: BuiltinType {
                     writer.visitInsn(Opcodes.DUP_X1) // [arrays, index, topArray, index]
                     val opcodes = getOpcodesFor(curType)
                     writer.visitInsn(opcodes.loadFromArray) // [arrays, index, topArray[index]]
+                    // Mask the value if necessary (unsigned ints)
+                    if (curType.builtin == U16Type || curType.builtin == U8Type)
+                        bitmask(writer, (curType.builtin as IntType).maxValue.longValueExact())
                     writer.visitVarInsn(opcodes.storeInLocal, curMaxVariable) // [arrays, index]
                     curMaxVariable += curType.stackSlots // Inc cur max variable
                 }
                 // Ending case, load from the last(/first) array.
                 val firstOpcodes = getOpcodesFor(desiredInnerTypes[0])
                 writer.visitInsn(firstOpcodes.loadFromArray) // Just load from the array
+                // Mask the value if necessary (unsigned ints)
+                if (desiredInnerTypes[0].builtin == U16Type || desiredInnerTypes[0].builtin == U8Type)
+                    bitmask(writer, (desiredInnerTypes[0].builtin as IntType).maxValue.longValueExact())
                 // Now, re-fetch all those local variables
                 for (curType in desiredInnerTypes.drop(1)) { // Iterate forwards
                     curMaxVariable -= curType.stackSlots

@@ -3,15 +3,12 @@ package snuggle.toomanylimits.representation.passes.output
 import org.objectweb.asm.ConstantDynamic
 import org.objectweb.asm.Handle
 import snuggle.toomanylimits.builtins.*
-import snuggle.toomanylimits.builtins.helpers.Fraction
-import snuggle.toomanylimits.builtins.helpers.basicLocal
-import snuggle.toomanylimits.builtins.helpers.popType
-import snuggle.toomanylimits.builtins.helpers.swapBasic
 import snuggle.toomanylimits.builtins.primitive.*
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
+import snuggle.toomanylimits.builtins.helpers.*
 import snuggle.toomanylimits.builtins.reflected.SnuggleString
 import snuggle.toomanylimits.representation.asts.ir.Instruction
 import java.lang.invoke.MethodHandles
@@ -49,6 +46,10 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
         val name = inst.methodToCall.runtimeName
         val descriptor = getMethodDescriptor(inst.methodToCall)
         writer.visitMethodInsn(inst.invokeBytecode, owner, name, descriptor, inst.isInterface)
+        // If the return type is an unsigned int under 32 bits, mask it!
+        if (inst.methodToCall.returnType.builtin == U16Type || inst.methodToCall.returnType.builtin == U8Type)
+            bitmask(writer, (inst.methodToCall.returnType.builtin as IntType).maxValue.longValueExact())
+        Unit
     }
 
     // Helper function for return
@@ -97,6 +98,10 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.GetReferenceTypeField -> {
         if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetReferenceTypeField with plural type? Bug in compiler, please report")
         writer.visitFieldInsn(Opcodes.GETFIELD, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
+        // If the type is an unsigned int under 32 bits, mask it!
+        if (inst.fieldType.builtin == U16Type || inst.fieldType.builtin == U8Type)
+            bitmask(writer, (inst.fieldType.builtin as IntType).maxValue.longValueExact())
+        Unit
     }
     is Instruction.PutReferenceTypeField -> {
         if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetReferenceTypeField with plural type? Bug in compiler, please report")
@@ -105,6 +110,9 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.GetStaticField -> {
         if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to GetStaticField with plural type? Bug in compiler, please report")
         writer.visitFieldInsn(Opcodes.GETSTATIC, inst.owningType.runtimeName, inst.runtimeFieldName, inst.fieldType.descriptor[0])
+        if (inst.fieldType.builtin == U16Type || inst.fieldType.builtin == U8Type)
+            bitmask(writer, (inst.fieldType.builtin as IntType).maxValue.longValueExact())
+        Unit
     }
     is Instruction.PutStaticField -> {
         if (inst.fieldType.descriptor.size != 1) throw IllegalStateException("Attempt to PutStaticField with plural type? Bug in compiler, please report")

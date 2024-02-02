@@ -419,6 +419,7 @@ private fun handleAssignment(lhs: TypedExpr, rhs: TypedExpr, fieldsToFollow: Con
     }
 
     lhs is TypedExpr.StaticFieldAccess -> sequence {
+        yieldAll(lowerExpr(rhs, ConsList.of(ConsList.nil()), filesWithEffects, typeCalc))
         val namePrefix = fieldsToFollow.fold(lhs.fieldName) { prefix, field -> prefix + "$" + field.name }
         if (rhs.type.isPlural) {
             for ((pathToField, field) in rhs.type.recursivePluralFields.asReversed())

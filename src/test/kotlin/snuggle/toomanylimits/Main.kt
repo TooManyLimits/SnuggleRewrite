@@ -12,36 +12,24 @@ fun main() {
         import "std/types/Inc"
         import "std/impls/String"
         
-        for c in "hello".chars() print(c)
+        //for c in "hello".chars() print(c)
         print("hello"[2, 3] + "hello"[4, 5] + "hello"[3, 4])
         
-        struct naturals {
-            static fn invoke(): () -> u64? {
-                let current: Box<u64> = new(0)
-                fn() {
-                    let next = *current;
-                    *current = *current + 1
-                    return new(next)
-                }
+        class Bleh {
+            static mut x: u8
+            static fn get255(): u8 {
+                return 255
+            }
+            static fn getX(): u8 {
+                return Bleh.x
             }
         }
+        Bleh.x = 255
         
-        for x in naturals() // "Infinite" iterator of natural numbers
-            .map::<u64>(fn(n) n*n) // Square them
-            .take(20) // Take the first 20
-            .filterMap::<u64>(fn(x) if x > 100 new(2 * x) else new()) // x over 100 are doubled, under 100 removed
-        {
-            print(x)
-        }
-        
-        {
-            import "std/impls/curry"
-            let add: (i32, i32) -> i32 = fn(a, b) a + b
-            let add2 = add(2)
-            print(add2(3)) // 5
-            print(add(3, 4)) // 7
-            print(add(5)(6)) // 11
-        }
+        print(255u8)
+        print(Bleh.get255())
+        print(Bleh.getX())
+        print(Bleh.x)
         
     """.trimIndent()
 

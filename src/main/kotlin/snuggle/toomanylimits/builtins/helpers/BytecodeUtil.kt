@@ -48,6 +48,27 @@ fun basicLocal(index: Int, type: TypeDef, store: Boolean, writer: MethodVisitor)
     else -> throw IllegalStateException("Unrecognized type \"${type.name}\" did not meet any condition for basicLocal? Bug in compiler, please report")
 }
 
+// Perform a bitmask with the given mask.
+// Only certain masks are supported:
+// 0x1, 0xFF, 0xFFFF: used when an int is on top of the stack
+// 0xFFFFFFFF: used when a long is on top of the stack
+fun bitmask(writer: MethodVisitor, mask: Long) {
+    if (mask == 0xFFFFL)
+        writer.visitInsn(Opcodes.I2C)
+    else {
+        when (mask) {
+            1L -> writer.visitInsn(Opcodes.ICONST_1)
+            0xFFL -> writer.visitIntInsn(Opcodes.SIPUSH, 0xFF)
+            0xFFFFFFFFL -> writer.visitLdcInsn(0xFFFFFFFFL)
+            else -> throw IllegalStateException()
+        }
+        if (mask == 0xFFFFFFFFL)
+            writer.visitInsn(Opcodes.LAND)
+        else
+            writer.visitInsn(Opcodes.IAND)
+    }
+}
+
 /**
  * Push a default, uninitialized value of the given type onto the top
  * of the stack.
