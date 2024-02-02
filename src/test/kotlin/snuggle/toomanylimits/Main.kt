@@ -13,12 +13,7 @@ fun main() {
         import "std/impls/String"
         
         for c in "hello".chars() print(c)
-        
-        print("hello"[1, 3])
-        
-        let x = "hello"
-        x.chars[1] = 'x'
-        print(x) // hxllo
+        print("hello"[2, 3] + "hello"[4, 5] + "hello"[3, 4])
         
         struct naturals {
             static fn invoke(): () -> u64? {
@@ -46,7 +41,7 @@ fun main() {
             print(add2(3)) // 5
             print(add(3, 4)) // 7
             print(add(5)(6)) // 11
-        }
+        } 
         
     """.trimIndent()
 

@@ -10,7 +10,12 @@ import java.lang.invoke.MethodHandles;
 @SnuggleRename("String")
 public class SnuggleString {
 
-    @SnuggleAllow public final char[] chars;
+    public static final SnuggleString EMPTY = new SnuggleString("");
+
+    // Do not give Snuggle access to .chars field, because then they can mutate it.
+    // Instead we need custom methods in here to allow reading the .chars() field, but
+    // not writing to it
+    private final char[] chars;
     @SnuggleAllow public final @Unsigned int start;
     @SnuggleAllow public final @Unsigned int length;
 
@@ -19,6 +24,38 @@ public class SnuggleString {
     public static SnuggleString create(char[] chars, @Unsigned int start, @Unsigned int length) throws SnuggleException {
         return new SnuggleString(chars, start, length);
     }
+
+    // Get the Nth char in this string
+    @SnuggleAllow
+    @SnuggleRename("get")
+    public char charAt(@Unsigned int index) throws SnuggleException {
+        if (Integer.compareUnsigned(index, length) >= 0)
+            throw new SnuggleException("Invalid string index " + Integer.toUnsignedString(index) + ": String only has length " + length);
+        return chars[start + index];
+    }
+
+    // Get a substring
+    @SnuggleAllow
+    @SnuggleRename("get")
+    public SnuggleString substring(@Unsigned int begin, @Unsigned int end) throws SnuggleException {
+        if (end == begin) return EMPTY;
+        // Make sure that:
+        // 1. begin <= end
+        // 2. start + begin >= start (begin >= 0) (Note: Satisfied by begin <= length)
+        // 3. start + begin <= start + length (begin <= length) (Note: Satisfied by 1 and 4)
+        // 4. end <= length
+        if (Integer.compareUnsigned(begin, end) > 0)
+            throw new SnuggleException("Invalid substring: end index " + Integer.toUnsignedString(end) + " is before start index " + Integer.toUnsignedString(begin));
+//        if (Integer.compareUnsigned(begin, length) > 0)
+//            throw new SnuggleException("Invalid substring: start index " + Integer.toUnsignedString(begin) + " is after the end of the string");
+        if (Integer.compareUnsigned(end, length) > 0)
+            throw new SnuggleException("Invalid substring: end index " + Integer.toUnsignedString(end) + " is after the end of the string");
+        // Now we can just happily add the values and continue along
+        // I'm sure there absolutely aren't any strange integer overflow or signed/unsigned errors here
+        return new SnuggleString(chars, start + begin, start + end - begin);
+    }
+
+
 
     public SnuggleString(char[] chars, @Unsigned int start, @Unsigned int length) throws SnuggleException {
         this.chars = chars;

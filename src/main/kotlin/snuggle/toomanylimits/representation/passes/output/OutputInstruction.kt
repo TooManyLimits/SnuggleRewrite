@@ -157,7 +157,7 @@ private fun outputPush(inst: Instruction.Push, writer: MethodVisitor) {
                     throw IllegalStateException("Number literal out of range - but this should have been caught earlier. Bug in compiler, please report")
                 when {
                     // LDC, SIPUSH
-                    !I16Type.fits(v) -> writer.visitLdcInsn(v.intValueExact())
+                    !I16Type.fits(v) -> writer.visitLdcInsn(v.toInt())
                     !I8Type.fits(v) -> writer.visitIntInsn(Opcodes.SIPUSH, v.shortValueExact().toInt())
                     // ICONST
                     v == BigInteger.ZERO -> writer.visitInsn(Opcodes.ICONST_0)

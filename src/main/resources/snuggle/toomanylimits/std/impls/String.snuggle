@@ -7,24 +7,14 @@ pub impl String {
     // of the string in chars.
     fn size(): u32 this.length
 
-    // Get the n'th char in this string.
-    fn get(index: u32): char {
-        this.chars[index]
-    }
-
-    // Get a substring from begin (inclusive) to end (exclusive).
-    fn get(begin: u32, end: u32): String {
-        new(chars, start + begin, start + end - begin)
-    }
-
     // Operator overload to check equality of strings:
     fn eq(other: String): bool {
         // If length is different, immediately rule it out
-        if this.length != other.length return false
+        if #this != #other return false
         // Iterate over the chars. If any is different, return false.
         let mut i: u32 = 0
         while i < length {
-            if chars[start + i] != other.chars[other.start + i]
+            if this[start + i] != other[other.start + i]
                 return false
             i = i + 1
         }
@@ -32,6 +22,17 @@ pub impl String {
         return true
     }
 
+    // Concatenate the two strings together into a new one
+    fn add(other: String): String {
+        let chars = new char[](#this + #other)
+        for (i, c) in this.chars().indexed() {
+            chars[i] = c
+        }
+        for (i, c) in other.chars().indexed() {
+            chars[#this + i] = c
+        }
+        new(chars, 0, #chars)
+    }
 
     // Get an iterator over the characters of this string.
     fn chars(): () -> char? {
