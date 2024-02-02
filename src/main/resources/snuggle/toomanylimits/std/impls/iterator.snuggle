@@ -136,6 +136,41 @@ pub impl<T> () -> T? {
         }
     }
 
-
-
+    // TODO: This can be written a lot better at my keyboard.
+    fn fork(): (() -> T?, () -> T?) {
+        // Store a 'flag' for which side is behind, and a list of what it has to catch up on.
+        let rightBehind: Box<bool> = new(false)
+        let elemsBehind: List<T> = new()
+        (fn()
+            if #elemsBehind == 0 {
+                // Not behind, so make other side behind.
+                *rightBehind = true
+                let v: T? = this()
+                if v elemsBehind.addLast(*v)
+                v
+            } else if *rightBehind {
+                // Other side's behind, so they become further behind.
+                let v: T? = this()
+                if v elemsBehind.addLast(*v)
+                v
+            } else
+                // We're behind! Use a value from the list.
+                new(v.removeFirst())
+        , fn()
+            if #elemsBehind == 0 {
+                // Not behind, so make other side behind.
+                *rightBehind = false
+                let v: T? = this()
+                if v elemsBehind.addLast(*v)
+                v
+            } else if !*rightBehind {
+                // Other side's behind, so they become further behind.
+                let v: T? = this()
+                if v elemsBehind.addLast(*v)
+                v
+            } else
+                // We're behind! Use a value from the list.
+                new(v.removeFirst())
+        )
+    }
 }
