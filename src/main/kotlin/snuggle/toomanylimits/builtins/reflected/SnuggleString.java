@@ -79,7 +79,8 @@ public class SnuggleString {
 
     // Java helpers
     public boolean equals(Object other) {
-        if (!(other instanceof SnuggleString s)) return false;
+        if (!(other instanceof SnuggleString)) return false;
+        SnuggleString s = (SnuggleString) other;
         if (length != s.length) return false;
         if (chars == s.chars) return true;
         for (int i = start; i < start + length; i++)

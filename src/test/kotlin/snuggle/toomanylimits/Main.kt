@@ -41,7 +41,13 @@ fun main() {
             print(add2(3)) // 5
             print(add(3, 4)) // 7
             print(add(5)(6)) // 11
-        } 
+        }
+        
+        class X: i32 {
+            
+        }
+        
+        print(new X())
         
     """.trimIndent()
 

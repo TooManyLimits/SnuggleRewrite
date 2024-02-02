@@ -193,20 +193,28 @@ private fun outputPush(inst: Instruction.Push, writer: MethodVisitor) {
         }
 
         is String -> {
-            val internalName = Type.getInternalName(SnuggleString::class.java)
-            val constantDesc = Type.getDescriptor(SnuggleString::class.java)
-            val methodDesc = Type.getMethodDescriptor(
-                Type.getType(SnuggleString::class.java),
-                Type.getType(MethodHandles.Lookup::class.java),
-                Type.getType(String::class.java),
-                Type.getType(Class::class.java),
-                Type.getType(String::class.java)
-            )
-            val handle = Handle(Opcodes.H_INVOKESTATIC, internalName, "bootstrapGenerator", methodDesc, false)
-            val constantDynamic = ConstantDynamic("blah", constantDesc, handle, value)
+            val constantDynamic = ConstantDynamic("blah", stringDesc, stringBootstrapHandle, value)
             writer.visitLdcInsn(constantDynamic)
         }
+
+        // Custom ConstantDynamic
+        is ConstantDynamic -> writer.visitLdcInsn(value)
 
         else -> throw IllegalStateException("Unrecognized literal class: ${inst.valueToPush.javaClass.name}")
     }
 }
+
+private val stringDesc: String = Type.getDescriptor(SnuggleString::class.java)
+private val stringBootstrapHandle: Handle = Handle(
+    Opcodes.H_INVOKESTATIC,
+    Type.getInternalName(SnuggleString::class.java),
+    "bootstrapGenerator",
+    Type.getMethodDescriptor(
+        Type.getType(SnuggleString::class.java),
+        Type.getType(MethodHandles.Lookup::class.java),
+        Type.getType(String::class.java),
+        Type.getType(Class::class.java),
+        Type.getType(String::class.java)
+    ),
+    false
+)
