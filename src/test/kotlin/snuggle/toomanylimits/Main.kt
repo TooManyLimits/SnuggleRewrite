@@ -2,33 +2,51 @@ package snuggle.toomanylimits
 
 import snuggle.toomanylimits.runtime.InstanceBuilder
 
+object MainObject // Here so I have something to get the classloader of... ?
+
 fun main() {
 
     val code = """
-        import "box"
+        import "std/impls/iterator"
+        import "std/types/Box"
+        import "std/types/Inc"
+        import "std/impls/String"
         
-        impl String {
-            fn chars(): () -> char? {
-                let i = new Box<u32>(0)
-                fn() if *i >= #this new() else { *i = *i + 1 new(this[*i - 1]) }
+        for c in "hello".chars() print(c)
+        
+        print("hello"[1, 3])
+        
+        let x = "hello"
+        x.chars[1] = 'x'
+        print(x) // hxllo
+        
+        struct naturals {
+            static fn invoke(): () -> u64? {
+                let current: Box<u64> = new(0)
+                fn() {
+                    let next = *current;
+                    *current = *current + 1
+                    return new(next)
+                }
             }
         }
-        impl<T> () -> T? { fn iter(): () -> T? this }
         
-        for c in "hello".chars()
-            print(c as! u16)
-            
-        let x: Object = "hi"
-        
-        // for c in x.chars() print(c) // Error, x is Object, no chars() method
-        
-        if x !is String {
-            // for c in x.chars() print(c) // Error, x is not a String here
-        } else {
-            for c in x.chars() print(c as! u16)
+        for x in naturals() // "Infinite" iterator of natural numbers
+            .map::<u64>(fn(n) n*n) // Square them
+            .take(20) // Take the first 20
+            .filterMap::<u64>(fn(x) if x > 100 new(2 * x) else new()) // x over 100 are doubled, under 100 removed
+        {
+            print(x)
         }
         
-        for c in (x as! String).chars() print(c as! u16)
+        {
+            import "std/impls/curry"
+            let add: (i32, i32) -> i32 = fn(a, b) a + b
+            let add2 = add(2)
+            print(add2(3)) // 5
+            print(add(3, 4)) // 7
+            print(add(5)(6)) // 11
+        }
         
     """.trimIndent()
 

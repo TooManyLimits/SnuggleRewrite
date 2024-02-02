@@ -10,4 +10,11 @@ fun toGeneric(base: String, generics: List<TypeDef>, leftBracket: String = "(", 
     }
 }
 
+//Cursed. Horrifying if you will
+//Use this whenever we send something into an actual
+//JVM-adjacent method, like something from ASM. We don't
+//need to mangle until then.
+
+//ClassVisitor.visitField/visitMethod()
+//MethodVisitor.visitFieldInsn/visitMethodInsn()
 fun mangleSlashes(str: String): String = str.replace('/', '\\')

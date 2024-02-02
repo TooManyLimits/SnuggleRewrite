@@ -275,12 +275,13 @@ sealed class TypeDef {
         override val methods: List<MethodDef> = builtin.getMethods(generics, typeCache)
     }
 
-    class ClassDef(val loc: Loc, override val name: String, val supertype: TypeDef,
+    class ClassDef(val loc: Loc, name: String, val supertype: TypeDef,
                    override val generics: List<TypeDef>,
                    override val fields: List<FieldDef>,
                    override val methods: List<MethodDef>,
                    override val typeHead: ResolvedTypeDef
     ): TypeDef(), FromTypeHead {
+        override val name: String = toGeneric("snuggle/" + loc.fileName + "/" + name, generics)
         override val runtimeName: String get() = name
         override val descriptor: List<String> get() = listOf("L$runtimeName;")
         override val stackSlots: Int get() = 1
@@ -291,12 +292,13 @@ sealed class TypeDef {
         override val supertypes: List<TypeDef> = listOf(primarySupertype)
     }
 
-    class StructDef(val loc: Loc, override val name: String,
+    class StructDef(val loc: Loc, name: String,
                    override val generics: List<TypeDef>,
                    override val fields: List<FieldDef>,
                    override val methods: List<MethodDef>,
                    override val typeHead: ResolvedTypeDef
     ): TypeDef(), FromTypeHead {
+        override val name: String = "snuggle/" + loc.fileName + "/" + name
         override val runtimeName: String get() = name
         override val descriptor: List<String> = fields.filter { !it.static }.flatMap { it.type.descriptor }
         override val stackSlots: Int get() = fields.filter { !it.static }.sumOf { it.type.stackSlots }

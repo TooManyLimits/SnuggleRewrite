@@ -3,6 +3,7 @@ package snuggle.toomanylimits.representation.passes.typing
 import snuggle.toomanylimits.builtins.*
 import snuggle.toomanylimits.builtins.helpers.Fraction
 import snuggle.toomanylimits.builtins.primitive.*
+import snuggle.toomanylimits.builtins.reflected.SnuggleString
 import snuggle.toomanylimits.errors.CompilationException
 import snuggle.toomanylimits.errors.ParsingException
 import snuggle.toomanylimits.errors.TypeCheckingException
@@ -507,7 +508,7 @@ fun inferExpr(expr: ResolvedExpr, scope: ConsMap<String, VariableBinding>, typeC
                 }
                 is Float -> getBasicBuiltin(F32Type, typeCache)
                 is Double -> getBasicBuiltin(F64Type, typeCache)
-                is String -> getBasicBuiltin(StringType, typeCache)
+                is String -> getReflectedBuiltin(SnuggleString::class.java, typeCache)
                 is Char -> getBasicBuiltin(CharType, typeCache)
                 else -> throw IllegalStateException("Unrecognized literal type: ${expr.value.javaClass.name}")
             }

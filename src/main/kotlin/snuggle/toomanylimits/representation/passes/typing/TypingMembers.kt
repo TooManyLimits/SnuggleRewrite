@@ -98,7 +98,7 @@ fun typeMethod(owningType: TypeDef, allMethodDefs: List<ResolvedMethodDef>, meth
         // If this is a class and the name is "new", make runtime name be "<init>" instead.
         // TODO: Still need to disambiguate jvm constructor methods
         (owningType.unwrap() is TypeDef.ClassDef) && methodDef.name == "new" -> "<init>"
-        // Second version: Incorporate a "signature" into the runtime name
+        // Incorporate a "signature" into the runtime name
         else -> {
             val paramTypeStr = methodDef.params.joinToString(separator = "-") { getSignature(getResolvedType(it)) }
             val returnTypeStr = getSignature(methodDef.returnType)

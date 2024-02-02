@@ -5,6 +5,7 @@ import snuggle.toomanylimits.builtins.primitive.*
 import snuggle.toomanylimits.builtins.reflected.PrintType
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.util.TraceClassVisitor
+import snuggle.toomanylimits.builtins.reflected.SnuggleString
 import snuggle.toomanylimits.reflection.ReflectedBuiltinType
 import snuggle.toomanylimits.representation.asts.parsed.ParsedAST
 import snuggle.toomanylimits.representation.passes.lexing.Lexer
@@ -14,12 +15,11 @@ import snuggle.toomanylimits.representation.passes.output.CompiledProgram
 import snuggle.toomanylimits.representation.passes.output.getRuntimeClassName
 import snuggle.toomanylimits.representation.passes.output.getStaticObjectName
 import snuggle.toomanylimits.representation.passes.output.output
+import snuggle.toomanylimits.representation.passes.parsing.parseFile
 import snuggle.toomanylimits.representation.passes.parsing.parseFileLazy
 import snuggle.toomanylimits.representation.passes.typing.typeAST
 import snuggle.toomanylimits.representation.passes.verify_generics.verify
-import snuggle.toomanylimits.util.Cons
-import snuggle.toomanylimits.util.ConsList
-import snuggle.toomanylimits.util.append
+import snuggle.toomanylimits.util.*
 import java.io.PrintWriter
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -70,6 +70,7 @@ class SnuggleInstance(compiledProgram: CompiledProgram, staticInstances: ConsLis
 }
 
 class InstanceBuilder(userFiles: Map<String, String>) {
+    private val stdlibFiles: Map<String, Lazy<String>> = getAllStdlibFiles()
     private val userFiles = mutableMapOf<String, String>().also { it.putAll(userFiles) } // Make mutable
     private var reflectedClasses: ConsList<Class<*>> = ConsList.of()
     private var reflectedObjects: ConsList<Any> = ConsList.of()
@@ -94,14 +95,25 @@ class InstanceBuilder(userFiles: Map<String, String>) {
             .append(staticObjects) // Add the static objects to the set of builtins
             .append(otherBuiltins)
             .append(ConsList.of( // Default reflected classes
+                SnuggleString::class.java,
                 PrintType::class.java
             ).map { ReflectedBuiltinType(it, null) })
             .append(ConsList.of(
                 BoolType, *INT_TYPES, *FLOAT_TYPES, CharType, // Primitive
                 IntLiteralType, FloatLiteralType, // Compile time literals
-                ObjectType, StringType, OptionType, ArrayType, // Essential objects
+                ObjectType, OptionType, ArrayType, // Essential objects
                 MaybeUninitType, // Helpers
             ))
+
+        // Check if the user has any files that start with "std/". This is disallowed
+        // because of potential weirdness with somehow breaking the standard library
+        userFiles.keys.forEach {
+            if (it.startsWith("std/"))
+                throw IllegalArgumentException("User files are not permitted to start with \"std/\". File was \"$it\"")
+        }
+        if (userFiles.keys.intersect(stdlibFiles.keys).isNotEmpty())
+            throw IllegalStateException("This should never happen, bug in compiler, please report")
+
         return SnuggleInstance(
             output(
                 lower(
@@ -110,6 +122,8 @@ class InstanceBuilder(userFiles: Map<String, String>) {
                             ParsedAST(
                                 userFiles.mapValues {
                                     parseFileLazy(Lexer(it.key, it.value))
+                                } + stdlibFiles.mapValues { (k, v) ->
+                                    v.map { parseFile(Lexer(k, it)) }
                                 }
                             ),
                             builtins

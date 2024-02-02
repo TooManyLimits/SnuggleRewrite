@@ -583,6 +583,11 @@ private fun handleCast(forced: Boolean, from: TypeDef, to: TypeDef): Sequence<In
                         U16Type, CharType -> bytecode { it.visitInsn(Opcodes.L2I); bitmask(it, 0xFFFF) }
                         I32Type, U32Type -> bytecode { it.visitInsn(Opcodes.L2I); }
                         I64Type, U64Type -> sequenceOf()
+                        // double dValue = (double) (value & 0x7fffffffffffffffL);
+                        // if (value < 0) {
+                        //     dValue += 0x1.0p63;
+                        // }
+                        // From https://stackoverflow.com/questions/24193788/convert-unsigned-64-bit-decimal-to-java-double
                         F32Type -> bytecode {
                             // start: [long]
                             it.visitInsn(Opcodes.DUP2) // [long, long]

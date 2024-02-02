@@ -8,7 +8,7 @@ import snuggle.toomanylimits.reflection.annotations.SnuggleStatic;
 @SnuggleStatic
 public class ExtraPrinter {
 
-    private String extra;
+    private final String extra;
 
     public ExtraPrinter(String extraMessage) {
         this.extra = extraMessage;

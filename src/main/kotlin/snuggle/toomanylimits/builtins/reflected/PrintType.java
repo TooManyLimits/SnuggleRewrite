@@ -11,10 +11,11 @@ import snuggle.toomanylimits.reflection.annotations.Unsigned;
 @SnuggleRename("print")
 public class PrintType {
 
-    @SnuggleDeny private PrintType() {}
+    private PrintType() {}
 
     public static void invoke(Object arg) { System.out.println(arg); }
 
+    public static void invoke(boolean arg) { System.out.println(arg); }
     public static void invoke(char arg) { System.out.println(arg); }
 
     public static void invoke(float arg) { System.out.println(arg); }

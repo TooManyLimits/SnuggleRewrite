@@ -1,0 +1,24 @@
+
+// Implement function currying for functions from 2 up to 8 args.
+
+pub impl <A, B, R> (A, B) -> R {
+  fn invoke(x: A): B -> R fn(b) this(x, b)
+}
+pub impl <A, B, C, R> (A, B, C) -> R {
+  fn invoke(x: A): (B, C) -> R fn(b, c) this(x, b, c)
+}
+pub impl <A, B, C, D, R> (A, B, C, D) -> R {
+  fn invoke(x: A): (B, C, D) -> R fn(b, c, d) this(x, b, c, d)
+}
+pub impl <A, B, C, D, E, R> (A, B, C, D, E) -> R {
+  fn invoke(x: A): (B, C, D, E) -> R fn(b, c, d, e) this(x, b, c, d, e)
+}
+pub impl <A, B, C, D, E, F, R> (A, B, C, D, E, F) -> R {
+  fn invoke(x: A): (B, C, D, E, F) -> R fn(b, c, d, e, f) this(x, b, c, d, e, f)
+}
+pub impl <A, B, C, D, E, F, G, R> (A, B, C, D, E, F, G) -> R {
+  fn invoke(x: A): (B, C, D, E, F, G) -> R fn(b, c, d, e, f, g) this(x, b, c, d, e, f, g)
+}
+pub impl <A, B, C, D, E, F, G, H, R> (A, B, C, D, E, F, G, H) -> R {
+  fn invoke(x: A): (B, C, D, E, F, G, H) -> R fn(b, c, d, e, f, g, h) this(x, b, c, d, e, f, g, h)
+}

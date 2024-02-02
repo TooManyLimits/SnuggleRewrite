@@ -1,13 +1,10 @@
 package snuggle.toomanylimits.builtins
 
-import snuggle.toomanylimits.builtins.primitive.BoolType
-import snuggle.toomanylimits.builtins.primitive.FloatType
-import snuggle.toomanylimits.builtins.primitive.IntType
-import snuggle.toomanylimits.builtins.primitive.U32Type
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
+import snuggle.toomanylimits.builtins.primitive.*
 import snuggle.toomanylimits.representation.asts.typed.FieldDef
 import snuggle.toomanylimits.representation.asts.typed.MethodDef
 import snuggle.toomanylimits.representation.asts.typed.TypeDef
@@ -241,6 +238,7 @@ object ArrayType: BuiltinType {
 
 private data class ArrayOpcodes(val isReferenceType: Boolean, val newArg: Int, val storeInArray: Int, val loadFromArray: Int, val storeInLocal: Int, val loadFromLocal: Int)
 private fun getOpcodesFor(innerType: TypeDef): ArrayOpcodes = when {
+    innerType.builtin == CharType -> ArrayOpcodes(false, Opcodes.T_CHAR, Opcodes.CASTORE, Opcodes.CALOAD, Opcodes.ISTORE, Opcodes.ILOAD)
     innerType.builtin is IntType -> when ((innerType.builtin as IntType).bits) {
         8 -> ArrayOpcodes(false, Opcodes.T_BYTE, Opcodes.BASTORE, Opcodes.BALOAD, Opcodes.ISTORE, Opcodes.ILOAD)
         16 -> ArrayOpcodes(false, Opcodes.T_SHORT, Opcodes.SASTORE, Opcodes.SALOAD, Opcodes.ISTORE, Opcodes.ILOAD)

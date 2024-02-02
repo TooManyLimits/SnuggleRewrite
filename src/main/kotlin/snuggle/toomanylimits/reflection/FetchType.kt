@@ -59,7 +59,7 @@ fun fetchType(type: AnnotatedType, typeCache: TypingCache): TypeDef {
         "char" -> getBasicBuiltin(CharType, typeCache)
         "void" -> getUnit(typeCache)
         // Builtin classes
-        "java.lang.String" -> getBasicBuiltin(StringType, typeCache)
+        "java.lang.String" -> throw IllegalArgumentException("Cannot use String as parameter or return in reflected method - use SnuggleString instead!")
         "java.lang.Object" -> getBasicBuiltin(ObjectType, typeCache)
         // Default, assume another reflected class
         else -> getReflectedBuiltin(c, typeCache)

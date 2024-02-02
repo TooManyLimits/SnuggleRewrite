@@ -1,9 +1,8 @@
 package snuggle.toomanylimits.representation.passes.typing
 
-import snuggle.toomanylimits.builtins.StringType
 import snuggle.toomanylimits.builtins.helpers.Fraction
 import snuggle.toomanylimits.builtins.primitive.*
-import snuggle.toomanylimits.errors.CompilationException
+import snuggle.toomanylimits.builtins.reflected.SnuggleString
 import snuggle.toomanylimits.errors.TypeCheckingException
 import snuggle.toomanylimits.representation.asts.resolved.ResolvedFalliblePattern
 import snuggle.toomanylimits.representation.asts.resolved.ResolvedInfalliblePattern
@@ -117,8 +116,8 @@ fun checkFalliblePattern(pattern: ResolvedFalliblePattern, scrutineeType: TypeDe
                 TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(BoolType, typeCache))
             }
             is String -> {
-                if (scrutineeType.builtin != StringType) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(StringType, typeCache).name}", pattern.loc)
-                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getBasicBuiltin(StringType, typeCache))
+                if (scrutineeType.actualType != SnuggleString::class.java) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getReflectedBuiltin(SnuggleString::class.java, typeCache).name}", pattern.loc)
+                TypedFalliblePattern.LiteralPattern(pattern.loc, pattern.value, getReflectedBuiltin(SnuggleString::class.java, typeCache))
             }
             is Char -> {
                 if (scrutineeType.builtin != CharType) throw TypeCheckingException("Scrutinee is of type ${scrutineeType.name}, but literal pattern is of type ${getBasicBuiltin(CharType, typeCache).name}", pattern.loc)

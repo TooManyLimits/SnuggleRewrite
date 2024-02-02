@@ -51,7 +51,7 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
     override fun stackSlots(generics: List<TypeDef>, typeCache: TypingCache): Int = 1
     override fun isPlural(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false
     override fun isReferenceType(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true
-    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = false //TODO Configurable
+    override fun hasStaticConstructor(generics: List<TypeDef>, typeCache: TypingCache): Boolean = true //TODO Configurable
     override fun getPrimarySupertype(generics: List<TypeDef>, typeCache: TypingCache): TypeDef
         = fetchType(reflectedClass.annotatedSuperclass, typeCache)
 
@@ -69,7 +69,7 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
                 Modifier.isPublic(it.modifiers),
                 Modifier.isStatic(it.modifiers),
                 !Modifier.isFinal(it.modifiers),
-                it.annotationOrElse(SnuggleRename::class, it.name) { it.value },
+                it.name,
                 null,
                 fetchType(it.annotatedType, typeCache)
             )
@@ -80,8 +80,6 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
         val thisType = getReflectedBuiltin(reflectedClass, typeCache)
         return reflectedClass.declaredMethods.mapNotNull {
             reflectMethod(it, thisType, typeCache)
-        } + reflectedClass.declaredConstructors.mapNotNull {
-            null // TODO Constructors
         }
     }
 
@@ -114,7 +112,7 @@ class ReflectedBuiltinType(val reflectedClass: Class<*>, private val objectIndex
                 val opcode = if (isStatic) Opcodes.INVOKESTATIC else Opcodes.INVOKEVIRTUAL
                 val owner = owningType.runtimeName
                 val descriptor = Type.getMethodDescriptor(method)
-                writer.visitMethodInsn(opcode, owner, name, descriptor, false)
+                writer.visitMethodInsn(opcode, owner, method.name, descriptor, false)
             },
             desiredReceiverFields = null
         )

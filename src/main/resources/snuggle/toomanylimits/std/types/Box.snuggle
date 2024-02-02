@@ -1,0 +1,13 @@
+
+// A container for interior mutability. Commonly used
+// as something for closures to capture and mutate.
+
+pub class Box<T> {
+    mut v: T
+    pub fn new(v: T) {
+        super()
+        this.v = v
+    }
+    pub fn get(): T v
+    pub fn set(e: T) v = e
+}

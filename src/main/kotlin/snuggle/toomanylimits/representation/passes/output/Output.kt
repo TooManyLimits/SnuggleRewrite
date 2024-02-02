@@ -7,6 +7,7 @@ import snuggle.toomanylimits.representation.asts.ir.Program
 import snuggle.toomanylimits.representation.asts.typed.MethodDef
 import snuggle.toomanylimits.representation.asts.typed.TypeDef
 import snuggle.toomanylimits.util.ConsList
+import snuggle.toomanylimits.util.mangleSlashes
 
 class CompiledProgram(
     val classes: Map<String, ByteArray>,
@@ -46,8 +47,8 @@ fun ClassVisitor.toByteArray(): ByteArray {
 fun getRuntimeClassName() = "Runtime"
 fun getStaticObjectName(index: Int) = "#STATIC_OBJECT#$index"
 fun getImporterClassName() = "Importer"
-fun getImporterFieldName(fileName: String) = "hasImported_$fileName"
-fun getImporterMethodName(fileName: String) = "runFile_$fileName"
+fun getImporterFieldName(fileName: String) = mangleSlashes("hasImported_$fileName")
+fun getImporterMethodName(fileName: String) = mangleSlashes("runFile_$fileName")
 
 // Helper to get method descriptor
 fun getMethodDescriptor(methodDef: MethodDef): String {

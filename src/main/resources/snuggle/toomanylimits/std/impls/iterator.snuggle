@@ -1,0 +1,141 @@
+import "std/types/Inc"
+import "std/types/Box"
+
+// This file provides implementations for iterators, which are the type "() -> T?" in Snuggle.
+
+pub impl<T> () -> T? {
+
+    // Implement the overload ".iter()", which allows an iterator to be used in a for loop.
+    fn iter(): () -> T? { this }
+
+    // Converts this iterator into one which additionally yields a u32, the index of
+    // the current element.
+    fn indexed(): () -> (u32, T)? {
+        // Create an internally mutable counter, so the closure can capture and mutate it.
+        let inc = new Inc<u32>()
+        // Return a new closure.
+        fn() {
+            let inner: T? = this() // Call the wrapped iterator to get the value T to wrap.
+            if inner {
+                // If there was an inner value, return a full option of a tuple.
+                new((inc(), *inner))
+            } else new() // Otherwise, return an empty option.
+        }
+    }
+
+    // Convert each element of this iterator into a new value.
+    fn map<R>(func: T -> R): () -> R? {
+        fn() {
+            // Call the original first:
+            let firstValue = this()
+            // If it returned something, unwrap it, apply func, wrap again, and return.
+            if firstValue return new(func(*firstValue))
+            // Otherwise, return an empty option.
+            return new()
+        }
+    }
+
+    // Only return the elements of this iterator where the given predicate is true.
+    fn filter(pred: T -> bool): () -> T? {
+        fn() {
+            // Look through elements, return one that matches
+            for e in this {
+                if pred(e) return new(e)
+            }
+            // If none was found, return empty
+            new()
+        }
+    }
+
+    // Map from T to R, removing anything where the given func results in an empty option.
+    fn filterMap<R>(func: T -> R?): () -> R? {
+        fn() {
+            // Look through elements, return mapped one that matches
+            for e in this {
+                let mapped = func(e)
+                if mapped return mapped
+            }
+            // If none was found, return empty
+            return new()
+        }
+    }
+
+    // Only return the first `count` elements of this iterator, if it has that many.
+    fn take(count: u32): () -> T? {
+        // Keep an incrementing counter:
+        let i: Inc<u32> = new()
+        fn() {
+            // If we've reached the cap, immediately return empty.
+            if *i >= count return new()
+            // Otherwise, increment i and defer to the original.
+            i()
+            return this()
+        }
+    }
+
+    // Returns an iterator which skips the next `count` elements of the iterator.
+    fn skip(count: u32): () -> T? {
+        let i: Inc<u32> = new()
+        fn() {
+            while *i < count {
+                this() // Call this to take away an element
+                i() // Increment the count
+            }
+            return this() // Delegate to this at the end, after having removed count elements.
+        }
+    }
+
+    // Get the last element of the iterator, if it has any elements.
+    // If the iterator has no more elements, returns empty.
+    fn last(): T? {
+        let mut last: T? = new()
+        let mut next: T? = this()
+        // Iterate until there are no more remaining elements.
+        while next {
+            last = next
+            next = this()
+        }
+        // Return last, which holds the last element in the iterator.
+        return last
+    }
+
+    // Concatenate two iterators together. Operator overload for +.
+    fn add(other: () -> T?): () -> T? {
+        // Create a closure:
+        fn() {
+            // Call this, to see if the first iterator returns a value.
+            let firstValue = this()
+            // If it did, then return said value.
+            if firstValue return firstValue
+            // Call other iterator, to see if it returns a value.
+            let secondValue = other()
+            // Again, if it did, return it.
+            if secondValue return secondValue
+            // Otherwise, return an empty option.
+            return new()
+        }
+    }
+
+    // Concatenate this iterator with 1 more element. Operator overload for +.
+    fn add(other: T): () -> T? {
+        // Store in a box whether other has been returned yet.
+        let returnedOther: Box<bool> = new(false)
+        // Create a closure:
+        fn() {
+            // Call this, to see if the iterator returns a value.
+            let firstValue = this()
+            // If it did, then return said value.
+            if firstValue return firstValue
+            // If we haven't returned other yet, then do so.
+            if !*returnedOther {
+                *returnedOther = true
+                return new(other) // Wrapped in an Option
+            }
+            // Otherwise, return an empty option.
+            return new()
+        }
+    }
+
+
+
+}

@@ -13,7 +13,7 @@ import snuggle.toomanylimits.representation.asts.typed.TypeDef
  * Pop an object of the given type from the top of the stack
  */
 fun popType(type: TypeDef, writer: MethodVisitor): Unit = when {
-    type.isPlural -> type.nonStaticFields.forEach { popType(it.type, writer) }
+    type.isPlural -> type.nonStaticFields.asReversed().forEach { popType(it.type, writer) }
     type.stackSlots == 2 -> writer.visitInsn(Opcodes.POP2)
     type.stackSlots == 1 -> writer.visitInsn(Opcodes.POP)
     else -> throw IllegalStateException("Types should always be 1, 2, or plural slots")

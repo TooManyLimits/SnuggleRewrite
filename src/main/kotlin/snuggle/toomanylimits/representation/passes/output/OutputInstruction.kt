@@ -1,5 +1,7 @@
 package snuggle.toomanylimits.representation.passes.output
 
+import org.objectweb.asm.ConstantDynamic
+import org.objectweb.asm.Handle
 import snuggle.toomanylimits.builtins.*
 import snuggle.toomanylimits.builtins.helpers.Fraction
 import snuggle.toomanylimits.builtins.helpers.basicLocal
@@ -9,9 +11,11 @@ import snuggle.toomanylimits.builtins.primitive.*
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
+import org.objectweb.asm.Type
+import snuggle.toomanylimits.builtins.reflected.SnuggleString
 import snuggle.toomanylimits.representation.asts.ir.Instruction
+import java.lang.invoke.MethodHandles
 import java.math.BigInteger
-import java.lang.String
 
 fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (inst) {
 
@@ -58,9 +62,15 @@ fun outputInstruction(inst: Instruction, writer: MethodVisitor): Unit = when (in
     is Instruction.TestEquality -> when(inst.type.builtin) {
         is IntType -> (inst.type.builtin as IntType).bytecodeCompareInt(Opcodes.IFEQ)(writer)
         is FloatType -> (inst.type.builtin as FloatType).bytecodeCompareFloat(Opcodes.IFNE)(writer) // Yes, it is supposed to be NE here. The code is scuffed
-        StringType -> writer.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false)
+//        StringType -> writer.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false)
         BoolType -> I32Type.bytecodeCompareInt(Opcodes.IFEQ)(writer)
-        else -> throw IllegalStateException("Unrecognized literal builtin: ${inst.type.name}")
+        else -> {
+            if (inst.type.actualType == SnuggleString::class.java) {
+                // These are strings, compare them
+                writer.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(SnuggleString::class.java), "equals", "(Ljava/lang/Object;)Z", false)
+            }
+            throw IllegalStateException("Unrecognized literal builtin: ${inst.type.name}")
+        }
     }
     // Perform an instanceof on the top stack element, turning it into a bool. Assumed to be ref type.
     is Instruction.InstanceOf -> writer.visitTypeInsn(Opcodes.INSTANCEOF, inst.type.runtimeName)
@@ -182,7 +192,20 @@ private fun outputPush(inst: Instruction.Push, writer: MethodVisitor) {
             else -> writer.visitLdcInsn(value)
         }
 
-        is String -> writer.visitLdcInsn(value)
+        is String -> {
+            val internalName = Type.getInternalName(SnuggleString::class.java)
+            val constantDesc = Type.getDescriptor(SnuggleString::class.java)
+            val methodDesc = Type.getMethodDescriptor(
+                Type.getType(SnuggleString::class.java),
+                Type.getType(MethodHandles.Lookup::class.java),
+                Type.getType(String::class.java),
+                Type.getType(Class::class.java),
+                Type.getType(String::class.java)
+            )
+            val handle = Handle(Opcodes.H_INVOKESTATIC, internalName, "bootstrapGenerator", methodDesc, false)
+            val constantDynamic = ConstantDynamic("blah", constantDesc, handle, value)
+            writer.visitLdcInsn(constantDynamic)
+        }
 
         else -> throw IllegalStateException("Unrecognized literal class: ${inst.valueToPush.javaClass.name}")
     }
