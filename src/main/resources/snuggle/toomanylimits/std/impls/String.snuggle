@@ -3,6 +3,9 @@ import "std/impls/iterator"
 
 pub impl String {
 
+    // .string() method. Just returns itself.
+    fn string(): String this
+
     // Overload the # operator .size() to get the length
     // of the string in chars.
     fn size(): u32 this.length
@@ -22,13 +25,15 @@ pub impl String {
         return true
     }
 
-    // Concatenate the two strings together into a new one
-    fn add(other: String): String {
-        let chars = new char[](#this + #other)
+    // Concatenate this string and the other object into a new string.
+    // The other object is required to have a `.string()` method.
+    fn add<T>(other: T): String {
+        let otherString: String = other.string()
+        let chars = new char[](#this + #otherString)
         for (i, c) in this.chars().indexed() {
             chars[i] = c
         }
-        for (i, c) in other.chars().indexed() {
+        for (i, c) in otherString.chars().indexed() {
             chars[#this + i] = c
         }
         new(chars, 0, #chars)

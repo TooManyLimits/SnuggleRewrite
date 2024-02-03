@@ -134,7 +134,7 @@ private fun getApplicableMethods(
                 method = method.getSpecialization(genericArguments)
             } else {
                 // Call site did not specify explicit args, so we'll try to infer
-                TODO() // Type inference for generic args
+                TODO("Cannot call method \"${methodName}\" like this since generic inference not yet implemented") // Type inference for generic args
             }
         }
 

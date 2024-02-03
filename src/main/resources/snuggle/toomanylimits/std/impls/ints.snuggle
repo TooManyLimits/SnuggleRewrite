@@ -1,0 +1,28 @@
+
+pub impl u32 {
+    // Convert the number to a string.
+    fn string(): String {
+        let len = this.stringlen()
+        let chars = new char[](len)
+        let mut i = 0
+        let mut cur = this
+        while i < len {
+            chars[len - i - 1] = cur % 10
+            cur = cur / 10
+        }
+        new String(chars, 0, len)
+    }
+
+    fn stringlen(): u32 {
+        // Special case, return 1 for 0
+        if this == 0 return 1
+        // Repeatedly divide by 10 until we hit 0
+        let mut cur = this
+        let mut count = 0
+        while cur != 0 {
+            count = count + 1
+            cur = cur / 10
+        }
+        count
+    }
+}

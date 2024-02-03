@@ -53,6 +53,7 @@ private fun parseBinary(lexer: Lexer, typeGenerics: List<String>, methodGenerics
             TokenType.MINUS -> "sub"
             TokenType.STAR -> "mul"
             TokenType.SLASH -> "div"
+            TokenType.PERCENT -> "rem"
             TokenType.GREATER -> "gt"
             TokenType.LESS -> "lt"
             TokenType.GREATER_EQUAL -> "ge"
@@ -300,7 +301,7 @@ private val TOKS_BY_PRECEDENCE: Array<Array<TokenType>> = arrayOf(
     arrayOf(TokenType.EQUALS, TokenType.NOT_EQUALS),
     arrayOf(TokenType.GREATER, TokenType.LESS, TokenType.GREATER_EQUAL, TokenType.LESS_EQUAL),
     arrayOf(TokenType.PLUS, TokenType.MINUS),
-    arrayOf(TokenType.STAR, TokenType.SLASH)
+    arrayOf(TokenType.STAR, TokenType.SLASH, TokenType.PERCENT)
 )
 
 private fun isRightAssociative(op: TokenType): Boolean {

@@ -105,6 +105,7 @@ fun tokenOf(loc: Loc, string: String): Token? {
         "-" -> TokenType.MINUS
         "*" -> TokenType.STAR
         "/" -> TokenType.SLASH
+        "%" -> TokenType.PERCENT
 
         "==" -> TokenType.EQUALS
         "!=" -> TokenType.NOT_EQUALS
@@ -230,6 +231,7 @@ enum class TokenType {
     MINUS,
     STAR,
     SLASH,
+    PERCENT,
 
     // Comparison
     EQUALS,

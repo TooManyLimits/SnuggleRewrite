@@ -1,0 +1,84 @@
+
+import "std/types/Inc"
+import "std/impls/String"
+import "std/impls/ints"
+
+// A simple growing-array implementation of a list!
+
+pub class List<T> {
+
+    // Backing array, using MaybeUninit.
+    // This is because we can't initialize an empty Object[], because
+    // what would we fill the slots with by default?
+    mut backing: MaybeUninit<T>[]
+    // The current number of elements in the list.
+    mut size: u32
+
+    // Overload for #. Get the number of elements in the list.
+    pub fn size(): u32 size
+
+    // Get the size of the backing array of the list.
+    pub fn backingSize(): u32 #backing
+
+    // Default constructor. Constructs the list with a default backing array
+    // size of 5.
+    pub fn new() {
+        super()
+        backing = new(5)
+    }
+
+    // Construct the list with the given backing array size.
+    pub fn new(startingSize: u32) {
+        super()
+        backing = new(startingSize)
+    }
+
+    // Append the given element to the end of the list, growing
+    // it if necessary.
+    pub fn push(elem: T) {
+        // If we're full, grow the array
+        if size == #backing this.growAtLeast(size * 2 + 1)
+        // Append the given element as the last one
+        backing[size] = new(elem) // Don't forget to wrap in MaybeUninit<T>
+        // And increment the size.
+        size = size + 1
+    }
+
+    // Get the nth element of this list.
+    // Errors if the index is out of bounds.
+    pub fn get(index: u32): T {
+        if index > size
+            error("List index out of bounds: list is size ".add::<u32>(size).add::<String>(", but index was ").add::<u32>(index));
+        *(backing[index])
+    }
+
+    // Implement an iterator for lists, so they're usable
+    // in a for loop.
+    pub fn iter(): () -> T? {
+        // Create an incrementor
+        let i = new Inc<u32>()
+        // Return the lambda
+        fn() {
+            // If i is in the range, get the ith element and increment it
+            // Otherwise, return an empty option.
+            if *i < size
+                new(this[i()])
+            else new()
+        }
+    }
+
+
+    // Internal helper function. Grows the backing array to the given size.
+    fn growAtLeast(desiredSize: u32) {
+        let newBacking: MaybeUninit<T>[] = new(desiredSize)
+        let mut i = 0u32
+        while (i < size) {
+            newBacking[i] = backing[i]
+            i = i + 1
+        }
+        backing = newBacking
+    }
+
+}
+
+

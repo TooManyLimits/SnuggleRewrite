@@ -5,6 +5,7 @@ import snuggle.toomanylimits.builtins.primitive.*
 import snuggle.toomanylimits.builtins.reflected.PrintType
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.util.TraceClassVisitor
+import snuggle.toomanylimits.builtins.reflected.ErrorType
 import snuggle.toomanylimits.builtins.reflected.SnuggleString
 import snuggle.toomanylimits.reflection.ReflectedBuiltinType
 import snuggle.toomanylimits.representation.asts.parsed.ParsedAST
@@ -96,7 +97,8 @@ class InstanceBuilder(userFiles: Map<String, String>) {
             .append(otherBuiltins)
             .append(ConsList.of( // Default reflected classes
                 SnuggleString::class.java,
-                PrintType::class.java
+                PrintType::class.java,
+                ErrorType::class.java,
             ).map { ReflectedBuiltinType(it, null) })
             .append(ConsList.of(
                 BoolType, *INT_TYPES, *FLOAT_TYPES, CharType, // Primitive
